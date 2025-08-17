@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/son-of-mervan/static/css/main.f855e6bc.css",
-    "main.js": "/son-of-mervan/static/js/main.0fde3b6a.js",
+    "main.js": "/son-of-mervan/static/js/main.eaf1ff42.js",
     "static/js/453.4874a390.chunk.js": "/son-of-mervan/static/js/453.4874a390.chunk.js",
     "index.html": "/son-of-mervan/index.html",
     "main.f855e6bc.css.map": "/son-of-mervan/static/css/main.f855e6bc.css.map",
-    "main.0fde3b6a.js.map": "/son-of-mervan/static/js/main.0fde3b6a.js.map",
+    "main.eaf1ff42.js.map": "/son-of-mervan/static/js/main.eaf1ff42.js.map",
     "453.4874a390.chunk.js.map": "/son-of-mervan/static/js/453.4874a390.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.f855e6bc.css",
-    "static/js/main.0fde3b6a.js"
+    "static/js/main.eaf1ff42.js"
   ]
 }
