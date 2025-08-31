@@ -4,6 +4,7 @@ import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2 } from 'lucide-react
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, Label
 } from "recharts";
+import Toast from "./Toast";
 
 
 const API_BASE_URL = import.meta?.env?.VITE_API_URL || 'https://son-of-mervan-production.up.railway.app';
@@ -27,6 +28,15 @@ const MonthlyTracker = ({ token, onSaved }) => {
     const salaryNum = Number(salaryStr) || 0;
     const saved = Math.max(salaryNum - spent, 0);
     return { salary: salaryNum, spent, saved };
+  };
+
+  const [toast, setToast] = useState({ open: false, type: "success", title: "", message: "" });
+  const showToast = (type, title, message, autoHideMs = 2600) => {
+    setToast({ open: true, type, title, message });
+    if (autoHideMs) {
+      window.clearTimeout(showToast._t);
+      showToast._t = window.setTimeout(() => setToast((t) => ({ ...t, open: false })), autoHideMs);
+    }
   };
 
   useEffect(() => {
@@ -209,11 +219,11 @@ const MonthlyTracker = ({ token, onSaved }) => {
       } catch {}
 
       if (typeof onSaved === 'function') onSaved();
-      alert('Monthly data saved successfully!');
+      showToast("success", "Saved monthly data", `${selectedMonth} totals are updated.`);
       // We do NOT clear state—values stay for editing.
     } catch (err) {
       console.error('Error saving monthly data:', err);
-      alert('Failed to save monthly data.');
+      showToast("error", "Save failed", "Couldn’t save monthly data. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -398,6 +408,14 @@ const MonthlyTracker = ({ token, onSaved }) => {
           </button>
         </div>
       </div>
+
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+      />
 
       {lastSaved && (
         <div className="bg-white rounded-xl shadow-md border p-6">
