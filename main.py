@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import List, Optional
 from fastapi import Path
 from fastapi import Body
+from fastapi import Query
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -109,15 +110,54 @@ async def login(login_data: LoginRequest):
 @app.post("/calculate-budget")
 async def calculate_budget(
     budget_data: BudgetRequest,
+    commit: bool = Query(False),                 # 👈 NEW: default is read-only
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-     # normalize month
     month_norm = normalize_month(budget_data.month)
 
+    # compute planned totals
     total_planned = sum(e.amount for e in budget_data.expenses)
     remaining_planned = budget_data.monthly_salary - total_planned
 
+    # build category breakdown (for both branches)
+    expenses_by_category = {}
+    for e in budget_data.expenses:
+        expenses_by_category[e.category] = expenses_by_category.get(e.category, 0.0) + e.amount
+
+    expense_percentages = (
+        {cat: round((amt / budget_data.monthly_salary) * 100, 2) for cat, amt in expenses_by_category.items()}
+        if budget_data.monthly_salary > 0 else {}
+    )
+
+    recs = []
+    if remaining_planned < 0:
+        recs.append(f"You're overspending by £{abs(remaining_planned):.2f}! Consider trimming the largest categories.")
+    elif remaining_planned < budget_data.monthly_salary * 0.1:
+        recs.append("Try to save at least 10% of your income for emergencies.")
+    elif remaining_planned < budget_data.monthly_salary * 0.2:
+        recs.append("Good job! Consider increasing your savings rate.")
+    else:
+        recs.append("Excellent! You have a healthy planned surplus.")
+
+    # ---------- READ-ONLY PATH ----------
+    if not commit:
+        return {
+            "id": None,
+            "month": month_norm,
+            "monthly_salary": budget_data.monthly_salary,
+            "total_expenses": total_planned,
+            "remaining_budget": remaining_planned,
+            "expenses_by_category": expenses_by_category,
+            "expense_percentages": expense_percentages,
+            "recommendations": recs,
+            "savings_rate": round((remaining_planned / budget_data.monthly_salary) * 100, 2)
+                if budget_data.monthly_salary else 0,
+            "user": current_user,
+            "committed": False,
+        }
+
+    # ---------- COMMIT (WRITE) PATH ----------
     user = get_or_create_user(db, current_user)
     month_row = get_or_create_month(db, user, month_norm)
 
@@ -128,6 +168,7 @@ async def calculate_budget(
     db.commit()
     db.refresh(month_row)
 
+    # replace planned lines
     db.query(MonthlyExpense).filter(
         MonthlyExpense.monthly_data_id == month_row.id
     ).delete()
@@ -145,27 +186,6 @@ async def calculate_budget(
     ])
     db.commit()
 
-    # 5) category breakdown (planned)
-    expenses_by_category = {}
-    for e in budget_data.expenses:
-        expenses_by_category[e.category] = expenses_by_category.get(e.category, 0.0) + e.amount
-
-    expense_percentages = (
-        {cat: round((amt / budget_data.monthly_salary) * 100, 2) for cat, amt in expenses_by_category.items()}
-        if budget_data.monthly_salary > 0 else {}
-    )
-
-    # 6) simple recommendations (planned)
-    recs = []
-    if remaining_planned < 0:
-        recs.append(f"You're overspending by £{abs(remaining_planned):.2f}! Consider trimming the largest categories.")
-    elif remaining_planned < budget_data.monthly_salary * 0.1:
-        recs.append("Try to save at least 10% of your income for emergencies.")
-    elif remaining_planned < budget_data.monthly_salary * 0.2:
-        recs.append("Good job! Consider increasing your savings rate.")
-    else:
-        recs.append("Excellent! You have a healthy planned surplus.")
-
     return {
         "id": month_row.id,
         "month": month_row.month,
@@ -178,6 +198,7 @@ async def calculate_budget(
         "savings_rate": round((remaining_planned / budget_data.monthly_salary) * 100, 2)
             if budget_data.monthly_salary else 0,
         "user": current_user,
+        "committed": True,
     }
 
 @app.post("/monthly-tracker/{month}")

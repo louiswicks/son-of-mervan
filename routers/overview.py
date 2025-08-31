@@ -76,11 +76,19 @@ def annual_overview(
         key = month_key(year, m)
         row = by_month.get(key)
 
-        planned_salary = float(row.salary_planned or 0.0) if row else 0.0
-        actual_salary = float(row.salary_actual or 0.0) if row else 0.0
-        total_planned = float(row.total_planned or 0.0) if row else 0.0
-        total_actual = float(row.total_actual or 0.0) if row else 0.0
-        remaining_actual = float(row.remaining_actual or (actual_salary - total_actual)) if row else 0.0
+        if row:
+            planned_salary = float(row.salary_planned or 0.0)
+            actual_salary = float(row.salary_actual or 0.0)
+            total_planned = float(row.total_planned or 0.0)
+            total_actual = float(row.total_actual or 0.0)
+            remaining_actual = (
+                float(row.remaining_actual)
+                if row.remaining_actual is not None
+                else actual_salary - total_actual
+            )
+        else:
+            planned_salary = actual_salary = total_planned = total_actual = remaining_actual = 0.0
+
 
         months_out.append(
             {

@@ -52,6 +52,39 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
     }));
   }, [data]);
 
+  const savingsChartData = useMemo(() => {
+    return (data.months || []).map((m, i) => ({
+      name: monthLabels[i],
+      Savings: Number(
+        // prefer the backend-calculated remaining_actual; fallback to actual_salary - total_actual
+        (m.remaining_actual ?? (m.actual_salary || 0) - (m.total_actual || 0)) || 0
+      ),
+    }));
+  }, [data]);
+
+  // ----- above your return(), build a clean savings series -----
+  const savingsTrendData = useMemo(() => {
+    const months = Array.isArray(data?.months) ? data.months : [];
+    return months.map((m, i) => {
+      const actualSalary = Number(m.actual_salary ?? 0);
+      const totalActual  = Number(m.total_actual ?? 0);
+      // clamp negative savings to 0 for the chart
+      const savings = Math.max(0, actualSalary - totalActual);
+      return {
+        name: monthLabels[i] ?? m.month ?? `M${i+1}`,
+        Savings: isFinite(savings) ? savings : 0,
+      };
+    });
+  }, [data]);
+
+  // compute a safe max so the line doesn't sit on the axis
+  const savingsMax = useMemo(() => {
+    const vals = savingsTrendData.map(d => d.Savings);
+    const max = Math.max(0, ...vals);
+    // if all zeros, use a small ceiling so the line is visible above the axis
+    return max > 0 ? Math.ceil(max * 1.1) : 100;
+  }, [savingsTrendData]);
+
   return (
     <div className="space-y-6">
       {/* Header + Year Picker */}
@@ -100,7 +133,7 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
         </div>
         <div className="bg-white border rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Total Remaining (Actual)</span>
+            <span className="text-sm text-gray-500">Total Remaining (Savings)</span>
             <PiggyBank className="text-green-600" />
           </div>
           <div className="text-3xl font-bold mt-2">
@@ -127,17 +160,44 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
         </div>
       </div>
 
+      {/* Trend Chart */}
+      {/* Savings Trend */}
+      <div className="bg-white border rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Savings Trend (Actual)</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={savingsTrendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis
+                domain={[0, savingsMax]}
+                tickFormatter={(v) => `£${v}`}
+                allowDecimals={false}
+              />
+              <Tooltip formatter={(v) => `£${Number(v).toLocaleString()}`} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="Savings"
+                stroke="#ef4444"    // red
+                strokeWidth={3}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Month Table */}
       <div className="bg-white border rounded-xl p-6 shadow-sm overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-100">
             <tr>
               <th className="p-3">Month</th>
-              <th className="p-3">Planned Salary</th>
-              <th className="p-3">Actual Salary</th>
+              <th className="p-3">Salary</th>
               <th className="p-3">Planned Spend</th>
               <th className="p-3">Actual Spend</th>
-              <th className="p-3">Remaining (Actual)</th>
+              <th className="p-3">Remaining (Savings)</th>
               <th className="p-3">Status</th>
             </tr>
           </thead>
@@ -148,7 +208,6 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
                 <tr key={m.month} className="border-t">
                   <td className="p-3 font-medium">{monthLabels[i]}</td>
                   <td className="p-3">£{Number(m.planned_salary || 0).toLocaleString()}</td>
-                  <td className="p-3">£{Number(m.actual_salary || 0).toLocaleString()}</td>
                   <td className="p-3">£{Number(m.total_planned || 0).toLocaleString()}</td>
                   <td className="p-3">£{Number(m.total_actual || 0).toLocaleString()}</td>
                   <td className="p-3">£{Number(m.remaining_actual || 0).toLocaleString()}</td>
@@ -171,7 +230,6 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
             <tr className="border-t bg-gray-50 font-semibold">
               <td className="p-3">Totals</td>
               <td className="p-3">£{Number(data?.totals?.planned_salary || 0).toLocaleString()}</td>
-              <td className="p-3">£{Number(data?.totals?.actual_salary || 0).toLocaleString()}</td>
               <td className="p-3">£{Number(data?.totals?.total_planned || 0).toLocaleString()}</td>
               <td className="p-3">£{Number(data?.totals?.total_actual || 0).toLocaleString()}</td>
               <td className="p-3">£{Number(data?.totals?.remaining_actual || 0).toLocaleString()}</td>

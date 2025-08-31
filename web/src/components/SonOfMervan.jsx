@@ -46,7 +46,7 @@ const SonOfMervan = ({ token, onSaved }) => {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/calculate-budget`, {
+      const response = await fetch(`${API_BASE_URL}/calculate-budget?commit=false`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
