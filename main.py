@@ -403,11 +403,13 @@ async def save_actuals(
 @app.get("/monthly-tracker/{month}")
 async def get_monthly_tracker(
     month: str = Path(..., description="Month in YYYY-MM format"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(25, ge=1, le=100, description="Items per page"),
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
     month_norm = normalize_month(month)
-    encrypted_month = encrypt_value(month_norm)  # ADD THIS
 
     user = get_user_by_email(db, current_user)
     if not user:
@@ -416,6 +418,7 @@ async def get_monthly_tracker(
             "salary_planned": 0.0,
             "salary_actual": 0.0,
             "rows": [],
+            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size},
         }
 
     # Use encrypted column for query
@@ -426,9 +429,10 @@ async def get_monthly_tracker(
             "salary_planned": 0.0,
             "salary_actual": 0.0,
             "rows": [],
+            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size},
         }
 
-    expenses = (
+    all_expenses = (
         db.query(MonthlyExpense)
         .filter(
             MonthlyExpense.monthly_data_id == month_row.id,
@@ -437,19 +441,8 @@ async def get_monthly_tracker(
         .all()
     )
 
-    # Group by category (for backward-compatible `rows` field)
-    sums = defaultdict(lambda: {"projected": 0.0, "actual": 0.0})
-    for e in expenses:
-        sums[e.category]["projected"] += float(e.planned_amount or 0.0)
-        sums[e.category]["actual"]   += float(e.actual_amount or 0.0)
-
-    rows = [
-        {"category": cat, "projected": v["projected"], "actual": v["actual"]}
-        for cat, v in sums.items()
-    ]
-
-    # Individual expense rows with IDs (for CRUD)
-    expense_list = [
+    # Decrypt and optionally filter by category (in Python — fields are Fernet-encrypted)
+    expense_dicts = [
         {
             "id": e.id,
             "name": e.name or "",
@@ -457,15 +450,41 @@ async def get_monthly_tracker(
             "planned_amount": float(e.planned_amount or 0.0),
             "actual_amount": float(e.actual_amount or 0.0),
         }
-        for e in expenses
+        for e in all_expenses
     ]
+
+    if category:
+        expense_dicts = [e for e in expense_dicts if e["category"] == category]
+
+    # Group by category for backward-compatible `rows` field (unfiltered)
+    sums = defaultdict(lambda: {"projected": 0.0, "actual": 0.0})
+    for e in expense_dicts:
+        sums[e["category"]]["projected"] += e["planned_amount"]
+        sums[e["category"]]["actual"]    += e["actual_amount"]
+
+    rows = [
+        {"category": cat, "projected": v["projected"], "actual": v["actual"]}
+        for cat, v in sums.items()
+    ]
+
+    # Paginate
+    total = len(expense_dicts)
+    pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 0
+    offset = (page - 1) * page_size
+    page_items = expense_dicts[offset: offset + page_size]
 
     return {
         "month": month_norm,
         "salary_planned": float(month_row.salary_planned or 0.0),
         "salary_actual": float(month_row.salary_actual or 0.0),
         "rows": rows,
-        "expenses": expense_list,
+        "expenses": {
+            "items": page_items,
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "page_size": page_size,
+        },
     }
 
 def _get_owned_expense(expense_id: int, current_user_email: str, db: Session) -> MonthlyExpense:

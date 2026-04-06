@@ -116,7 +116,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Acceptance Criteria:** User stays logged in for 30 days without action. Logging out invalidates the session on all future requests immediately.  
 **Note:** 401 auto-retry Axios interceptor deferred to Phase 3.1 (centralized API client).
 
-### 2.5 Pagination and Filtering
+### 2.5 Pagination and Filtering [DONE 2026-04-06]
 **Problem:** All expenses are returned in a single API call. Performance degrades and UI becomes unusable with large datasets.  
 **Solution:** Add `?page=1&page_size=25&month=2025-03&category=Food` query params to expense endpoints. Return `{ items, total, page, pages }` envelope. Add DB indexes on `(user_id, date)` and `(user_id, category)`. Frontend: pagination controls and filter bar.  
 **Files:** `routers/tracker.py`, `models.py`, `web/src/components/ExpenseList.jsx`, new `web/src/components/FilterBar.jsx`  

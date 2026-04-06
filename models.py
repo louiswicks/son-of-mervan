@@ -6,6 +6,13 @@ class ExpenseItem(BaseModel):
     amount: float
     category: str
 
+class PaginatedExpenseResponse(BaseModel):
+    items: List["ExpenseResponse"]
+    total: int
+    page: int
+    pages: int
+    page_size: int
+
 class ExpenseUpdateRequest(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None

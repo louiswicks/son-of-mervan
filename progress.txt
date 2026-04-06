@@ -1,3 +1,10 @@
+## Phase 2.5 — Pagination and Filtering [DONE] 2026-04-06
+- Added `PaginatedExpenseResponse` Pydantic schema to models.py: `{ items, total, page, pages, page_size }`
+- Updated `GET /monthly-tracker/{month}` in main.py: added `category` (optional), `page` (default 1), `page_size` (default 25, max 100) query params; decrypts all expenses then filters/paginates in Python (required because fields are Fernet-encrypted); `expenses` field now returns paginated envelope instead of flat array; `rows` field preserved for backward compat
+- Created Alembic migration e5f6a7b8c9d0: composite index `(monthly_data_id, deleted_at)` + standalone index `(deleted_at)` on `monthly_expenses` table
+- Updated `web/src/components/MonthlyTracker.jsx`: added `filterCategory`, `currentPage`, `pagination` state; extracted `buildRowsFromExpenses()` helper; data fetch passes `page`, `page_size`, and optional `category` params; skips localStorage cache when filter is active; added filter bar with category dropdown and "Clear filter" button; added prev/next pagination controls (shown only when pages > 1); page resets to 1 on month or filter change
+- Files changed: models.py, main.py, alembic/versions/e5f6a7b8c9d0_add_expense_indexes.py (new), web/src/components/MonthlyTracker.jsx
+
 ## Phase 2.4 — JWT Refresh Token Mechanism [DONE] 2026-04-06
 - Added `RefreshToken` model to database.py: stores `token_hash` (SHA-256), `user_id`, `expires_at`, `revoked_at`, `created_at`; raw token never persisted
 - Created Alembic migration d4e5f6a7b8c9 to add `refresh_tokens` table with indexes

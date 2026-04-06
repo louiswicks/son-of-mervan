@@ -25,6 +25,10 @@ const MonthlyTracker = ({ token, onSaved }) => {
   const [editDraft, setEditDraft] = useState({});
   // Delete confirm modal state
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, expenseId: null, rowIndex: null });
+  // Filter & pagination state
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 0, page_size: 25 });
 
   const computeSnapshot = (rows, salaryStr) => {
     const spent = rows.reduce((s, r) => s + (Number(r.actual) || 0), 0);
@@ -59,47 +63,71 @@ const MonthlyTracker = ({ token, onSaved }) => {
     setUsername(usernameFromToken(t));
   }, [token]);
 
+  // Helper: build rows from server expense items and merge with base categories
+  const buildRowsFromExpenses = (items) => {
+    const serverRows = items.map(e => ({
+      id: e.id,
+      category: e.category,
+      projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+      actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+      builtin: BASE_CATEGORIES.includes(e.category),
+      name: e.name || '',
+    }));
+
+    // Only add missing builtin placeholders when not filtering by category
+    const presentCategories = new Set(serverRows.map(r => r.category));
+    const missingBuiltins = BASE_CATEGORIES
+      .filter(cat => !presentCategories.has(cat))
+      .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+
+    return [...serverRows, ...missingBuiltins];
+  };
+
   useEffect(() => {
     const load = async () => {
       const hdr = { Authorization: `Bearer ${token || localStorage.getItem('authToken')}` };
-      try {
-        if (!username) return;
-        const raw = localStorage.getItem(storageKey(username, selectedMonth));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed.rows)) setRows(parsed.rows);
-          if (parsed.salary !== undefined && parsed.salary !== null) setSalary(String(parsed.salary));
-          const snap = computeSnapshot(parsed.rows || [], parsed.salary);
-          setLastSaved(snap);
-          return;
-        }
-      } catch {}
+
+      // Skip localStorage cache when a filter is active (cache holds unfiltered data)
+      if (filterCategory === 'All' && currentPage === 1) {
+        try {
+          if (!username) return;
+          const raw = localStorage.getItem(storageKey(username, selectedMonth));
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+            if (parsed.salary !== undefined && parsed.salary !== null) setSalary(String(parsed.salary));
+            const snap = computeSnapshot(parsed.rows || [], parsed.salary);
+            setLastSaved(snap);
+            return;
+          }
+        } catch {}
+      }
 
       try {
+        const params = { _r: Date.now(), page: currentPage, page_size: 25 };
+        if (filterCategory !== 'All') params.category = filterCategory;
+
         const res = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
           headers: hdr,
-          params: { _r: Date.now() },
+          params,
         });
 
-        const { salary_planned, salary_actual, expenses: serverExpenses = [] } = res.data || {};
+        const { salary_planned, salary_actual, expenses: expEnvelope = {} } = res.data || {};
+        const items = expEnvelope.items || [];
+        const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
+        setPagination(pag);
 
-        // Build rows from individual server expenses (each has id, name, category, planned_amount, actual_amount)
-        const serverRows = serverExpenses.map(e => ({
-          id: e.id,
-          category: e.category,
-          projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
-          actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
-          builtin: BASE_CATEGORIES.includes(e.category),
-          name: e.name || '',
-        }));
+        const allRows = filterCategory === 'All'
+          ? buildRowsFromExpenses(items)
+          : items.map(e => ({
+              id: e.id,
+              category: e.category,
+              projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+              actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+              builtin: BASE_CATEGORIES.includes(e.category),
+              name: e.name || '',
+            }));
 
-        // Add empty builtin rows for categories not yet in the server data
-        const presentCategories = new Set(serverRows.map(r => r.category));
-        const missingBuiltins = BASE_CATEGORIES
-          .filter(cat => !presentCategories.has(cat))
-          .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
-
-        const allRows = [...serverRows, ...missingBuiltins];
         setRows(allRows);
 
         const s = (salary_actual ?? salary_planned);
@@ -112,10 +140,10 @@ const MonthlyTracker = ({ token, onSaved }) => {
     };
 
     load();
-    // Cancel any in-progress edit when month changes
+    // Cancel any in-progress edit when month or filter changes
     setEditingIndex(null);
     setEditDraft({});
-  }, [selectedMonth, token, username]);
+  }, [selectedMonth, token, username, filterCategory, currentPage]);
 
   useEffect(() => {
     try {
@@ -269,22 +297,13 @@ const MonthlyTracker = ({ token, onSaved }) => {
       try {
         const refreshed = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
           headers: authHeader(),
-          params: { _r: Date.now() },
+          params: { _r: Date.now(), page: 1, page_size: 25 },
         });
-        const { expenses: serverExpenses = [] } = refreshed.data || {};
-        const serverRows = serverExpenses.map(e => ({
-          id: e.id,
-          category: e.category,
-          projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
-          actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
-          builtin: BASE_CATEGORIES.includes(e.category),
-          name: e.name || '',
-        }));
-        const presentCategories = new Set(serverRows.map(r => r.category));
-        const missingBuiltins = BASE_CATEGORIES
-          .filter(cat => !presentCategories.has(cat))
-          .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
-        setRows([...serverRows, ...missingBuiltins]);
+        const { expenses: expEnvelope = {} } = refreshed.data || {};
+        const items = expEnvelope.items || [];
+        const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
+        setPagination(pag);
+        setRows(buildRowsFromExpenses(items));
       } catch {}
 
       try {
@@ -311,9 +330,35 @@ const MonthlyTracker = ({ token, onSaved }) => {
         <input
           type="month"
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
+          onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); setFilterCategory('All'); }}
           className="border rounded-lg px-3 py-2 text-[16px] text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <label className="text-sm font-medium text-gray-700">Filter by category:</label>
+        <select
+          value={filterCategory}
+          onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
+          className="border rounded-lg px-3 py-2 text-[14px] text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-auto"
+        >
+          <option value="All">All categories</option>
+          {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {filterCategory !== 'All' && (
+          <button
+            onClick={() => { setFilterCategory('All'); setCurrentPage(1); }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Clear filter
+          </button>
+        )}
+        {pagination.total > 0 && (
+          <span className="text-xs text-gray-500 sm:ml-auto">
+            {pagination.total} expense{pagination.total !== 1 ? 's' : ''} found
+          </span>
+        )}
       </div>
 
       {/* Salary input */}
@@ -530,6 +575,29 @@ const MonthlyTracker = ({ token, onSaved }) => {
           </tfoot>
         </table>
       </div>
+
+      {/* Pagination controls */}
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 text-sm">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+          >
+            &larr; Prev
+          </button>
+          <span className="text-gray-600">
+            Page {currentPage} of {pagination.pages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(pagination.pages, p + 1))}
+            disabled={currentPage >= pagination.pages}
+            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+          >
+            Next &rarr;
+          </button>
+        </div>
+      )}
 
       {/* Add row + Save */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
