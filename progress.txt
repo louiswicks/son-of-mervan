@@ -342,3 +342,12 @@
 - Updated `web/src/index.js`: imports `* as Sentry from '@sentry/react'`; conditionally calls `Sentry.init(...)` with `REACT_APP_SENTRY_DSN`, `REACT_APP_ENVIRONMENT`, `REACT_APP_VERSION` build-time env vars and `browserTracingIntegration()`; no-op when DSN env var is absent
 - Test results: 94 backend tests pass unchanged; frontend build clean (281.76 kB gzip, +37 kB from Sentry bundle)
 - Files changed: requirements.txt, core/config.py, core/logging_config.py, main.py, web/package.json, web/src/index.js
+
+## Phase 5.4 — Database Backups [DONE] 2026-04-06
+- Created `scripts/backup.py`: runs `pg_dump` against `DATABASE_URL`, gzip-compresses the output, uploads to Cloudflare R2 (S3-compatible via boto3); writes a daily key `daily/son-of-mervan-YYYY-MM-DD.sql.gz` on every run, and an additional monthly key `monthly/son-of-mervan-YYYY-MM.sql.gz` on the 1st of each month; applies retention (30 daily, 12 monthly) by listing objects under each prefix, sorting by LastModified, and deleting extras; sends a failure alert email via SendGrid to `BACKUP_ALERT_EMAIL` if any step raises (console log fallback when `SENDGRID_API_KEY` is absent)
+- Created `scripts/restore.py`: two subcommands — `list` (prints all backups in R2 grouped by daily/monthly, showing size and timestamp) and `restore <key>` (downloads the object, decompresses, pipes SQL to `psql --single-transaction`); `--dry-run` flag logs what would happen without touching the DB; `--yes` flag skips the interactive "type 'yes'" safety prompt
+- Added `boto3>=1.34.0` to `requirements.txt`
+- Added R2 and backup-alert env vars to `.env.example`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` (default: `son-of-mervan-backups`), `BACKUP_ALERT_EMAIL`
+- Deployment: schedule in Railway with cron expression `0 3 * * *` pointing to `python scripts/backup.py`; both scripts require `pg_dump`/`psql` binaries on PATH (available in the backend Docker image)
+- Test result: 94 backend tests pass unchanged
+- Files changed: scripts/backup.py (new), scripts/restore.py (new), requirements.txt, .env.example

@@ -256,8 +256,9 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Solution:** Sentry `sentry-sdk[fastapi]` on backend; `@sentry/react` on frontend. Both report errors with user context and stack traces. Structured JSON logging via `structlog`. `GET /health` endpoint returning `{ status, db, version }` for Railway health checks.  
 **Acceptance Criteria:** A deliberate 500 error appears in Sentry within 60 seconds. Railway restarts unhealthy instances automatically.
 
-### 5.4 Database Backups
+### 5.4 Database Backups [DONE 2026-04-06]
 **Solution:** Daily `pg_dump` → gzip → upload to Cloudflare R2 (S3-compatible) via `scripts/backup.py`. 30 daily + 12 monthly retention. Railway cron at `0 3 * * *`. `scripts/restore.py` with dry-run flag. Alert email if backup job fails.  
+**Files:** `scripts/backup.py` (new), `scripts/restore.py` (new), `requirements.txt` (boto3), `.env.example` (R2 + alert vars)  
 **Acceptance Criteria:** Backup runs daily without manual intervention. Restore procedure documented and tested monthly.
 
 ### 5.5 Performance Optimisation
