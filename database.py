@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from cryptography.fernet import Fernet
 from sqlalchemy import (
-    Boolean, create_engine, Column, Integer, String, Float, DateTime,
+    Boolean, create_engine, Column, Index, Integer, String, Float, DateTime,
     ForeignKey, Text, Date, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
@@ -56,6 +56,8 @@ else:
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
         connect_args=connect_args,
     )
 
@@ -120,6 +122,9 @@ class MonthlyData(Base):
     One row per user per month. All financial data encrypted.
     """
     __tablename__ = "monthly_data"
+    __table_args__ = (
+        Index("ix_monthly_data_user_id", "user_id"),
+    )
     id = Column(Integer, primary_key=True, index=True)
     
     # ENCRYPTED - month identifier

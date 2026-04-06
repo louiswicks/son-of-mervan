@@ -24,6 +24,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from core.logging_config import setup_logging
 from core.config import settings
 from core.limiter import limiter
+from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
@@ -344,6 +345,7 @@ async def calculate_budget(
 
     db.commit()
     logger.debug("calculate_budget committed all expenses")
+    invalidate_annual_cache(user.id, int(month_norm[:4]))
 
     return {
         "id": month_row.id,
@@ -441,6 +443,7 @@ async def save_actuals(
     db.add(month_row)
     db.commit()
     db.refresh(month_row)
+    invalidate_annual_cache(user.id, int(month_norm[:4]))
 
     expenses_by_category = {}
     for e in refreshed_expenses:
@@ -546,6 +549,13 @@ async def get_monthly_tracker(
         },
     }
 
+def _invalidate_expense_year_cache(db: Session, user_id: int, monthly_data_id: int) -> None:
+    """Look up the month for an expense and invalidate its annual cache entry."""
+    md = db.query(MonthlyData).filter(MonthlyData.id == monthly_data_id).first()
+    if md and md.month:
+        invalidate_annual_cache(user_id, int(md.month[:4]))
+
+
 def _get_owned_expense(expense_id: int, current_user_email: str, db: Session) -> MonthlyExpense:
     """Fetch an expense and verify the current user owns it. Raises 404/403 as appropriate."""
     expense = db.query(MonthlyExpense).filter(MonthlyExpense.id == expense_id).first()
@@ -623,6 +633,7 @@ async def update_expense(
     _write_audit(db, user.id, expense.id, "update", before, after)
     db.commit()
     db.refresh(expense)
+    _invalidate_expense_year_cache(db, user.id, expense.monthly_data_id)
 
     return {
         "id": expense.id,
@@ -646,9 +657,11 @@ async def delete_expense(
 
     before = _expense_snapshot(expense)
     user = get_user_by_email(db, current_user)
+    monthly_data_id = expense.monthly_data_id
     expense.deleted_at = datetime.utcnow()
     _write_audit(db, user.id, expense.id, "delete", before, None)
     db.commit()
+    _invalidate_expense_year_cache(db, user.id, monthly_data_id)
     # 204 No Content — no response body
 
 

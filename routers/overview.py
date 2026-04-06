@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 
 from database import get_db, User, MonthlyData
 from security import verify_token
+from core.cache import annual_cache_key, cache_get, cache_set
 
 router = APIRouter(prefix="/overview", tags=["overview"])
 
@@ -27,6 +28,12 @@ def annual_overview(
     """
     y = year or datetime.utcnow().year
     user = _require_user_by_email(db, current_user)
+
+    # Serve from Redis cache when available (1-hour TTL)
+    cache_key = annual_cache_key(user.id, y)
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     # pull all months for that user+year
     all_months: List[MonthlyData] = (
@@ -93,4 +100,6 @@ def annual_overview(
         totals["total_actual"]     += total_actual
         totals["remaining_actual"] += remaining_actual
 
-    return {"months": months_out, "totals": totals}
+    result = {"months": months_out, "totals": totals}
+    cache_set(cache_key, result, ttl=3600)
+    return result

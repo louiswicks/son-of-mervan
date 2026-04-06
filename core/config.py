@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     # Sentry DSN — leave empty to disable error reporting (safe for local dev)
     SENTRY_DSN: str = ""
+    # Redis URL for caching — leave empty to run without cache (safe for local dev)
+    REDIS_URL: str = ""
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod

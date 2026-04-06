@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from database import get_db, User, MonthlyData, MonthlyExpense
 from security import verify_token
@@ -209,7 +209,13 @@ def spending_trends(
     user = _require_user(db, current_user)
     month_strs = _month_list(months)
 
-    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    # Use selectinload to fetch all expenses in one query, avoiding N+1.
+    all_rows = (
+        db.query(MonthlyData)
+        .filter(MonthlyData.user_id == user.id)
+        .options(selectinload(MonthlyData.expenses))
+        .all()
+    )
     month_map = {row.month: row for row in all_rows}
 
     monthly: list[Dict[str, Any]] = []
@@ -224,14 +230,8 @@ def spending_trends(
             })
             continue
 
-        expenses = (
-            db.query(MonthlyExpense)
-            .filter(
-                MonthlyExpense.monthly_data_id == row.id,
-                MonthlyExpense.deleted_at == None,  # noqa: E711
-            )
-            .all()
-        )
+        # Expenses already loaded via selectinload — no extra DB query.
+        expenses = [e for e in row.expenses if e.deleted_at is None]
         cat_totals: Dict[str, float] = {}
         for e in expenses:
             cat = e.category or "Other"

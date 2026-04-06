@@ -351,3 +351,16 @@
 - Deployment: schedule in Railway with cron expression `0 3 * * *` pointing to `python scripts/backup.py`; both scripts require `pg_dump`/`psql` binaries on PATH (available in the backend Docker image)
 - Test result: 94 backend tests pass unchanged
 - Files changed: scripts/backup.py (new), scripts/restore.py (new), requirements.txt, .env.example
+
+## Phase 5.5 — Performance Optimisation [DONE] 2026-04-06
+- Created `core/cache.py`: Redis-backed cache helpers (`cache_get`, `cache_set`, `cache_delete`, `invalidate_annual_cache`) with lazy client initialisation and graceful degradation — all operations silently no-op when `REDIS_URL` is unset or Redis is unreachable; connection errors logged as warnings, not raised
+- Added `REDIS_URL: str = ""` to `core/config.py`; added `REDIS_URL=redis://localhost:6379/0` to `.env.example` with explanatory comment
+- Added `redis>=5.0.0` to `requirements.txt`
+- Updated `database.py`: PostgreSQL engine now sets `pool_size=10, max_overflow=20` (previously used SQLAlchemy defaults); added `Index("ix_monthly_data_user_id", "user_id")` to `MonthlyData.__table_args__` for fast user-scoped month queries; added `Index` to SQLAlchemy imports
+- Created `alembic/versions/i9j0k1l2m3n4_add_performance_indexes.py`: `upgrade` creates `ix_monthly_data_user_id` on `monthly_data.user_id`; `downgrade` drops it. (Composite index on `(monthly_expenses.monthly_data_id, deleted_at)` was already added in e5f6a7b8c9d0.)
+- Updated `routers/overview.py`: `GET /overview/annual` checks Redis cache first (key `annual:{user_id}:{year}`, TTL 3600s); serves cached result on hit; stores result after computation on miss
+- Updated `main.py`: imported `invalidate_annual_cache`; added `_invalidate_expense_year_cache(db, user_id, monthly_data_id)` helper (looks up `MonthlyData` to extract year); added cache invalidation calls after commits in `POST /calculate-budget` (commit=True path), `POST /monthly-tracker/{month}`, `PUT /expenses/{id}`, and `DELETE /expenses/{id}`
+- Updated `routers/insights.py`: fixed N+1 query pattern in `GET /insights/trends` — replaced per-month `db.query(MonthlyExpense)` loop with a single `selectinload(MonthlyData.expenses)` on the initial `MonthlyData` query; expenses now accessed as `row.expenses` filtered by `deleted_at is None` (eliminates up to 24 extra DB queries for the max lookback window)
+- React Query `staleTime` was already set correctly in prior phases: `useAnnualSummary` = 5 min, `useMonthlyTracker` = 30s — no frontend changes needed
+- Test result: 94 backend tests pass, 7 pre-existing deprecation warnings; ruff 0 errors
+- Files changed: core/cache.py (new), core/config.py, .env.example, requirements.txt, database.py, alembic/versions/i9j0k1l2m3n4_add_performance_indexes.py (new), routers/overview.py, routers/insights.py, main.py
