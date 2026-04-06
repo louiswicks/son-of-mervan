@@ -81,7 +81,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `core/limiter.py`, `routers/signup.py`, `main.py`  
 **Acceptance Criteria:** 6th login attempt within 60 seconds returns 429. Header `Retry-After` is present.
 
-### 1.4 Security Headers & CORS Hardening
+### 1.4 Security Headers & CORS Hardening [DONE 2026-04-06]
 **Problem:** No security headers. CORS may allow wildcard origins.  
 **Solution:** Add `SecurityHeadersMiddleware` setting CSP, HSTS (prod only), `X-Content-Type-Options: nosniff`, `Referrer-Policy`. Replace wildcard CORS origins with an explicit `ALLOWED_ORIGINS` env var.  
 **Files:** new `middleware/security.py`, `main.py`  

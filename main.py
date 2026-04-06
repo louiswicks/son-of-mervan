@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from core.logging_config import setup_logging
 from core.config import settings
 from core.limiter import limiter
+from middleware.security import SecurityHeadersMiddleware
 from database import init_db, get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from routers import tracker, overview, signup
@@ -32,12 +33,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 CORS_ORIGINS = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 
+app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 init_db()
