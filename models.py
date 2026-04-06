@@ -120,3 +120,43 @@ class SavingsGoalResponse(BaseModel):
     status: str          # on_track | behind | ahead | achieved | no_deadline
     required_monthly: Optional[float]   # amount needed per month to hit target
     created_at: datetime
+
+
+# ---------- Budget Alerts ----------
+
+VALID_CATEGORIES = {"Housing", "Transportation", "Food", "Utilities", "Insurance", "Healthcare", "Entertainment", "Other"}
+
+
+class BudgetAlertCreate(BaseModel):
+    category: str
+    threshold_pct: int = 80   # 1–100
+
+
+class BudgetAlertUpdate(BaseModel):
+    category: Optional[str] = None
+    threshold_pct: Optional[int] = None
+    active: Optional[bool] = None
+
+
+class BudgetAlertResponse(BaseModel):
+    id: int
+    category: str
+    threshold_pct: int
+    active: bool
+    created_at: datetime
+
+
+# ---------- Notifications ----------
+
+class NotificationResponse(BaseModel):
+    id: int
+    type: str
+    title: str
+    message: str
+    read_at: Optional[datetime]
+    created_at: datetime
+
+
+class NotificationListResponse(BaseModel):
+    items: List[NotificationResponse]
+    unread_count: int

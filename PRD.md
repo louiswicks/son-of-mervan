@@ -204,9 +204,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `database.py` (SavingsGoal + SavingsContribution models with Fernet encryption), `models.py` (Pydantic schemas), `routers/savings.py` (new — CRUD + contribution endpoints), `alembic/versions/b3c4d5e6f7a8_add_savings_goals.py` (new migration), `main.py` (router registration), `web/src/api/savings.js` (new), `web/src/hooks/useSavings.js` (new), `web/src/components/SavingsGoalsPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx` (Savings nav item)  
 **User Benefit:** Motivational stickiness — users with goals check in more frequently.
 
-### 4.3 Budget Alerts and In-App Notifications
+### 4.3 Budget Alerts and In-App Notifications [DONE 2026-04-06]
 **Problem:** No proactive alerts when users approach or exceed budget limits.  
-**Solution:** `BudgetAlert` model with configurable threshold (e.g., 80% of category budget). Daily background job evaluates spending per category and sends email + in-app notification when threshold is breached. Notification bell in nav bar with unread count and slide-over panel.  
+**Solution:** `BudgetAlert` model with configurable threshold (e.g., 80% of category budget). Daily background job (00:10 UTC) evaluates spending per category and sends email + in-app notification when threshold is breached. Notification bell in nav bar with unread count badge and full slide-over panel (mark read, mark all read, delete). Dedicated `/alerts` page for creating/editing/deleting/toggling alert configs.  
+**Files:** `database.py` (BudgetAlert + Notification models with Fernet encryption), `models.py` (schemas), `routers/alerts.py` (new — CRUD + `check_budget_alerts` scheduler job), `alembic/versions/c4d5e6f7a8b9_add_budget_alerts.py` (new migration), `main.py` (router + scheduler), `email_utils.py` (send_budget_alert_email), `web/src/api/alerts.js` (new), `web/src/hooks/useAlerts.js` (new), `web/src/components/BudgetAlertsPage.jsx` (new), `web/src/components/AuthGuard.jsx` (Bell + slide-over), `web/src/router.jsx` (/alerts route)  
 **User Benefit:** Turns the app from a passive record-keeper into an active financial coach.
 
 ### 4.4 Spending Insights and Trends

@@ -13,6 +13,7 @@ import AnnualOverview from "./components/AnnualOverview";
 import AccountSettings from "./components/AccountSettings";
 import RecurringExpensesPage from "./components/RecurringExpensesPage";
 import SavingsGoalsPage from "./components/SavingsGoalsPage";
+import BudgetAlertsPage from "./components/BudgetAlertsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function withPageBoundary(element) {
@@ -35,6 +36,7 @@ export const router = createHashRouter([
       { path: "annual", element: withPageBoundary(<AnnualOverview />) },
       { path: "recurring", element: withPageBoundary(<RecurringExpensesPage />) },
       { path: "savings", element: withPageBoundary(<SavingsGoalsPage />) },
+      { path: "alerts", element: withPageBoundary(<BudgetAlertsPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },

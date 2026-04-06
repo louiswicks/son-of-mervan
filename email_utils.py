@@ -87,6 +87,58 @@ def send_account_deletion_email(to_email: str):
         logger.exception("[SG] EXCEPTION sending deletion email to %s: %s", to_email, e)
 
 
+def send_budget_alert_email(
+    to_email: str,
+    category: str,
+    pct: float,
+    actual: float,
+    planned: float,
+    month: str,
+):
+    """Send a budget alert email when a category threshold is breached."""
+    if not SENDGRID_API_KEY:
+        logger.info(
+            "[DEV] Budget alert: %s reached %.1f%% (£%.2f / £%.2f) in %s",
+            category, pct, actual, planned, month,
+        )
+        return
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": f"Budget Alert: {category} spending at {pct:.0f}% — Son of Mervan",
+        "content": [{
+            "type": "text/plain",
+            "value": (
+                f"Hi,\n\n"
+                f"This is a heads-up that your {category} spending for {month} has reached "
+                f"{pct:.1f}% of your planned budget.\n\n"
+                f"  Actual spent:  £{actual:.2f}\n"
+                f"  Planned budget: £{planned:.2f}\n\n"
+                f"Log in to Son of Mervan to review your spending and adjust your plan if needed.\n\n"
+                f"You can manage your alert thresholds in the Alerts section of the app."
+            ),
+        }],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] budget alert accepted (%d) to=%s", r.status_code, to_email)
+        else:
+            logger.error("[SG] budget alert ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending budget alert to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

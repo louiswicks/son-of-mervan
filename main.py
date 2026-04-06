@@ -22,12 +22,12 @@ from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router
 from collections import defaultdict
 
 setup_logging()
@@ -567,6 +567,7 @@ app.include_router(signup.router)
 app.include_router(users_router.router)
 app.include_router(recurring_router.router)
 app.include_router(savings_router.router)
+app.include_router(alerts_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)
@@ -575,6 +576,7 @@ _scheduler = BackgroundScheduler(daemon=True)
 @app.on_event("startup")
 def _start_scheduler():
     from routers.recurring import generate_all_recurring
+    from routers.alerts import check_budget_alerts
     _scheduler.add_job(
         generate_all_recurring,
         "cron",
@@ -584,8 +586,20 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    _scheduler.add_job(
+        check_budget_alerts,
+        "cron",
+        hour=0,
+        minute=10,
+        id="check_budget_alerts",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
-    logger.info("APScheduler started — recurring-expense generation runs daily at 00:05 UTC")
+    logger.info(
+        "APScheduler started — recurring-expense generation at 00:05 UTC, "
+        "budget alert checks at 00:10 UTC"
+    )
 
 
 @app.on_event("shutdown")

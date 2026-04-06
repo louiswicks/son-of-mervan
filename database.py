@@ -427,6 +427,84 @@ class SavingsContribution(Base):
         self._note_encrypted = encrypt_value(value) if value else None
 
 
+class BudgetAlert(Base):
+    """
+    A configurable alert that fires when a category's actual spending
+    reaches a given percentage of its planned budget.
+    All sensitive fields encrypted at rest.
+    """
+    __tablename__ = "budget_alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Threshold percentage (e.g. 80 = fire when actual >= 80% of planned)
+    threshold_pct = Column(Integer, nullable=False, default=80)
+
+    # Whether this alert is enabled
+    active = Column(Boolean, default=True, nullable=False)
+
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ENCRYPTED fields
+    _category_encrypted = Column("category_encrypted", String(512), nullable=False)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def category(self):
+        return decrypt_value(self._category_encrypted) if self._category_encrypted else None
+
+    @category.setter
+    def category(self, value):
+        self._category_encrypted = encrypt_value(value) if value else None
+
+
+class Notification(Base):
+    """
+    An in-app notification for a user (e.g. budget alert triggered).
+    Title and message are encrypted; dedup_key is an unencrypted hash
+    used to prevent duplicate notifications.
+    """
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Notification type — not sensitive (e.g. "budget_alert")
+    type = Column(String(64), nullable=False, default="budget_alert")
+
+    # NULL = unread; set = read timestamp
+    read_at = Column(DateTime, nullable=True, default=None)
+
+    # Deduplication key (e.g. "ba:{alert_id}:{YYYY-MM}") — unencrypted
+    dedup_key = Column(String(128), nullable=True, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ENCRYPTED fields
+    _title_encrypted = Column("title_encrypted", String(512), nullable=False)
+    _message_encrypted = Column("message_encrypted", String(512), nullable=False)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def title(self):
+        return decrypt_value(self._title_encrypted) if self._title_encrypted else None
+
+    @title.setter
+    def title(self, value):
+        self._title_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def message(self):
+        return decrypt_value(self._message_encrypted) if self._message_encrypted else None
+
+    @message.setter
+    def message(self, value):
+        self._message_encrypted = encrypt_value(value) if value else None
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)
