@@ -85,22 +85,21 @@ def normalize_month(m: str) -> str:
     y, mo = parts
     return f"{int(y):04d}-{int(mo):02d}"
 
-def get_or_create_month(db: Session, user: User, month: str) -> MonthlyData:
-    """
-    Get or create a month record. Since month is encrypted, we must:
-    1. Encrypt the search value
-    2. Query using the encrypted column directly
-    """
-    encrypted_month = encrypt_value(month)
-    
-    rec = (
+def find_month_by_value(db: Session, user: User, month: str) -> MonthlyData | None:
+    """Find a month row by decrypting values since encryption is non-deterministic."""
+    all_months = (
         db.query(MonthlyData)
-        .filter(
-            MonthlyData.user_id == user.id, 
-            MonthlyData._month_encrypted == encrypted_month  # Use encrypted column
-        )
-        .first()
+        .filter(MonthlyData.user_id == user.id)
+        .all()
     )
+    for row in all_months:
+        if row.month == month:
+            return row
+    return None
+
+def get_or_create_month(db: Session, user: User, month: str) -> MonthlyData:
+    """Get or create a month record by comparing decrypted month values."""
+    rec = find_month_by_value(db, user, month)
     if not rec:
         rec = MonthlyData(user_id=user.id)  # Create without month
         rec.month = month  # Set month via property (encrypts automatically)
@@ -108,6 +107,12 @@ def get_or_create_month(db: Session, user: User, month: str) -> MonthlyData:
         db.commit()
         db.refresh(rec)
     return rec
+
+def find_expense_by_values(expenses: list[MonthlyExpense], name: str, category: str) -> MonthlyExpense | None:
+    for expense in expenses:
+        if expense.name == name and expense.category == category:
+            return expense
+    return None
 
 # -------------------- Routes --------------------
 @app.get("/")
@@ -226,27 +231,21 @@ async def calculate_budget(
 
     # UPSERT expenses instead of deleting and recreating
     print(f"DEBUG: Processing {len(budget_data.expenses)} expenses...")
+
+    existing_expenses = (
+        db.query(MonthlyExpense)
+        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .all()
+    )
     
     for i, e in enumerate(budget_data.expenses):
         print(f"DEBUG: Expense {i+1}:")
         print(f"  Name: '{e.name}'")
         print(f"  Category: '{e.category}'")
         print(f"  Amount: {e.amount}")
-        
-        encrypted_name = encrypt_value(e.name)
-        encrypted_category = encrypt_value(e.category)
-        
-        # Try to find existing expense
-        existing = (
-            db.query(MonthlyExpense)
-            .filter(
-                MonthlyExpense.monthly_data_id == month_row.id,
-                MonthlyExpense._name_encrypted == encrypted_name,
-                MonthlyExpense._category_encrypted == encrypted_category,
-            )
-            .first()
-        )
-        
+
+        existing = find_expense_by_values(existing_expenses, e.name, e.category)
+
         if existing:
             print(f"  DEBUG: Found existing expense (ID: {existing.id})")
             print(f"  DEBUG: Old planned_amount: {existing.planned_amount}")
@@ -260,6 +259,7 @@ async def calculate_budget(
             expense.planned_amount = e.amount
             expense.actual_amount = 0.0
             db.add(expense)
+            existing_expenses.append(expense)
             print(f"  DEBUG: Added new expense to session")
     
     db.commit()
@@ -296,8 +296,6 @@ async def save_actuals(
     db: Session = Depends(get_db),
 ):
     month_norm = normalize_month(month)
-    encrypted_month = encrypt_value(month_norm)
-
     user = get_user_by_email(db, current_user)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -311,19 +309,13 @@ async def save_actuals(
         month_row.salary_actual = float(data.salary)
 
     items = (data.expenses if data and data.expenses else [])
+    existing_expenses = (
+        db.query(MonthlyExpense)
+        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .all()
+    )
     for item in items:
-        encrypted_name = encrypt_value(item.name)
-        encrypted_category = encrypt_value(item.category)
-        
-        exp = (
-            db.query(MonthlyExpense)
-            .filter(
-                MonthlyExpense.monthly_data_id == month_row.id,
-                MonthlyExpense._name_encrypted == encrypted_name,
-                MonthlyExpense._category_encrypted == encrypted_category,
-            )
-            .first()
-        )
+        exp = find_expense_by_values(existing_expenses, item.name, item.category)
         
         if exp:
             # Update ONLY actual_amount, preserve planned_amount
@@ -336,6 +328,8 @@ async def save_actuals(
             new_expense.planned_amount = 0.0  # No planned data for this new line
             new_expense.actual_amount = float(item.amount or 0.0)
             db.add(new_expense)
+            existing_expenses.append(new_expense)
+
 
     db.commit()
 
@@ -347,16 +341,12 @@ async def save_actuals(
     )
 
     total_actual = sum((e.actual_amount or 0.0) for e in refreshed_expenses)
-    total_planned = sum((e.planned_amount or 0.0) for e in refreshed_expenses)
 
     salary_actual = month_row.salary_actual if month_row.salary_actual is not None else 0.0
-    salary_planned = month_row.salary_planned if month_row.salary_planned is not None else 0.0
 
-    # Update month row - preserve planned values, only update actual
+    # Only update actual totals — planned totals are owned by calculate_budget
     month_row.total_actual = total_actual
-    month_row.total_planned = total_planned  # Recalculate from expenses
     month_row.remaining_actual = float(salary_actual) - total_actual
-    month_row.remaining_planned = float(salary_planned) - total_planned
     
     db.add(month_row)
     db.commit()
@@ -396,14 +386,7 @@ async def get_monthly_tracker(
         }
 
     # Use encrypted column for query
-    month_row = (
-        db.query(MonthlyData)
-        .filter(
-            MonthlyData.user_id == user.id, 
-            MonthlyData._month_encrypted == encrypted_month  # CHANGED
-        )
-        .first()
-    )
+    month_row = find_month_by_value(db, user, month_norm)
     if not month_row:
         return {
             "month": month_norm,

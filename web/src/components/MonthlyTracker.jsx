@@ -127,18 +127,22 @@ const MonthlyTracker = ({ token, onSaved }) => {
         .filter(r => r.projected !== '' && !isNaN(Number(r.projected)))
         .map(r => ({ name: r.name?.trim() ? r.name.trim() : r.category, amount: Number(r.projected) || 0, category: r.category }));
 
-      const plannedPayload = {
-        month: selectedMonth,
-        monthly_salary: salary !== '' ? Number(salary) : 0,
-        expenses: plannedExpenses,
-      };
+      // Only commit planned budget if the user has actually entered projected amounts.
+      // Skipping this when empty prevents zeroing out planned data saved from the budget planner.
+      if (plannedExpenses.some(e => e.amount > 0)) {
+        const plannedPayload = {
+          month: selectedMonth,
+          monthly_salary: salary !== '' ? Number(salary) : 0,
+          expenses: plannedExpenses,
+        };
 
-      await axios.post(`${API_BASE_URL}/calculate-budget?commit=true`, plannedPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
-        },
-      });
+        await axios.post(`${API_BASE_URL}/calculate-budget?commit=true`, plannedPayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
+          },
+        });
+      }
 
       const actualExpenses = rows
         .filter(r => r.actual !== '' && !isNaN(Number(r.actual)))
