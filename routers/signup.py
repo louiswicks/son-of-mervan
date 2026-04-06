@@ -1,10 +1,15 @@
 # routers/signup.py
+import logging
+import os
+import re
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, EmailStr, constr, validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime
-import os, re
+
+logger = logging.getLogger(__name__)
 
 from database import get_db, User
 from security import get_password_hash, create_email_verify_token, decode_email_verify_token
@@ -62,7 +67,7 @@ async def signup(payload: SignupRequest, background_tasks: BackgroundTasks, db: 
         background_tasks.add_task(send_verification_email, user.email, verify_url)
         dev_link = None
     else:
-        print(f"[DEV] Verification link for {user.email}: {verify_url}")
+        logger.info("[DEV] Verification link for %s: %s", user.email, verify_url)
         dev_link = verify_url
 
     return {

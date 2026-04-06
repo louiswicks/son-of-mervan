@@ -1,3 +1,4 @@
+import logging
 import os
 import uvicorn
 from datetime import timedelta
@@ -11,10 +12,14 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from starlette import status
 
+from core.logging_config import setup_logging
 from database import init_db, get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from routers import tracker, overview, signup
 from collections import defaultdict
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # -------------------- App Setup --------------------
 app = FastAPI(title="Son of Mervan - Budget API", version="1.0.0")
@@ -150,18 +155,12 @@ async def calculate_budget(
     db: Session = Depends(get_db),
 ):
     month_norm = normalize_month(budget_data.month)
-    
-    # DEBUG: Log what we're receiving
-    print(f"========== DEBUG calculate_budget ==========")
-    print(f"Month: {month_norm}")
-    print(f"Commit: {commit}")
-    print(f"User: {current_user}")
-    print(f"Salary: {budget_data.monthly_salary}")
-    print(f"Number of expenses: {len(budget_data.expenses)}")
-    print(f"Expenses:")
-    for e in budget_data.expenses:
-        print(f"  - Name: '{e.name}', Category: '{e.category}', Amount: {e.amount}")
-    print(f"===========================================")
+
+    logger.debug(
+        "calculate_budget month=%s commit=%s user=%s salary=%s expenses=%d",
+        month_norm, commit, current_user,
+        budget_data.monthly_salary, len(budget_data.expenses),
+    )
 
     # compute planned totals
     total_planned = sum(e.amount for e in budget_data.expenses)
@@ -189,7 +188,7 @@ async def calculate_budget(
 
     # ---------- READ-ONLY PATH ----------
     if not commit:
-        print(f"DEBUG: Returning read-only response (not saving)")
+        logger.debug("calculate_budget read-only response (not saving)")
         return {
             "id": None,
             "month": month_norm,
@@ -206,31 +205,24 @@ async def calculate_budget(
         }
 
     # ---------- COMMIT (WRITE) PATH ----------
-    print(f"DEBUG: Starting commit path...")
-    
+    logger.debug("calculate_budget starting commit path")
+
     user = require_user_by_email(db, current_user)
-    print(f"DEBUG: Found user with ID: {user.id}")
-    
+    logger.debug("calculate_budget user_id=%d", user.id)
+
     month_row = get_or_create_month(db, user, month_norm)
-    print(f"DEBUG: Got month_row with ID: {month_row.id}")
+    logger.debug("calculate_budget month_row_id=%d", month_row.id)
 
     month_row.salary_planned = budget_data.monthly_salary
     month_row.total_planned = total_planned
     month_row.remaining_planned = remaining_planned
-    
-    print(f"DEBUG: Set month_row values:")
-    print(f"  salary_planned: {month_row.salary_planned}")
-    print(f"  total_planned: {month_row.total_planned}")
-    print(f"  remaining_planned: {month_row.remaining_planned}")
-    
+
     db.add(month_row)
     db.commit()
     db.refresh(month_row)
-    
-    print(f"DEBUG: Committed month_row")
 
     # UPSERT expenses instead of deleting and recreating
-    print(f"DEBUG: Processing {len(budget_data.expenses)} expenses...")
+    logger.debug("calculate_budget processing %d expenses", len(budget_data.expenses))
 
     existing_expenses = (
         db.query(MonthlyExpense)
@@ -238,21 +230,17 @@ async def calculate_budget(
         .all()
     )
     
-    for i, e in enumerate(budget_data.expenses):
-        print(f"DEBUG: Expense {i+1}:")
-        print(f"  Name: '{e.name}'")
-        print(f"  Category: '{e.category}'")
-        print(f"  Amount: {e.amount}")
-
+    for e in budget_data.expenses:
         existing = find_expense_by_values(existing_expenses, e.name, e.category)
 
         if existing:
-            print(f"  DEBUG: Found existing expense (ID: {existing.id})")
-            print(f"  DEBUG: Old planned_amount: {existing.planned_amount}")
+            logger.debug(
+                "calculate_budget updating expense id=%d name=%r planned=%s->%s",
+                existing.id, e.name, existing.planned_amount, e.amount,
+            )
             existing.planned_amount = e.amount
-            print(f"  DEBUG: New planned_amount: {existing.planned_amount}")
         else:
-            print(f"  DEBUG: Creating new expense")
+            logger.debug("calculate_budget creating expense name=%r category=%r", e.name, e.category)
             expense = MonthlyExpense(monthly_data_id=month_row.id)
             expense.name = e.name
             expense.category = e.category
@@ -260,18 +248,9 @@ async def calculate_budget(
             expense.actual_amount = 0.0
             db.add(expense)
             existing_expenses.append(expense)
-            print(f"  DEBUG: Added new expense to session")
-    
+
     db.commit()
-    print(f"DEBUG: Committed all expenses")
-    
-    # Verify what was saved
-    saved_expenses = db.query(MonthlyExpense).filter(
-        MonthlyExpense.monthly_data_id == month_row.id
-    ).all()
-    print(f"DEBUG: Verification - found {len(saved_expenses)} expenses in database:")
-    for exp in saved_expenses:
-        print(f"  - {exp.name} ({exp.category}): planned={exp.planned_amount}, actual={exp.actual_amount}")
+    logger.debug("calculate_budget committed all expenses")
 
     return {
         "id": month_row.id,
@@ -422,73 +401,6 @@ async def get_monthly_tracker(
 @app.get("/verify-token")
 async def verify_user_token(current_user: str = Depends(verify_token)):
     return {"user": current_user, "authenticated": True, "expires_in_hours": 24}
-
-@app.post("/run-migration")
-async def run_migration():
-    """Temporary endpoint to run migration - REMOVE after use!"""
-    import subprocess
-    result = subprocess.run(["python", "migrate_to_encrypted.py"], 
-                          capture_output=True, text=True)
-    return {
-        "stdout": result.stdout,
-        "stderr": result.stderr,
-        "returncode": result.returncode
-    }
-
-@app.post("/cleanup-old-columns")
-async def cleanup_old_columns():
-    """Remove old unencrypted columns"""
-    from sqlalchemy import text
-    from database import engine
-    
-    with engine.connect() as conn:
-        # Drop old columns from users
-        conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS username"))
-        
-        # Drop old columns from monthly_data
-        for col in ["month", "salary_planned", "salary_actual", "total_planned", 
-                    "total_actual", "remaining_planned", "remaining_actual"]:
-            conn.execute(text(f"ALTER TABLE monthly_data DROP COLUMN IF EXISTS {col}"))
-        
-        # Drop old columns from monthly_expenses
-        for col in ["name", "category", "planned_amount", "actual_amount"]:
-            conn.execute(text(f"ALTER TABLE monthly_expenses DROP COLUMN IF EXISTS {col}"))
-        
-        conn.commit()
-    
-    return {"status": "Old columns dropped successfully"}
-
-@app.get("/debug/check-month/{month}")
-async def debug_month(
-    month: str,
-    current_user: str = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    """Debug endpoint to check what's in the database"""
-    from database import encrypt_value
-    
-    user = db.query(User).filter(User.email == current_user).first()
-    if not user:
-        return {"error": "User not found"}
-    
-    encrypted_month = encrypt_value(month)
-    month_row = db.query(MonthlyData).filter(
-        MonthlyData.user_id == user.id,
-        MonthlyData._month_encrypted == encrypted_month
-    ).first()
-    
-    if not month_row:
-        return {"error": f"No data for {month}"}
-    
-    return {
-        "month": month_row.month,
-        "salary_planned": month_row.salary_planned,
-        "salary_actual": month_row.salary_actual,
-        "total_planned": month_row.total_planned,
-        "total_actual": month_row.total_actual,
-        "remaining_planned": month_row.remaining_planned,
-        "remaining_actual": month_row.remaining_actual,
-    }
 
 # -------------------- Routers --------------------
 # Ensure your routers import:  from security import verify_token

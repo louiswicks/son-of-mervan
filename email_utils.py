@@ -1,5 +1,11 @@
 # email_utils.py — Send via SendGrid Web API (no SMTP), fail-safe
-import os, json, requests
+import json
+import logging
+import os
+
+import requests
+
+logger = logging.getLogger(__name__)
 
 SENDGRID_API_KEY = (
     os.getenv("SENDGRID_API_KEY") or os.getenv("SMTP_PASS")  # reuse your existing key
@@ -7,9 +13,9 @@ SENDGRID_API_KEY = (
 EMAIL_FROM = os.getenv("EMAIL_FROM") or "no-reply@example.com"
 
 def send_verification_email(to_email: str, verify_url: str):
-    # If no key set, behave like dev: print link and return
+    # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:
-        print(f"[DEV] Verification link for {to_email}: {verify_url}")
+        logger.info("[DEV] Verification link for %s: %s", to_email, verify_url)
         return
 
     payload = {
@@ -27,7 +33,7 @@ def send_verification_email(to_email: str, verify_url: str):
     }
 
     try:
-        print(f"[SG] POST /v3/mail/send from={EMAIL_FROM} to={to_email}")
+        logger.debug("[SG] POST /v3/mail/send from=%s to=%s", EMAIL_FROM, to_email)
         r = requests.post(
             "https://api.sendgrid.com/v3/mail/send",
             headers={
@@ -38,10 +44,10 @@ def send_verification_email(to_email: str, verify_url: str):
             timeout=15,
         )
         if r.status_code in (200, 202):
-            print(f"[SG] accepted ({r.status_code})")
+            logger.info("[SG] accepted (%d) to=%s", r.status_code, to_email)
         else:
-            print(f"[SG] ERROR {r.status_code}: {r.text}")
-            # don’t crash signup if email fails
+            logger.error("[SG] ERROR %d: %s", r.status_code, r.text)
+            # don't crash signup if email fails
     except Exception as e:
-        print(f"[SG] EXCEPTION: {e}")
-        # don’t raise — keep signup successful
+        logger.exception("[SG] EXCEPTION sending to %s: %s", to_email, e)
+        # don't raise — keep signup successful
