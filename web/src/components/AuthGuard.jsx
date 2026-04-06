@@ -1,7 +1,7 @@
 // src/components/AuthGuard.jsx
 import React from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Moon, Sun, LayoutDashboard, Calendar, TrendingUp, Settings, Repeat } from "lucide-react";
+import { Moon, Sun, LayoutDashboard, Calendar, TrendingUp, Settings, Repeat, PiggyBank } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 
@@ -10,6 +10,7 @@ const NAV_TABS = [
   ["/expenses", "Tracker", Calendar],
   ["/annual", "Annual", TrendingUp],
   ["/recurring", "Recurring", Repeat],
+  ["/savings", "Savings", PiggyBank],
   ["/settings", "Settings", Settings],
 ];
 

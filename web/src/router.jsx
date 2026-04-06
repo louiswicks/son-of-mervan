@@ -12,6 +12,7 @@ import MonthlyTracker from "./components/MonthlyTracker";
 import AnnualOverview from "./components/AnnualOverview";
 import AccountSettings from "./components/AccountSettings";
 import RecurringExpensesPage from "./components/RecurringExpensesPage";
+import SavingsGoalsPage from "./components/SavingsGoalsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function withPageBoundary(element) {
@@ -33,6 +34,7 @@ export const router = createHashRouter([
       { path: "expenses", element: withPageBoundary(<MonthlyTracker />) },
       { path: "annual", element: withPageBoundary(<AnnualOverview />) },
       { path: "recurring", element: withPageBoundary(<RecurringExpensesPage />) },
+      { path: "savings", element: withPageBoundary(<SavingsGoalsPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },

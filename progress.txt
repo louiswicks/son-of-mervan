@@ -222,3 +222,18 @@
 - Replaced all print() calls with stdlib logging (LOG_LEVEL env var controlled)
 - Added core/logging_config.py and scripts/migrate.py CLI as replacement
 - Files changed: main.py, email_utils.py, routers/signup.py, core/, scripts/
+
+## Phase 4.2 — Savings Goals [DONE] 2026-04-06
+- Added `SavingsGoal` ORM model to `database.py`: `id`, `user_id` (FK to users), `target_date` (nullable DateTime), `deleted_at`, `created_at`; encrypted fields `name_encrypted`, `target_amount_encrypted` with hybrid properties for transparent Fernet en/decrypt
+- Added `SavingsContribution` ORM model to `database.py`: `id`, `goal_id` (FK to savings_goals), `contributed_at` (DateTime), `created_at`; encrypted fields `amount_encrypted`, `note_encrypted`; `contributions` relationship on SavingsGoal
+- Added Pydantic schemas to `models.py`: `SavingsGoalCreate`, `SavingsGoalUpdate`, `SavingsGoalResponse` (includes computed `current_amount`, `status`, `required_monthly`), `SavingsContributionCreate`, `SavingsContributionResponse`
+- Created Alembic migration `b3c4d5e6f7a8_add_savings_goals.py`: creates `savings_goals` and `savings_contributions` tables with indexes on id, user_id, deleted_at, goal_id; down_revision `a7b8c9d0e1f2`
+- Created `routers/savings.py`: `GET /savings-goals` (list), `POST /savings-goals` (create, 201), `PUT /savings-goals/{id}` (update), `DELETE /savings-goals/{id}` (soft-delete, 204), `GET /savings-goals/{id}/contributions`, `POST /savings-goals/{id}/contributions` (add, 201), `DELETE /savings-goals/{id}/contributions/{contrib_id}` (hard-delete, 204); `_compute_status` derives on_track/behind/ahead/achieved/no_deadline from contribution pace vs required monthly rate
+- Updated `main.py`: imports and registers `savings_router`
+- Created `web/src/api/savings.js`: `listGoals`, `createGoal`, `updateGoal`, `deleteGoal`, `listContributions`, `addContribution`, `deleteContribution` Axios wrappers
+- Created `web/src/hooks/useSavings.js`: `useSavingsGoals`, `useCreateGoal`, `useUpdateGoal`, `useDeleteGoal`, `useContributions`, `useAddContribution`, `useDeleteContribution` React Query hooks with toast feedback and cache invalidation
+- Created `web/src/components/SavingsGoalsPage.jsx`: goal cards with `RadialBarChart` progress ring (Recharts), progress bar, status badge (on_track/behind/ahead/achieved/no_deadline), inline contribution panel (add/delete), create/edit forms; PiggyBank icon in nav
+- Updated `web/src/router.jsx`: added `/savings` route → SavingsGoalsPage
+- Updated `web/src/components/AuthGuard.jsx`: added Savings nav item (PiggyBank icon) for both desktop and mobile bottom tab bar
+- Test result: 94 tests passing (unchanged); frontend build clean
+- Files changed: database.py, models.py, routers/savings.py (new), alembic/versions/b3c4d5e6f7a8_add_savings_goals.py (new), main.py, web/src/api/savings.js (new), web/src/hooks/useSavings.js (new), web/src/components/SavingsGoalsPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx

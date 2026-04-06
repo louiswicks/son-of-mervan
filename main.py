@@ -27,7 +27,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router
 from collections import defaultdict
 
 setup_logging()
@@ -566,6 +566,7 @@ app.include_router(overview.router)
 app.include_router(signup.router)
 app.include_router(users_router.router)
 app.include_router(recurring_router.router)
+app.include_router(savings_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

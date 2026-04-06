@@ -80,3 +80,43 @@ class RecurringExpenseResponse(BaseModel):
     end_date: Optional[datetime]
     last_generated_at: Optional[datetime]
     created_at: datetime
+
+
+# ---------- Savings Goals ----------
+
+class SavingsGoalCreate(BaseModel):
+    name: str
+    target_amount: float
+    target_date: Optional[datetime] = None
+
+
+class SavingsGoalUpdate(BaseModel):
+    name: Optional[str] = None
+    target_amount: Optional[float] = None
+    target_date: Optional[datetime] = None
+
+
+class SavingsContributionCreate(BaseModel):
+    amount: float
+    note: Optional[str] = None
+    contributed_at: Optional[datetime] = None
+
+
+class SavingsContributionResponse(BaseModel):
+    id: int
+    goal_id: int
+    amount: float
+    note: Optional[str]
+    contributed_at: datetime
+    created_at: datetime
+
+
+class SavingsGoalResponse(BaseModel):
+    id: int
+    name: str
+    target_amount: float
+    current_amount: float
+    target_date: Optional[datetime]
+    status: str          # on_track | behind | ahead | achieved | no_deadline
+    required_monthly: Optional[float]   # amount needed per month to hit target
+    created_at: datetime

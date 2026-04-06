@@ -198,9 +198,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `database.py`, `alembic/versions/a7b8c9d0e1f2_add_recurring_expenses.py`, `models.py`, `routers/recurring.py` (new), `main.py`, `requirements.txt`, `web/src/api/recurring.js` (new), `web/src/hooks/useRecurring.js` (new), `web/src/components/RecurringExpensesPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx`  
 **User Benefit:** Eliminates the biggest ongoing friction in app usage.
 
-### 4.2 Savings Goals
+### 4.2 Savings Goals [DONE 2026-04-06]
 **Problem:** The app tracks spending but not progress toward financial targets.  
 **Solution:** `SavingsGoal` model with `target_amount`, `current_amount`, `target_date`. `SavingsContribution` tracks each addition. Dashboard widget shows radial progress chart and on-track/behind/ahead status derived from contribution pace vs required monthly rate.  
+**Files:** `database.py` (SavingsGoal + SavingsContribution models with Fernet encryption), `models.py` (Pydantic schemas), `routers/savings.py` (new — CRUD + contribution endpoints), `alembic/versions/b3c4d5e6f7a8_add_savings_goals.py` (new migration), `main.py` (router registration), `web/src/api/savings.js` (new), `web/src/hooks/useSavings.js` (new), `web/src/components/SavingsGoalsPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx` (Savings nav item)  
 **User Benefit:** Motivational stickiness — users with goals check in more frequently.
 
 ### 4.3 Budget Alerts and In-App Notifications

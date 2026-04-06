@@ -348,6 +348,85 @@ class RecurringExpense(Base):
         self._planned_amount_encrypted = encrypt_value(str(value))
 
 
+class SavingsGoal(Base):
+    """
+    A named savings target with an optional deadline.
+    current_amount is computed dynamically from SavingsContribution rows.
+    All sensitive fields encrypted at rest.
+    """
+    __tablename__ = "savings_goals"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Optional deadline for the goal
+    target_date = Column(DateTime, nullable=True, default=None)
+
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ENCRYPTED fields
+    _name_encrypted = Column("name_encrypted", String(512), nullable=False)
+    _target_amount_encrypted = Column("target_amount_encrypted", String(512), nullable=False)
+
+    user = relationship("User")
+    contributions = relationship("SavingsContribution", back_populates="goal", cascade="all, delete-orphan")
+
+    @hybrid_property
+    def name(self):
+        return decrypt_value(self._name_encrypted) if self._name_encrypted else None
+
+    @name.setter
+    def name(self, value):
+        self._name_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def target_amount(self):
+        val = decrypt_value(self._target_amount_encrypted) if self._target_amount_encrypted else "0.0"
+        return float(val)
+
+    @target_amount.setter
+    def target_amount(self, value):
+        self._target_amount_encrypted = encrypt_value(str(value))
+
+
+class SavingsContribution(Base):
+    """
+    A single contribution toward a SavingsGoal.
+    amount is encrypted; note is optional and encrypted.
+    """
+    __tablename__ = "savings_contributions"
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, ForeignKey("savings_goals.id"), nullable=False)
+
+    # Date the contribution was made (defaults to UTC today)
+    contributed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ENCRYPTED fields
+    _amount_encrypted = Column("amount_encrypted", String(512), nullable=False)
+    _note_encrypted = Column("note_encrypted", String(512), nullable=True)
+
+    goal = relationship("SavingsGoal", back_populates="contributions")
+
+    @hybrid_property
+    def amount(self):
+        val = decrypt_value(self._amount_encrypted) if self._amount_encrypted else "0.0"
+        return float(val)
+
+    @amount.setter
+    def amount(self, value):
+        self._amount_encrypted = encrypt_value(str(value))
+
+    @hybrid_property
+    def note(self):
+        return decrypt_value(self._note_encrypted) if self._note_encrypted else None
+
+    @note.setter
+    def note(self, value):
+        self._note_encrypted = encrypt_value(value) if value else None
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)
