@@ -128,11 +128,12 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `routers/users.py`, new `web/src/components/AccountSettings.jsx`, `database.py`, `security.py`, `main.py`, `email_utils.py`, `web/src/App.js`, new `alembic/versions/f6a7b8c9d0e1`  
 **Acceptance Criteria:** Profile updates persist. Password change requires correct current password. Account deletion sends confirmation email and removes all personal data after 30 days. GDPR-compliant.
 
-### 2.7 Backend Test Suite (Target: 80% line coverage)
+### 2.7 Backend Test Suite (Target: 80% line coverage) [DONE 2026-04-06]
 **Problem:** Zero backend tests. Every change is an undetected potential regression.  
-**Solution:** `pytest` + `httpx.AsyncClient` + `pytest-asyncio`. SQLite in-memory DB fixture overrides `get_db` in tests. Test categories: auth flows, expense CRUD and ownership enforcement, budget calculation logic, encryption (verify no plaintext in DB).  
-**Files:** new `tests/conftest.py`, `tests/test_auth.py`, `tests/test_expenses.py`, `tests/test_budget.py`, `tests/test_encryption.py`  
-**Acceptance Criteria:** `pytest --cov=. --cov-fail-under=80` passes in CI. All test categories covered.
+**Solution:** `pytest` + `httpx` + `starlette.testclient`. SQLite file-based DB with `autouse` clean fixture between tests overrides `get_db`; `verify_token` overridden for auth'd routes. Test categories: auth flows, expense CRUD and ownership enforcement, budget calculation logic, encryption (verify no plaintext in DB).  
+**Files:** new `tests/conftest.py`, `tests/test_auth.py`, `tests/test_expenses.py`, `tests/test_budget.py`, `tests/test_encryption.py`, new `pytest.ini`, updated `requirements.txt`  
+**Acceptance Criteria:** `pytest --cov=. --cov-fail-under=80` passes in CI. All test categories covered.  
+**Result:** 94 tests, 87% line coverage.
 
 ---
 

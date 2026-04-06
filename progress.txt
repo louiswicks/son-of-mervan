@@ -1,3 +1,14 @@
+## Phase 2.7 — Backend Test Suite [DONE] 2026-04-06
+- Created `tests/conftest.py`: sets env vars before import, patches alembic migrations to skip at test startup, creates SQLite test DB with `Base.metadata.create_all`, autouse fixture truncates all tables + resets rate-limiter storage between tests; fixtures: `db`, `verified_user`, `second_user`, `client` (unauthenticated), `auth_client` (overrides `verify_token` + `get_db`); helper functions `make_month` and `make_expense`
+- Created `tests/test_auth.py`: 48 tests covering root health, signup (success + 5 invalid cases), email verification, login (success + wrong password + unverified + soft-deleted + nonexistent), password reset flow (request always-200, confirm success/invalid/expired/used, invalidates old tokens), refresh token (valid/revoked/expired), logout, account management (get/update profile, change password, delete account)
+- Created `tests/test_expenses.py`: 22 tests covering PUT /expenses/{id} (name/category/amounts/wrong-user/404/soft-deleted), DELETE /expenses/{id} (success/soft-delete-db/wrong-user/already-deleted/404), GET /monthly-tracker (empty/all expenses/soft-deleted exclusion/category filter/pagination/salary totals/id field), POST /monthly-tracker (new actuals/update existing/preserve planned/remaining calculation)
+- Created `tests/test_budget.py`: 17 tests covering POST /calculate-budget (read-only/no-save/commit-saves-month/saves-expenses/upsert/overspend-rec/surplus-rec/savings-rate/category-breakdown/invalid-month/zero-salary), GET /overview/annual (empty/with-data/totals-aggregate/year-filter/no-param/user-isolation)
+- Created `tests/test_encryption.py`: 13 tests covering encrypt/decrypt helpers (roundtrip/none/non-deterministic/missing-key), username field not plaintext, monthly data salary not plaintext, expense name/category/amounts not plaintext, bcrypt password hash
+- Fixed pre-existing bug: added `@username.expression` to `User.username` hybrid property in `database.py` so class-level SQL filters don't raise `AttributeError` (Fernet-encrypted username can't be matched in SQL, but at least it doesn't crash)
+- Added `pytest>=7.4.0`, `pytest-cov>=4.1.0`, `httpx>=0.24.0` to `requirements.txt`; created `pytest.ini`
+- Result: 94 tests passing, 87% line coverage (target: 80%)
+- Files changed: tests/conftest.py (new), tests/test_auth.py (new), tests/test_expenses.py (new), tests/test_budget.py (new), tests/test_encryption.py (new), pytest.ini (new), requirements.txt, database.py, PRD.md
+
 ## Phase 2.6 — Account Management [DONE] 2026-04-06
 - Added `deleted_at` (nullable DateTime) column to `User` in database.py for 30-day soft-delete
 - Created Alembic migration f6a7b8c9d0e1: adds `deleted_at` column + index on `users` table

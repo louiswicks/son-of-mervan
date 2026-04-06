@@ -15,3 +15,8 @@ psycopg[binary]==3.1.18
 axios
 requests>=2.31
 cryptography>=41.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+httpx>=0.24.0

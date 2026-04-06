@@ -99,6 +99,18 @@ class User(Base):
         else:
             self._username_encrypted = None
 
+    @username.expression
+    def username(cls):
+        """
+        SQL expression fallback — returns the raw encrypted column.
+        Since Fernet is non-deterministic, SQL equality comparisons against
+        plaintext will never match. All username lookups that need to find a
+        user by their plaintext username must decrypt in Python (O(n) scan).
+        This expression exists solely to prevent AttributeError when the
+        property is referenced at class level (e.g. in a filter clause).
+        """
+        return cls._username_encrypted
+
 
 class MonthlyData(Base):
     """
