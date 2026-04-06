@@ -1,3 +1,12 @@
+## Phase 3.4 — Global Error Boundaries [DONE] 2026-04-06
+- Created `web/src/components/ErrorBoundary.jsx`: class component with `getDerivedStateFromError` + `componentDidCatch`; renders "Something went wrong" card UI with "Try again" (reset state) and "Reload page" buttons; accepts optional `fallback` render-prop for custom error UI
+- Created `web/src/components/AsyncBoundary.jsx`: composes `ErrorBoundary` + `Suspense` (falls back to `SkeletonCard`) for async data sections
+- Updated `web/src/App.jsx`: wrapped root tree in `<ErrorBoundary>` so any unhandled throw is caught at the top level
+- Updated `web/src/router.jsx`: added `withPageBoundary()` helper that wraps each protected page element in its own `<ErrorBoundary>`; nav and other pages remain functional when one page throws
+- Added error boundary CSS to `web/src/App.css`: `.error-boundary-root` / `.error-boundary-card` / `.error-boundary-btn` styles
+- Build passes: 0 errors, 0 warnings; bundle 225.21 kB gzip (+325 B)
+- Files changed: web/src/components/ErrorBoundary.jsx (new), web/src/components/AsyncBoundary.jsx (new), web/src/App.jsx, web/src/router.jsx, web/src/App.css, PRD.md
+
 ## Phase 3.3 — React Query + Loading States + Optimistic Updates [DONE] 2026-04-06
 - Installed `@tanstack/react-query@5` (^5.96.2) and `react-hot-toast@2` (^2.6.0)
 - Created `web/src/components/Skeleton.jsx`: `Skeleton` base component (animate-pulse) + `SkeletonCard`, `SkeletonTable`, `SkeletonChart` composites used during loading states

@@ -11,6 +11,11 @@ import SonOfMervan from "./components/SonOfMervan";
 import MonthlyTracker from "./components/MonthlyTracker";
 import AnnualOverview from "./components/AnnualOverview";
 import AccountSettings from "./components/AccountSettings";
+import ErrorBoundary from "./components/ErrorBoundary";
+
+function withPageBoundary(element) {
+  return <ErrorBoundary key={element.type?.name}>{element}</ErrorBoundary>;
+}
 
 export const router = createHashRouter([
   { path: "/login", element: <LoginPage /> },
@@ -23,10 +28,10 @@ export const router = createHashRouter([
     element: <AuthGuard />,
     children: [
       { index: true, element: <Navigate to="/budget" replace /> },
-      { path: "budget", element: <SonOfMervan /> },
-      { path: "expenses", element: <MonthlyTracker /> },
-      { path: "annual", element: <AnnualOverview /> },
-      { path: "settings", element: <AccountSettings /> },
+      { path: "budget", element: withPageBoundary(<SonOfMervan />) },
+      { path: "expenses", element: withPageBoundary(<MonthlyTracker />) },
+      { path: "annual", element: withPageBoundary(<AnnualOverview />) },
+      { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },
   { path: "*", element: <Navigate to="/" replace /> },

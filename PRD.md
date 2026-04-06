@@ -157,10 +157,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `web/src/App.jsx`, new hooks (`useExpenses`, `useBudget`, `useAnnualSummary`), new `web/src/components/Skeleton.jsx`  
 **Acceptance Criteria:** Every data-loading state shows a meaningful skeleton. Expense added/edited/deleted updates the UI instantly before server confirms. Failed mutations roll back with a toast error.
 
-### 3.4 Global Error Boundaries
+### 3.4 Global Error Boundaries [DONE 2026-04-06]
 **Problem:** Any uncaught JavaScript error crashes the entire app to a blank white screen.  
 **Solution:** `ErrorBoundary` class component wrapping the root app and each major page individually. Renders a "Something went wrong" UI with a Reload button. Reports to Sentry (Phase 5).  
-**Files:** new `web/src/components/ErrorBoundary.jsx`, new `web/src/components/AsyncBoundary.jsx`, `web/src/App.jsx`  
+**Files:** new `web/src/components/ErrorBoundary.jsx`, new `web/src/components/AsyncBoundary.jsx`, `web/src/App.jsx`, `web/src/router.jsx`  
 **Acceptance Criteria:** A deliberate thrown error in a chart component shows the page-level error fallback UI without crashing the nav or other pages.
 
 ### 3.5 Zustand Global State Management
