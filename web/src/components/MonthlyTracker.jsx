@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
@@ -10,9 +10,61 @@ import {
   useUpdateExpense,
   useDeleteExpense,
 } from "../hooks/useExpenses";
+import { exportCSV, exportPDF } from "../api/export";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
+
+const ExportMenu = ({ month }) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(null); // 'csv' | 'pdf' | null
+
+  const handleExport = async (type) => {
+    setOpen(false);
+    setLoading(type);
+    try {
+      if (type === 'csv') {
+        await exportCSV(month, month);
+      } else {
+        await exportPDF(month);
+      }
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={!!loading}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 min-h-[44px] text-sm font-medium"
+        title="Export data"
+      >
+        <Download size={16} />
+        {loading ? 'Exporting…' : 'Export'}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20">
+          <button
+            onClick={() => handleExport('csv')}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-lg"
+          >
+            Download CSV
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-b-lg"
+          >
+            Download PDF Report
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const buildRowsFromExpenses = (items) => {
   const serverRows = items.map(e => ({
@@ -206,12 +258,15 @@ const MonthlyTracker = () => {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
           <Calendar className="mr-2 text-blue-500" /> Monthly Tracker
         </h2>
-        <input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); setFilterCategory('All'); }}
-          className="border rounded-lg px-3 py-2 text-[16px] text-gray-700 dark:text-gray-200 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); setFilterCategory('All'); }}
+            className="border rounded-lg px-3 py-2 text-[16px] text-gray-700 dark:text-gray-200 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+          />
+          <ExportMenu month={selectedMonth} />
+        </div>
       </div>
 
       {/* Filter bar */}

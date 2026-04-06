@@ -216,9 +216,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `routers/insights.py` (new — `/insights/monthly-summary`, `/insights/trends`, `/insights/heatmap`), `main.py` (router registration), `web/src/api/insights.js` (new), `web/src/hooks/useInsights.js` (new), `web/src/components/InsightsPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx`  
 **User Benefit:** The difference between a data viewer and a financial advisor.
 
-### 4.5 Data Export (CSV and PDF)
+### 4.5 Data Export (CSV and PDF) [DONE 2026-04-06]
 **Problem:** No way to extract data for personal analysis, tax preparation, or accountant review.  
-**Solution:** `GET /export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD` streams expenses as CSV. `GET /export/pdf?month=YYYY-MM` generates a monthly budget report PDF with charts. Export dropdown in expense list and annual overview. Rate-limited to 1 export/minute/user.  
+**Solution:** `GET /export/csv?from=YYYY-MM&to=YYYY-MM` streams all non-deleted expenses in the month range as a CSV file (Month, Category, Name, Planned Amount, Actual Amount). `GET /export/pdf?month=YYYY-MM` generates a monthly budget report PDF (fpdf2) with salary summary, per-category breakdown table (overspend rows highlighted red), totals row, and net savings row. Both endpoints rate-limited to 1 request/minute per IP via slowapi. Export dropdown (CSV + PDF) added to MonthlyTracker header; CSV button added to AnnualOverview year picker. Frontend uses `responseType: blob` + `URL.createObjectURL` for authenticated downloads.  
+**Files:** `routers/export.py` (new), `main.py` (import + `app.include_router`), `requirements.txt` (fpdf2≥2.7.0), `web/src/api/export.js` (new — `exportCSV`, `exportPDF`), `web/src/components/MonthlyTracker.jsx` (ExportMenu component + import), `web/src/components/AnnualOverview.jsx` (AnnualExportButton component + import)  
 **User Benefit:** Unlocks use cases beyond the app itself.
 
 ### 4.6 Audit Trail / Transaction History

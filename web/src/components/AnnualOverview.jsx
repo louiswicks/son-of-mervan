@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { BarChart3, Calendar, LineChart as LineIcon, PiggyBank } from "lucide-react";
+import { BarChart3, Calendar, Download, LineChart as LineIcon, PiggyBank } from "lucide-react";
+import { exportCSV } from "../api/export";
 import {
   ResponsiveContainer,
   LineChart,
@@ -15,6 +16,33 @@ import { SkeletonCard, SkeletonChart } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
 
 const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const AnnualExportButton = ({ year }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleExport = async () => {
+    setLoading(true);
+    try {
+      await exportCSV(`${year}-01`, `${year}-12`);
+    } catch (e) {
+      console.error('CSV export failed', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={loading}
+      className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 min-h-[44px] text-sm font-medium"
+      title="Export year as CSV"
+    >
+      <Download size={16} />
+      {loading ? 'Exporting…' : 'CSV'}
+    </button>
+  );
+};
 
 const AnnualOverview = () => {
   const thisYear = new Date().getFullYear().toString();
@@ -91,6 +119,7 @@ const AnnualOverview = () => {
               );
             })}
           </select>
+          <AnnualExportButton year={year} />
         </div>
       </div>
 

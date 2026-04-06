@@ -265,3 +265,13 @@
 - Updated `web/src/components/AuthGuard.jsx`: added Savings nav item (PiggyBank icon) for both desktop and mobile bottom tab bar
 - Test result: 94 tests passing (unchanged); frontend build clean
 - Files changed: database.py, models.py, routers/savings.py (new), alembic/versions/b3c4d5e6f7a8_add_savings_goals.py (new), main.py, web/src/api/savings.js (new), web/src/hooks/useSavings.js (new), web/src/components/SavingsGoalsPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx
+
+## Phase 4.5 — Data Export (CSV and PDF) [DONE] 2026-04-06
+- Created `routers/export.py` with two endpoints: `GET /export/csv?from=YYYY-MM&to=YYYY-MM` (streams all non-deleted expenses in the month range as a CSV with columns Month, Category, Name, Planned Amount, Actual Amount; returns empty CSV with headers when no data found); `GET /export/pdf?month=YYYY-MM` (generates a monthly budget report PDF using fpdf2 with salary summary table, per-category expense breakdown with overspend rows highlighted red, totals row, net savings row, and generated timestamp footer)
+- Both endpoints: user-scoped via `verify_token`, rate-limited to 1 request/minute per IP using existing `slowapi` limiter, return 404 when month row not found for PDF, 422 on invalid month format
+- Added `fpdf2>=2.7.0` to `requirements.txt`; installed locally
+- Registered `export_router` in `main.py` (import + `app.include_router`)
+- Created `web/src/api/export.js`: `exportCSV(fromMonth, toMonth)` and `exportPDF(month)` — both use `responseType: 'blob'` with the shared axios client, then trigger download via `URL.createObjectURL` + temporary `<a>` element
+- Updated `web/src/components/MonthlyTracker.jsx`: added `ExportMenu` component (dropdown with "Download CSV" and "Download PDF Report" options, loading state, renders next to month picker) and imports (`Download` icon from lucide-react, `exportCSV`/`exportPDF` from api/export)
+- Updated `web/src/components/AnnualOverview.jsx`: added `AnnualExportButton` component (single "CSV" button that exports the full selected year as `YYYY-01` to `YYYY-12`, loading state) and imports (`Download` icon, `exportCSV`)
+- Tests: 94 backend tests pass unchanged; frontend build clean, 0 errors, 1 pre-existing warning; bundle 242.45 kB gzip (+612 B)
