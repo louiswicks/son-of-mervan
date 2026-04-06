@@ -20,7 +20,7 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service backend --environment production --detach
+        run: railway up --service son-of-mervan --environment production --detach
 
       - name: Wait for deployment
         run: sleep 30
