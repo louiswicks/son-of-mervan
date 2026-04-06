@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 from database import get_db, User
 from security import get_password_hash, create_email_verify_token, decode_email_verify_token
 from email_utils import send_verification_email
+from core.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,7 +37,8 @@ class SignupResponse(BaseModel):
     dev_verify_url: str | None = None
 
 @router.post("/signup", response_model=SignupResponse)
-async def signup(payload: SignupRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def signup(request: Request, payload: SignupRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1) check duplicate
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:

@@ -75,7 +75,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `core/config.py`, `security.py`, `main.py`, `.env.example`  
 **Acceptance Criteria:** Starting the app without `JWT_SECRET` set exits immediately with a clear error message.
 
-### 1.3 Rate Limiting on Auth Endpoints
+### 1.3 Rate Limiting on Auth Endpoints [DONE 2026-04-06]
 **Problem:** No rate limiting on login/register endpoints allows unlimited brute-force and credential-stuffing attacks.  
 **Solution:** Add `slowapi` with in-memory (dev) or Redis (prod) backend. Limit `/login` and `/auth/signup` to 5 requests/minute per IP. Return HTTP 429 with `Retry-After` header on breach.  
 **Files:** new `core/limiter.py`, `routers/signup.py`, `main.py`  

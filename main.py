@@ -6,14 +6,17 @@ from typing import List, Optional
 from fastapi import Path
 from fastapi import Body
 from fastapi import Query
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from starlette import status
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from core.logging_config import setup_logging
 from core.config import settings
+from core.limiter import limiter
 from database import init_db, get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from routers import tracker, overview, signup
@@ -24,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 # -------------------- App Setup --------------------
 app = FastAPI(title="Son of Mervan - Budget API", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 CORS_ORIGINS = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 
@@ -123,7 +128,8 @@ async def root():
     return {"message": "Son of Mervan Budget API is running", "status": "healthy"}
 
 @app.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     ident = payload.identifier.strip()
 
     # Try email first (exact match); then username fallback
