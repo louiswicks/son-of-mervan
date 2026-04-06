@@ -306,3 +306,14 @@
 - Updated `web/src/hooks/useExpenses.js`: `useSaveMonthlyTracker` passes `currency` in actualExpenses items when present
 - Test result: 94 backend tests pass unchanged; frontend build clean (244.31 kB gzip, +889 B, 0 errors)
 - Files changed: database.py, alembic/versions/h8i9j0k1l2m3_add_multi_currency.py (new), routers/currency.py (new), routers/users.py, models.py, main.py, web/src/api/currency.js (new), web/src/hooks/useCurrency.js (new), web/src/components/AccountSettings.jsx, web/src/components/MonthlyTracker.jsx, web/src/hooks/useExpenses.js
+
+## Phase 5.1 — Docker and Docker Compose [DONE] 2026-04-06
+- Created multi-stage `Dockerfile` for the backend: stage 1 (`builder`) installs gcc/libpq-dev and pip-installs all requirements into `/install`; stage 2 (`runtime`) uses `python:3.11-slim`, copies the prefix, creates a non-root `appuser:appgroup` (UID/GID 1001), copies application source with correct ownership, and runs `alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000`
+- Created `web/nginx.conf`: serves static assets with `Cache-Control: public, immutable` (1-year expiry), falls back all routes to `index.html` for client-side hash routing, adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers, disables `server_tokens`
+- Created multi-stage `web/Dockerfile`: stage 1 (`builder`) runs `npm ci --legacy-peer-deps` and `npm run build` (accepting `REACT_APP_API_URL` build arg); stage 2 (`runtime`) serves the built assets via `nginx:1.25-alpine` with the custom config
+- Created `web/Dockerfile.dev`: single-stage Node 20 Alpine image that runs `npm start` for hot-reload
+- Created `docker-compose.yml` with four services: `db` (postgres:16-alpine, health-checked with `pg_isready`), `redis` (redis:7-alpine, health-checked with `redis-cli ping`), `backend` (health-checked via `GET /health`, depends on db/redis healthy), `frontend` (nginx, depends on backend healthy); secrets via env vars; named volumes `postgres_data` and `redis_data`
+- Created `docker-compose.override.yml` (auto-applied in dev): overrides backend `command` to add `--reload` flag and sets `LOG_LEVEL=DEBUG`; overrides frontend service to use `Dockerfile.dev` on port 3000 with source-code volume mounts and polling-based file watching
+- Created `.dockerignore` (backend) and `web/.dockerignore` (frontend) to exclude venvs, test artifacts, `.env` files, `node_modules`, and `build/` directories
+- Added `GET /health` endpoint to `main.py`: performs `SELECT 1` via SQLAlchemy `text()` to verify DB connectivity; returns `{"status": "ok", "version": "1.0.0"}`; used by Docker healthcheck and pre-wired for Railway health checks (Phase 5.3)
+- Tests: 94 backend tests pass (unchanged), 7 deprecation warnings (pre-existing)

@@ -238,8 +238,9 @@ The core logic works but the app has critical security gaps, zero test coverage,
 
 ## Phase 5: Production Infrastructure
 
-### 5.1 Docker and Docker Compose
+### 5.1 Docker and Docker Compose [DONE 2026-04-06]
 **Solution:** Multi-stage `Dockerfile` for backend (non-root user). `web/Dockerfile` with Nginx for frontend. `docker-compose.yml` with services: `db` (postgres:16-alpine), `redis` (redis:7-alpine), `backend`, `frontend`. `docker-compose.override.yml` for dev hot-reload. One-command setup: `docker compose up`.  
+**Files:** `Dockerfile`, `web/Dockerfile`, `web/Dockerfile.dev`, `web/nginx.conf`, `docker-compose.yml`, `docker-compose.override.yml`, `.dockerignore`, `web/.dockerignore`, `main.py` (added `GET /health` endpoint)  
 **Acceptance Criteria:** Fresh clone + `docker compose up` produces a working local environment.
 
 ### 5.2 CI/CD Pipeline (GitHub Actions)

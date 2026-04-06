@@ -154,6 +154,13 @@ def find_expense_by_values(expenses: list[MonthlyExpense], name: str, category: 
 async def root():
     return {"message": "Son of Mervan Budget API is running", "status": "healthy"}
 
+@app.get("/health")
+async def health(db: Session = Depends(get_db)):
+    """Health check endpoint used by Docker and Railway."""
+    # Verify DB connectivity with a lightweight query
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "version": "1.0.0"}
+
 @app.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
 def login(request: Request, response: Response, payload: LoginRequest, db: Session = Depends(get_db)):
