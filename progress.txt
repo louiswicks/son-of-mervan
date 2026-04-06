@@ -1,0 +1,5 @@
+## Phase 1.1 — Remove debug/migration HTTP endpoints [DONE] 2026-04-06
+- Removed POST /run-migration, POST /cleanup-old-columns, GET /debug/check-month/{month} from main.py
+- Replaced all print() calls with stdlib logging (LOG_LEVEL env var controlled)
+- Added core/logging_config.py and scripts/migrate.py CLI as replacement
+- Files changed: main.py, email_utils.py, routers/signup.py, core/, scripts/
