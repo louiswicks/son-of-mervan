@@ -1,18 +1,12 @@
 // src/components/ResetPasswordPage.jsx
 import React, { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset } from "../api/auth";
 
-function getTokenFromHash() {
-  // Hash looks like: #/reset-password?token=abc123
-  const hash = window.location.hash || "";
-  const qIndex = hash.indexOf("?");
-  if (qIndex === -1) return null;
-  const params = new URLSearchParams(hash.slice(qIndex + 1));
-  return params.get("token");
-}
-
-export default function ResetPasswordPage({ goToLogin }) {
-  const token = getTokenFromHash();
+export default function ResetPasswordPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +23,7 @@ export default function ResetPasswordPage({ goToLogin }) {
             This password reset link is missing or malformed. Please request a new one.
           </p>
           <button
-            onClick={goToLogin}
+            onClick={() => navigate("/login")}
             className="font-semibold text-blue-600 hover:text-blue-800 text-sm"
           >
             Back to login
@@ -88,7 +82,7 @@ export default function ResetPasswordPage({ goToLogin }) {
         {success ? (
           <div className="text-center">
             <button
-              onClick={goToLogin}
+              onClick={() => navigate("/login")}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg transition"
             >
               Go to login
@@ -138,7 +132,7 @@ export default function ResetPasswordPage({ goToLogin }) {
 
         {!success && (
           <div className="mt-6 text-center text-sm text-gray-600">
-            <button onClick={goToLogin} className="font-semibold text-blue-600 hover:text-blue-800">
+            <button onClick={() => navigate("/login")} className="font-semibold text-blue-600 hover:text-blue-800">
               Back to login
             </button>
           </div>

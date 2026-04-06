@@ -14,7 +14,7 @@ import { getAnnualOverview } from "../api/expenses";
 
 const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-const AnnualOverview = ({ token, refreshKey = 0 }) => {
+const AnnualOverview = () => {
   const thisYear = new Date().getFullYear().toString();
   const [year, setYear] = useState(thisYear);
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
   useEffect(() => {
     fetchData(year);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, refreshKey]); // <-- refresh when monthly saves
+  }, [year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = useMemo(() => {
     return (data.months || []).map((m, i) => ({

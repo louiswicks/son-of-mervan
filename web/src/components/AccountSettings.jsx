@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { getProfile, updateProfile, changePassword, deleteAccount } from "../api/users";
+import { useAuth } from "../context/AuthContext";
 
 function Section({ title, children }) {
   return (
@@ -25,7 +27,9 @@ function StatusBanner({ type, message }) {
   );
 }
 
-export default function AccountSettings({ token, onLogout }) {
+export default function AccountSettings() {
+  const navigate = useNavigate();
+  const { handleLogout } = useAuth();
   const [profile, setProfile] = useState({ email: "", username: "" });
   const [usernameInput, setUsernameInput] = useState("");
   const [profileStatus, setProfileStatus] = useState({ type: "", message: "" });
@@ -103,8 +107,9 @@ export default function AccountSettings({ token, onLogout }) {
       const data = await deleteAccount();
       setDeleteStatus({ type: "success", message: data.message });
       // Give user a moment to read the message, then log out
-      setTimeout(() => {
-        if (onLogout) onLogout();
+      setTimeout(async () => {
+        await handleLogout();
+        navigate("/login");
       }, 2500);
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || "Deletion failed.";

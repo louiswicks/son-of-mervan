@@ -1,8 +1,14 @@
 // src/components/LoginPage.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
 
-export default function LoginPage({ onLogin, goToSignup, goToForgotPassword }) {
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const { handleLogin } = useAuth();
+  const goToSignup = () => navigate("/register");
+  const goToForgotPassword = () => navigate("/forgot-password");
   const [identifier, setIdentifier] = useState(""); // email or username
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -18,7 +24,8 @@ export default function LoginPage({ onLogin, goToSignup, goToForgotPassword }) {
     try {
       const data = await login(identifier, password);
       if (!data?.access_token) throw new Error("No access token returned");
-      onLogin?.(data.access_token);
+      handleLogin(data.access_token);
+      navigate("/budget");
     } catch (err) {
       setIsError(true);
       setMessage(err.response?.data?.detail || err.message || "Login failed");

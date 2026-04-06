@@ -1,8 +1,11 @@
 // src/components/ForgotPasswordPage.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
 
-export default function ForgotPasswordPage({ goToLogin }) {
+export default function ForgotPasswordPage() {
+  const navigate = useNavigate();
+  const goToLogin = () => navigate("/login");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);

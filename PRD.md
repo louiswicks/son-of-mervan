@@ -145,7 +145,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `web/src/api/client.js` and feature modules, `web/.env.example`  
 **Acceptance Criteria:** `REACT_APP_API_URL=http://localhost:8000` routes all calls to local backend without code changes.
 
-### 3.2 React Router v6
+### 3.2 React Router v6 [DONE 2026-04-06]
 **Problem:** Custom hash routing is fragile, doesn't support nested routes, and breaks browser history.  
 **Solution:** `react-router-dom` v6 with `createHashRouter`. Routes: `/dashboard`, `/expenses`, `/budget`, `/annual`, `/login`, `/register`, `/reset-password`, `/settings`. `<AuthGuard>` redirects unauthenticated users to `/login`.  
 **Files:** new `web/src/router.jsx`, `web/src/App.jsx`, new `web/src/components/AuthGuard.jsx`  

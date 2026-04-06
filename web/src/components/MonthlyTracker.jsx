@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Toast from "./Toast";
@@ -15,7 +16,8 @@ const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insuranc
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
 const storageKey = (u, m) => `monthlyTracker:${u}:${m}`;
 
-const MonthlyTracker = ({ token, onSaved }) => {
+const MonthlyTracker = () => {
+  const { token } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState('2025-08');
   const [saving, setSaving] = useState(false);
   const [salary, setSalary] = useState('');
@@ -287,7 +289,6 @@ const MonthlyTracker = ({ token, onSaved }) => {
         localStorage.removeItem(key); // force server reload next time
       } catch {}
 
-      if (typeof onSaved === 'function') onSaved();
       showToast("success", "Saved monthly data", `${selectedMonth} totals are updated.`);
     } catch (err) {
       showToast("error", "Save failed", "Couldn't save monthly data. Please try again.");

@@ -15,7 +15,7 @@ const CATEGORIES = [
   "Healthcare","Entertainment","Other"
 ];
 
-export default function SonOfMervan({ token, onSaved }) {
+export default function SonOfMervan() {
   const [salary, setSalary] = useState("");
   const [expenses, setExpenses] = useState([
     { name: "", amount: "", category: "Housing" },
@@ -53,7 +53,6 @@ export default function SonOfMervan({ token, onSaved }) {
     try {
       const data = await calculateBudget(body, false);
       setResults(data);
-      onSaved?.();
     } catch (err) {
       alert(err.response?.data?.detail || err.message || "Network error. Please try again.");
     } finally {

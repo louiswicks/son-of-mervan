@@ -1,3 +1,20 @@
+## Phase 3.2 — React Router v6 [DONE] 2026-04-06
+- Installed `react-router-dom@6` (^6.30.3)
+- Created `web/src/context/AuthContext.jsx`: `AuthProvider` component holds `isAuthenticated`, `token`, `loading` state; performs `refreshSession()` on startup; exposes `handleLogin` / `handleLogout`; registers `setOnUnauthorized` callback so Axios 401 interceptor can clear auth state; `useAuth()` hook for consumer access
+- Created `web/src/components/AuthGuard.jsx`: layout component used as parent route; shows spinner while loading; `<Navigate to="/login">` when unauthenticated; renders `Nav` + `<Outlet />` when authenticated; `Nav` uses `useNavigate` and `useLocation` to drive tab buttons and mobile select — replaces the tab-switching logic in the old `App.js`
+- Created `web/src/router.jsx`: `createHashRouter` with routes `/login`, `/register`, `/forgot-password`, `/verify-email`, `/reset-password` (public); `/`, `/budget`, `/expenses`, `/annual`, `/settings` (protected under `AuthGuard`); `*` catch-all redirects to `/`
+- Created `web/src/App.jsx`: thin wrapper — `<AuthProvider>` wrapping `<RouterProvider router={router} />`; updated `web/src/index.js` to import `./App.jsx` explicitly
+- Updated `LoginPage.jsx`: removed `onLogin`/`goToSignup`/`goToForgotPassword` props; uses `useAuth().handleLogin` + `useNavigate`; navigates to `/budget` after successful login
+- Updated `SignUpPage.jsx`, `ForgotPasswordPage.jsx`: removed `goToLogin` prop; use `useNavigate("/login")`
+- Updated `VerifyEmailPage.jsx`: removed `goToLogin` prop and `window.location.hash` parsing; uses `useSearchParams` to read token; uses `useNavigate`
+- Updated `ResetPasswordPage.jsx`: removed `getTokenFromHash` helper and `goToLogin` prop; uses `useSearchParams` + `useNavigate`
+- Updated `AccountSettings.jsx`: removed `token`/`onLogout` props; uses `useAuth().handleLogout` + `useNavigate("/login")` on deletion
+- Updated `MonthlyTracker.jsx`: removed `token`/`onSaved` props; reads `token` from `useAuth()` for localStorage key derivation; removed `onSaved()` call
+- Updated `SonOfMervan.jsx`: removed `token`/`onSaved` props; removed `onSaved()` call
+- Updated `AnnualOverview.jsx`: removed `token`/`refreshKey` props; `useEffect` now depends only on `year` (component remounts on route navigation, ensuring fresh data)
+- Build passes: `npm run build` compiles with 0 errors; bundle 207.39 kB gzip (+19.84 kB for react-router-dom)
+- Files changed: web/src/context/AuthContext.jsx (new), web/src/components/AuthGuard.jsx (new), web/src/router.jsx (new), web/src/App.jsx (new), web/src/index.js, web/src/components/LoginPage.jsx, web/src/components/SignUpPage.jsx, web/src/components/ForgotPasswordPage.jsx, web/src/components/VerifyEmailPage.jsx, web/src/components/ResetPasswordPage.jsx, web/src/components/AccountSettings.jsx, web/src/components/MonthlyTracker.jsx, web/src/components/SonOfMervan.jsx, web/src/components/AnnualOverview.jsx, web/package.json, PRD.md
+
 ## Phase 3.1 — Centralised API Client [DONE] 2026-04-06
 - Created `web/src/api/client.js`: single Axios instance reading base URL from `REACT_APP_API_URL` (falls back to Railway prod URL); `withCredentials: true` sends httpOnly cookie on every request; request interceptor injects in-memory access token via `setAccessToken()`; response interceptor catches 401, calls `/auth/refresh` (deduplicating concurrent retries), retries the original request with the new token, calls `setOnUnauthorized()` callback on refresh failure (skips retry for `/auth/refresh`, `/login`, `/auth/signup`)
 - Created `web/src/api/auth.js`: `login`, `signup`, `verifyEmail`, `requestPasswordReset`, `confirmPasswordReset`, `refreshSession`, `logout` — all returning unwrapped data

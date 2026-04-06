@@ -1,17 +1,16 @@
 // src/components/VerifyEmailPage.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { verifyEmail } from "../api/auth";
 
-export default function VerifyEmailPage({ goToLogin }) {
+export default function VerifyEmailPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("verifying"); // verifying | ok | error
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    // Works for both /verify-email?token=... and #/verify-email?token=...
-    const hash = window.location.hash || "";
-    const tokenFromHash = new URLSearchParams(hash.split("?")[1] || "").get("token");
-    const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
-    const token = tokenFromHash || tokenFromQuery;
+    const token = searchParams.get("token");
 
     if (!token) {
       setStatus("error");
@@ -29,7 +28,7 @@ export default function VerifyEmailPage({ goToLogin }) {
         setMsg(e.response?.data?.detail || e.message || "Verification failed.");
       }
     })();
-  }, []);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-dvh bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
@@ -44,10 +43,7 @@ export default function VerifyEmailPage({ goToLogin }) {
             <p className="text-gray-700 mb-6">{msg}</p>
             <button
               className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-              onClick={() => {
-                window.location.hash = "";
-                goToLogin?.();
-              }}
+              onClick={() => navigate("/login")}
             >
               Go to Login
             </button>

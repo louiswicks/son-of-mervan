@@ -1,8 +1,11 @@
 // src/components/SignUpPage.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { signup } from "../api/auth";
 
-export default function SignUpPage({ goToLogin }) {
+export default function SignUpPage() {
+  const navigate = useNavigate();
+  const goToLogin = () => navigate("/login");
   const [form, setForm] = useState({ email: "", password: "", confirm: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
