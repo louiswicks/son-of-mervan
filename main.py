@@ -6,7 +6,9 @@ from typing import List, Optional
 from fastapi import Path
 from fastapi import Body
 from fastapi import Query
-from fastapi import FastAPI, HTTPException, Depends, Request
+import hashlib
+import secrets
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -20,7 +22,7 @@ from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, encrypt_value
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
 from routers import tracker, overview, signup
@@ -43,7 +45,7 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Cache-Control"],
 )
 
 _alembic_cfg = AlembicConfig("alembic.ini")
@@ -150,7 +152,7 @@ async def root():
 
 @app.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
-def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
+def login(request: Request, response: Response, payload: LoginRequest, db: Session = Depends(get_db)):
     ident = payload.identifier.strip()
 
     # Try email first (exact match); then username fallback
@@ -168,9 +170,27 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Please verify your email before logging in.")
 
-    # Put the email (or user_id) in the JWT. Be consistent with your frontend.
-    token = create_access_token({"sub": user.email}, expires_delta=timedelta(hours=24))
-    return {"access_token": token, "token_type": "bearer"}
+    # 15-min access token (short-lived; refresh token handles long-term sessions)
+    access_token = create_access_token({"sub": user.email}, expires_delta=timedelta(minutes=15))
+
+    # 30-day refresh token — stored as httpOnly cookie, only hash persisted in DB
+    raw_refresh = secrets.token_urlsafe(32)
+    refresh_hash = hashlib.sha256(raw_refresh.encode()).hexdigest()
+    refresh_expires = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_TTL_DAYS)
+    db.add(RefreshToken(user_id=user.id, token_hash=refresh_hash, expires_at=refresh_expires))
+    db.commit()
+
+    response.set_cookie(
+        key="refresh_token",
+        value=raw_refresh,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/calculate-budget")
 async def calculate_budget(

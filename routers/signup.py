@@ -6,15 +6,15 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Response
 from pydantic import BaseModel, EmailStr, constr, validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
-from database import get_db, User, PasswordResetToken
-from security import get_password_hash, verify_password, create_email_verify_token, decode_email_verify_token
+from database import get_db, User, PasswordResetToken, RefreshToken
+from security import get_password_hash, verify_password, create_access_token, create_email_verify_token, decode_email_verify_token
 from email_utils import send_verification_email, send_password_reset_email
 from core.limiter import limiter
 from core.config import settings
@@ -190,3 +190,50 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     return {"message": "Email verified successfully."}
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+async def refresh_access_token(request: Request, db: Session = Depends(get_db)):
+    """Issue a new 15-min access token from a valid httpOnly refresh token cookie."""
+    raw_token = request.cookies.get("refresh_token")
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="No refresh token provided.")
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    rt = db.query(RefreshToken).filter(
+        RefreshToken.token_hash == token_hash,
+        RefreshToken.revoked_at == None,  # noqa: E711
+    ).first()
+
+    if not rt:
+        raise HTTPException(status_code=401, detail="Invalid or revoked refresh token.")
+    if rt.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=401, detail="Refresh token has expired.")
+
+    user = db.query(User).filter(User.id == rt.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found.")
+
+    access_token = create_access_token({"sub": user.email}, expires_delta=timedelta(minutes=15))
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout", response_model=VerifyResponse)
+async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Revoke the refresh token cookie and clear the cookie."""
+    raw_token = request.cookies.get("refresh_token")
+    if raw_token:
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        db.query(RefreshToken).filter(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked_at == None,  # noqa: E711
+        ).update({"revoked_at": datetime.utcnow()})
+        db.commit()
+
+    response.delete_cookie(key="refresh_token", path="/")
+    return {"message": "Logged out successfully."}

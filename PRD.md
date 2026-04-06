@@ -109,11 +109,12 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `routers/signup.py`, `database.py` (PasswordResetToken), `email_utils.py`, `core/config.py`, new `alembic/versions/c3d4e5f6a7b8`, new `web/src/components/ForgotPasswordPage.jsx`, new `web/src/components/ResetPasswordPage.jsx`, `web/src/components/LoginPage.jsx`, `web/src/App.js`  
 **Acceptance Criteria:** User receives email within 30 seconds of request. Token link works once only. Expired tokens return a clear error. Reused tokens are rejected.
 
-### 2.4 JWT Refresh Token Mechanism
+### 2.4 JWT Refresh Token Mechanism [DONE 2026-04-06]
 **Problem:** Long-lived access tokens are a security risk; short-lived tokens force frequent re-logins.  
 **Solution:** Issue `access_token` (15-min TTL) and `refresh_token` (30-day TTL, httpOnly cookie) on login. `POST /auth/refresh` issues new access tokens. `POST /auth/logout` revokes the refresh token. Frontend Axios interceptor catches 401, silently refreshes, retries original request. Access token stored in memory only (not localStorage).  
-**Files:** `routers/signup.py`, `models.py` (RefreshToken), `security.py`, `web/src/api/client.js`, `web/src/store/authStore.js`  
-**Acceptance Criteria:** User stays logged in for 30 days without action. Logging out invalidates the session on all future requests immediately.
+**Files:** `routers/signup.py`, `database.py` (RefreshToken), `core/config.py`, `main.py`, new `alembic/versions/d4e5f6a7b8c9`, `web/src/App.js`  
+**Acceptance Criteria:** User stays logged in for 30 days without action. Logging out invalidates the session on all future requests immediately.  
+**Note:** 401 auto-retry Axios interceptor deferred to Phase 3.1 (centralized API client).
 
 ### 2.5 Pagination and Filtering
 **Problem:** All expenses are returned in a single API call. Performance degrades and UI becomes unusable with large datasets.  

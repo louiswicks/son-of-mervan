@@ -28,26 +28,22 @@ function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // On startup: try to restore session from httpOnly refresh token cookie.
+  // Access token is never stored in localStorage — memory only.
   useEffect(() => {
-    const savedToken = localStorage.getItem("authToken");
-    if (!savedToken) {
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/verify-token`, {
-          headers: { Authorization: `Bearer ${savedToken}` },
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
         });
         if (res.ok) {
-          setToken(savedToken);
+          const data = await res.json();
+          setToken(data.access_token);
           setIsAuthenticated(true);
-        } else {
-          localStorage.removeItem("authToken");
         }
       } catch {
-        localStorage.removeItem("authToken");
+        // No valid session — stay on login page
       } finally {
         setLoading(false);
       }
@@ -55,17 +51,23 @@ function App() {
   }, []);
 
   const handleLogin = (newToken) => {
-    localStorage.setItem("authToken", newToken);
+    // Access token stored in memory only — NOT localStorage
     setToken(newToken);
     setIsAuthenticated(true);
-    // optional: clear any verify route after logging in
     if (window.location.hash.startsWith("#/verify-email")) {
       window.location.hash = "";
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Proceed with local logout even if request fails
+    }
     setToken(null);
     setIsAuthenticated(false);
   };

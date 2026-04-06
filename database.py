@@ -260,6 +260,22 @@ class PasswordResetToken(Base):
     user = relationship("User")
 
 
+class RefreshToken(Base):
+    """
+    Long-lived refresh tokens (30-day TTL) stored as httpOnly cookies.
+    Only the SHA-256 hash is persisted; the raw token lives in the cookie.
+    """
+    __tablename__ = "refresh_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)
