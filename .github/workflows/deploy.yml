@@ -22,11 +22,14 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --service son-of-mervan --environment production --detach
 
-      - name: Wait for deployment
-        run: sleep 30
-
-      - name: Smoke test — GET /health
+      - name: Smoke test — GET /health (with retries)
         run: |
-          curl -sf https://son-of-mervan-production.up.railway.app/health \
-            | grep -q '"status":"ok"' \
-            || (echo "Health check failed" && exit 1)
+          for i in $(seq 1 10); do
+            echo "Attempt $i/10..."
+            if curl -sf https://son-of-mervan-production.up.railway.app/health | grep -q '"status":"ok"'; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed after 150s" && exit 1
