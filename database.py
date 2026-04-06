@@ -291,6 +291,63 @@ class RefreshToken(Base):
     user = relationship("User")
 
 
+class RecurringExpense(Base):
+    """
+    A recurring expense template that auto-generates MonthlyExpense rows.
+    Frequencies: daily, weekly, monthly, yearly.
+    All sensitive fields encrypted at rest.
+    """
+    __tablename__ = "recurring_expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Frequency: daily / weekly / monthly / yearly
+    frequency = Column(String(16), nullable=False)
+
+    # Date range (stored as DateTime for consistency with rest of schema)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=True, default=None)
+
+    # Tracks when a planned row was last generated; used to avoid duplicate rows
+    last_generated_at = Column(DateTime, nullable=True, default=None)
+
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ENCRYPTED fields
+    _name_encrypted = Column("name_encrypted", String(512), nullable=False)
+    _category_encrypted = Column("category_encrypted", String(512), nullable=False)
+    _planned_amount_encrypted = Column("planned_amount_encrypted", String(512), nullable=False)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def name(self):
+        return decrypt_value(self._name_encrypted) if self._name_encrypted else None
+
+    @name.setter
+    def name(self, value):
+        self._name_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def category(self):
+        return decrypt_value(self._category_encrypted) if self._category_encrypted else None
+
+    @category.setter
+    def category(self, value):
+        self._category_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def planned_amount(self):
+        val = decrypt_value(self._planned_amount_encrypted) if self._planned_amount_encrypted else "0.0"
+        return float(val)
+
+    @planned_amount.setter
+    def planned_amount(self, value):
+        self._planned_amount_encrypted = encrypt_value(str(value))
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)

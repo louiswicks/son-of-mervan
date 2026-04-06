@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional
+from datetime import datetime
 
 class ExpenseItem(BaseModel):
     name: str
@@ -46,3 +47,36 @@ class AnnualOverviewResponse(BaseModel):
     total_income: float
     total_expenses: float
     average_savings_rate: float
+
+
+VALID_FREQUENCIES = {"daily", "weekly", "monthly", "yearly"}
+
+
+class RecurringExpenseCreate(BaseModel):
+    name: str
+    category: str
+    planned_amount: float
+    frequency: str          # daily / weekly / monthly / yearly
+    start_date: datetime
+    end_date: Optional[datetime] = None
+
+
+class RecurringExpenseUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    planned_amount: Optional[float] = None
+    frequency: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
+class RecurringExpenseResponse(BaseModel):
+    id: int
+    name: str
+    category: str
+    planned_amount: float
+    frequency: str
+    start_date: datetime
+    end_date: Optional[datetime]
+    last_generated_at: Optional[datetime]
+    created_at: datetime

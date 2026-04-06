@@ -23,9 +23,11 @@ from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
 from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value
+from apscheduler.schedulers.background import BackgroundScheduler
+from database import SessionLocal
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router
 from collections import defaultdict
 
 setup_logging()
@@ -563,6 +565,33 @@ app.include_router(tracker.router)
 app.include_router(overview.router)
 app.include_router(signup.router)
 app.include_router(users_router.router)
+app.include_router(recurring_router.router)
+
+# -------------------- Scheduler --------------------
+_scheduler = BackgroundScheduler(daemon=True)
+
+
+@app.on_event("startup")
+def _start_scheduler():
+    from routers.recurring import generate_all_recurring
+    _scheduler.add_job(
+        generate_all_recurring,
+        "cron",
+        hour=0,
+        minute=5,
+        id="generate_recurring",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
+    _scheduler.start()
+    logger.info("APScheduler started — recurring-expense generation runs daily at 00:05 UTC")
+
+
+@app.on_event("shutdown")
+def _stop_scheduler():
+    if _scheduler.running:
+        _scheduler.shutdown(wait=False)
+        logger.info("APScheduler stopped")
 
 # -------------------- Entrypoint --------------------
 if __name__ == "__main__":

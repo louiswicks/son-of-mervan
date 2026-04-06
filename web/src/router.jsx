@@ -11,6 +11,7 @@ import SonOfMervan from "./components/SonOfMervan";
 import MonthlyTracker from "./components/MonthlyTracker";
 import AnnualOverview from "./components/AnnualOverview";
 import AccountSettings from "./components/AccountSettings";
+import RecurringExpensesPage from "./components/RecurringExpensesPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function withPageBoundary(element) {
@@ -31,6 +32,7 @@ export const router = createHashRouter([
       { path: "budget", element: withPageBoundary(<SonOfMervan />) },
       { path: "expenses", element: withPageBoundary(<MonthlyTracker />) },
       { path: "annual", element: withPageBoundary(<AnnualOverview />) },
+      { path: "recurring", element: withPageBoundary(<RecurringExpensesPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },

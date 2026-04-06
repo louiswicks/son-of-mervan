@@ -192,9 +192,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 
 ## Phase 4: Advanced Features
 
-### 4.1 Recurring Expenses
+### 4.1 Recurring Expenses [DONE 2026-04-06]
 **Problem:** Most real expenses (rent, subscriptions, utilities) recur monthly. Users must re-enter them every period.  
-**Solution:** `RecurringExpense` model with `frequency` ENUM (daily/weekly/monthly/yearly), `start_date`, `end_date`, `last_generated_at`. Daily background job auto-generates actual expense rows. Frontend: "Recurring" toggle on expense form; dedicated management page.  
+**Solution:** `RecurringExpense` model with `frequency` ENUM (daily/weekly/monthly/yearly), `start_date`, `end_date`, `last_generated_at`. APScheduler daily background job (00:05 UTC) auto-generates planned MonthlyExpense rows; amounts scaled by frequency (daily × days-in-month, weekly × 4). Frontend: dedicated management page at `/recurring` with create/edit/delete and a "Generate now" manual trigger button. Nav updated with Repeat icon.  
+**Files:** `database.py`, `alembic/versions/a7b8c9d0e1f2_add_recurring_expenses.py`, `models.py`, `routers/recurring.py` (new), `main.py`, `requirements.txt`, `web/src/api/recurring.js` (new), `web/src/hooks/useRecurring.js` (new), `web/src/components/RecurringExpensesPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx`  
 **User Benefit:** Eliminates the biggest ongoing friction in app usage.
 
 ### 4.2 Savings Goals

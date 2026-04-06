@@ -1,3 +1,18 @@
+## Phase 4.1 — Recurring Expenses [DONE] 2026-04-06
+- Added `RecurringExpense` ORM model to `database.py`: `id`, `user_id`, `frequency` (daily/weekly/monthly/yearly string), `start_date`, `end_date`, `last_generated_at`, `deleted_at`, `created_at`; encrypted fields `name_encrypted`, `category_encrypted`, `planned_amount_encrypted` with hybrid properties for transparent Fernet en/decrypt
+- Created Alembic migration `a7b8c9d0e1f2_add_recurring_expenses.py`: creates `recurring_expenses` table with indexes on `id`, `user_id`, `deleted_at`; down_revision `f6a7b8c9d0e1`
+- Added `RecurringExpenseCreate`, `RecurringExpenseUpdate`, `RecurringExpenseResponse` Pydantic schemas + `VALID_FREQUENCIES` set to `models.py`
+- Created `routers/recurring.py`: `GET /recurring-expenses` (list), `POST /recurring-expenses` (create, 201), `PUT /recurring-expenses/{id}` (update), `DELETE /recurring-expenses/{id}` (soft-delete, 204), `POST /recurring-expenses/generate` (manual trigger); generation logic in `_generate_for_user` and `generate_all_recurring` — scales amount by frequency (daily × days-in-month, weekly × 4), skips if past end_date or already generated this month, avoids duplicate rows via name+category match
+- Updated `main.py`: imports `BackgroundScheduler` from APScheduler; registers `generate_all_recurring` as a daily cron job at 00:05 UTC on app startup via `@app.on_event("startup")`; shuts down scheduler on `@app.on_event("shutdown")`; registers `recurring_router`
+- Added `apscheduler>=3.10.0,<4.0.0` to `requirements.txt`
+- Created `web/src/api/recurring.js`: `listRecurring`, `createRecurring`, `updateRecurring`, `deleteRecurring`, `triggerGenerate` Axios wrappers
+- Created `web/src/hooks/useRecurring.js`: `useRecurring` query + `useCreateRecurring`, `useUpdateRecurring`, `useDeleteRecurring`, `useTriggerGenerate` mutations with React Query invalidation and toast feedback
+- Created `web/src/components/RecurringExpensesPage.jsx`: management page with add/edit/delete flows, frequency badge, "Generate now" button (calls `/recurring-expenses/generate`), empty state, ConfirmModal for deletion, mobile WCAG-compliant touch targets
+- Updated `web/src/router.jsx`: added `/recurring` route wrapping `RecurringExpensesPage` with `withPageBoundary`
+- Updated `web/src/components/AuthGuard.jsx`: added `Repeat` icon from lucide-react; added `["/recurring", "Recurring", Repeat]` to `NAV_TABS` (desktop + mobile bottom bar)
+- Tests: 94 backend tests pass (87% coverage); 25 frontend tests pass; build 229.71 kB gzip (+2.08 kB)
+- Files changed: database.py, alembic/versions/a7b8c9d0e1f2_add_recurring_expenses.py (new), models.py, routers/recurring.py (new), main.py, requirements.txt, web/src/api/recurring.js (new), web/src/hooks/useRecurring.js (new), web/src/components/RecurringExpensesPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, PRD.md
+
 ## Phase 3.8 — Frontend Test Suite [DONE] 2026-04-06
 - Updated `web/src/setupTests.js`: added `window.matchMedia` mock (required by `useTheme` hook reading `prefers-color-scheme`) and `ResizeObserver` mock (required by recharts)
 - Updated `web/src/App.test.js`: fixed broken "learn react" smoke test; mocks `./api/client` to block ESM-only axios; mocks `AuthContext` to render login page in unauthenticated state
