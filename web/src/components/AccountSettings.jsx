@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount } from "../hooks/useProfile";
+import { useCurrencies } from "../hooks/useCurrency";
 
 function Section({ title, children }) {
   return (
@@ -24,22 +25,28 @@ export default function AccountSettings() {
   const changePasswordMutation = useChangePassword();
   const deleteAccountMutation = useDeleteAccount();
 
+  const { data: currencies = [] } = useCurrencies();
+
   const [usernameInput, setUsernameInput] = useState("");
+  const [baseCurrencyInput, setBaseCurrencyInput] = useState("GBP");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  // Sync username input when profile loads
+  // Sync inputs when profile loads
   useEffect(() => {
     if (profile?.username !== undefined) {
       setUsernameInput(profile.username || "");
+    }
+    if (profile?.base_currency) {
+      setBaseCurrencyInput(profile.base_currency);
     }
   }, [profile]);
 
   async function handleProfileSave(e) {
     e.preventDefault();
-    updateProfileMutation.mutate({ username: usernameInput || null });
+    updateProfileMutation.mutate({ username: usernameInput || null, base_currency: baseCurrencyInput });
   }
 
   async function handleChangePassword(e) {
@@ -102,6 +109,28 @@ export default function AccountSettings() {
               disabled={profileLoading}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Base Currency</label>
+            <select
+              value={baseCurrencyInput}
+              onChange={(e) => setBaseCurrencyInput(e.target.value)}
+              disabled={profileLoading || currencies.length === 0}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+            >
+              {currencies.length === 0 ? (
+                <option value={baseCurrencyInput}>{baseCurrencyInput}</option>
+              ) : (
+                currencies.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.symbol} {c.code} — {c.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              All totals and new expenses will use this currency by default.
+            </p>
           </div>
           <button
             type="submit"

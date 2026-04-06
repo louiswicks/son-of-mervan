@@ -228,10 +228,11 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `database.py` (AuditLog model), `models.py` (AuditLogResponse schema), `main.py` (`_expense_snapshot`, `_write_audit`, audit calls on CRUD), `routers/audit.py` (new), `alembic/versions/g7h8i9j0k1l2_add_audit_logs.py` (new), `web/src/api/audit.js` (new), `web/src/hooks/useAudit.js` (new), `web/src/components/MonthlyTracker.jsx` (HistoryDrawer component + clock button)  
 **User Benefit:** Builds user trust — users can see exactly when an amount was changed and what it was before.
 
-### 4.7 Multi-Currency Support
+### 4.7 Multi-Currency Support [DONE 2026-04-06]
 **Problem:** Users who travel or have multi-currency income cannot accurately track in a single view.  
-**Solution:** `currency` field (ISO 4217) on all monetary records. Daily exchange rate sync from a free API, stored in `ExchangeRate` model. All aggregates convert to the user's `base_currency` at the rate on the transaction date. Currency selector on expense form; toggle on totals ("Show in GBP / Show in original currencies").  
-**User Benefit:** Opens the app to international users.
+**Solution:** `currency` field (ISO 4217) on all monetary records. Daily exchange rate sync from Frankfurter API (open.er-api.com fallback), stored in `ExchangeRate` model. User's `base_currency` preference stored on User model. Currency selector on expense form per row; dynamic currency symbols throughout MonthlyTracker. APScheduler job at 00:15 UTC syncs rates daily.  
+**Files:** `database.py` (User.base_currency, MonthlyExpense.currency, ExchangeRate model), `alembic/versions/h8i9j0k1l2m3_add_multi_currency.py` (migration), `routers/currency.py` (new — GET /currency/list, GET /currency/rates, sync_exchange_rates job), `routers/users.py` (base_currency in profile endpoints), `models.py` (currency on ExpenseUpdateRequest/ExpenseResponse), `main.py` (currency router + scheduler job + expense endpoint updates), `web/src/api/currency.js` (new), `web/src/hooks/useCurrency.js` (new — useCurrencies, useExchangeRates, currencySymbol), `web/src/components/AccountSettings.jsx` (base currency selector), `web/src/components/MonthlyTracker.jsx` (dynamic symbol, per-row currency selector), `web/src/hooks/useExpenses.js` (currency in save payload)  
+**User Benefit:** Opens the app to international users; supports per-expense foreign currency tracking.
 
 ---
 

@@ -4,7 +4,7 @@ from datetime import datetime
 from cryptography.fernet import Fernet
 from sqlalchemy import (
     Boolean, create_engine, Column, Integer, String, Float, DateTime,
-    ForeignKey, Text
+    ForeignKey, Text, Date, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -80,6 +80,9 @@ class User(Base):
     
     # Soft-delete timestamp — NULL means active, set means pending 30-day data removal
     deleted_at = Column(DateTime, nullable=True, default=None)
+
+    # Preferred display currency (ISO 4217 code, e.g. "GBP", "USD", "EUR")
+    base_currency = Column(String(3), nullable=False, default="GBP", server_default="GBP")
 
     months = relationship("MonthlyData", back_populates="owner", cascade="all, delete-orphan")
     
@@ -217,6 +220,9 @@ class MonthlyExpense(Base):
     _category_encrypted = Column("category_encrypted", String(512), nullable=False)
     _planned_amount_encrypted = Column("planned_amount_encrypted", String(512), default=None)
     _actual_amount_encrypted = Column("actual_amount_encrypted", String(512), default=None)
+
+    # Currency of this expense (ISO 4217 code); defaults to user's base_currency at save time
+    currency = Column(String(3), nullable=False, default="GBP", server_default="GBP")
 
     # Soft-delete timestamp — NULL means not deleted
     deleted_at = Column(DateTime, nullable=True, default=None)
@@ -525,6 +531,29 @@ class AuditLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User")
+
+
+class ExchangeRate(Base):
+    """
+    Daily exchange rates synced from Frankfurter API (open.er-api.com fallback).
+    Rates are stored relative to EUR as the base to allow cross-currency math.
+    e.g. base='EUR', target='GBP', rate=0.86 means 1 EUR = 0.86 GBP.
+    """
+    __tablename__ = "exchange_rates"
+    id = Column(Integer, primary_key=True, index=True)
+    # Base currency (always 'EUR' from our sync source)
+    base = Column(String(3), nullable=False, index=True)
+    # Target currency ISO 4217 code
+    target = Column(String(3), nullable=False, index=True)
+    # How many target units equal 1 base unit
+    rate = Column(Float, nullable=False)
+    # Date this rate is valid for
+    date = Column(Date, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("base", "target", "date", name="uq_exchange_rate_base_target_date"),
+    )
 
 
 # ---------- Helpers ----------

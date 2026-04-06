@@ -19,6 +19,7 @@ class ExpenseUpdateRequest(BaseModel):
     category: Optional[str] = None
     planned_amount: Optional[float] = None
     actual_amount: Optional[float] = None
+    currency: Optional[str] = None
 
 class ExpenseResponse(BaseModel):
     id: int
@@ -26,6 +27,7 @@ class ExpenseResponse(BaseModel):
     category: str
     planned_amount: float
     actual_amount: float
+    currency: str = "GBP"
 
 class MonthlyTrackerRequest(BaseModel):
     month: str   # e.g. "2025-08"

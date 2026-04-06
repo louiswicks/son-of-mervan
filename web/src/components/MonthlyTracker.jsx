@@ -12,6 +12,8 @@ import {
 } from "../hooks/useExpenses";
 import { exportCSV, exportPDF } from "../api/export";
 import { useExpenseAudit } from "../hooks/useAudit";
+import { useProfile } from "../hooks/useProfile";
+import { currencySymbol, useCurrencies } from "../hooks/useCurrency";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
@@ -147,8 +149,8 @@ const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
                           <>
                             <div><span className="font-medium">Name:</span> {snapshot.name || '—'}</div>
                             <div><span className="font-medium">Category:</span> {snapshot.category}</div>
-                            <div><span className="font-medium">Planned:</span> £{Number(snapshot.planned_amount).toFixed(2)}</div>
-                            <div><span className="font-medium">Actual:</span> £{Number(snapshot.actual_amount).toFixed(2)}</div>
+                            <div><span className="font-medium">Planned:</span> {currencySymbol(snapshot.currency || 'GBP')}{Number(snapshot.planned_amount).toFixed(2)}</div>
+                            <div><span className="font-medium">Actual:</span> {currencySymbol(snapshot.currency || 'GBP')}{Number(snapshot.actual_amount).toFixed(2)}</div>
                           </>
                         )}
                       </div>
@@ -164,7 +166,7 @@ const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
   );
 };
 
-const buildRowsFromExpenses = (items) => {
+const buildRowsFromExpenses = (items, defaultCurrency = 'GBP') => {
   const serverRows = items.map(e => ({
     id: e.id,
     category: e.category,
@@ -172,22 +174,28 @@ const buildRowsFromExpenses = (items) => {
     actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
     builtin: BASE_CATEGORIES.includes(e.category),
     name: e.name || '',
+    currency: e.currency || defaultCurrency,
   }));
 
   const presentCategories = new Set(serverRows.map(r => r.category));
   const missingBuiltins = BASE_CATEGORIES
     .filter(cat => !presentCategories.has(cat))
-    .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+    .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '', currency: defaultCurrency }));
 
   return [...serverRows, ...missingBuiltins];
 };
 
 const MonthlyTracker = () => {
   useAuth(); // ensure auth context is available
+  const { data: profile } = useProfile();
+  const { data: currencies = [] } = useCurrencies();
+  const baseCurrency = profile?.base_currency || 'GBP';
+  const sym = currencySymbol(baseCurrency);
+
   const [selectedMonth, setSelectedMonth] = useState('2025-08');
   const [salary, setSalary] = useState('');
   const [rows, setRows] = useState(
-    BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null }))
+    BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null, currency: 'GBP' }))
   );
   const [editingIndex, setEditingIndex] = useState(null);
   const [editDraft, setEditDraft] = useState({});
@@ -211,6 +219,7 @@ const MonthlyTracker = () => {
     if (!trackerData) return;
     const { salary_planned, salary_actual, expenses: expEnvelope = {} } = trackerData;
     const items = expEnvelope.items || [];
+    const serverCurrency = trackerData.base_currency || baseCurrency;
     setPagination({
       total: expEnvelope.total ?? 0,
       pages: expEnvelope.pages ?? 0,
@@ -218,7 +227,7 @@ const MonthlyTracker = () => {
     });
 
     const allRows = filterCategory === 'All'
-      ? buildRowsFromExpenses(items)
+      ? buildRowsFromExpenses(items, serverCurrency)
       : items.map(e => ({
           id: e.id,
           category: e.category,
@@ -226,12 +235,13 @@ const MonthlyTracker = () => {
           actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
           builtin: BASE_CATEGORIES.includes(e.category),
           name: e.name || '',
+          currency: e.currency || serverCurrency,
         }));
 
     setRows(allRows);
     const s = salary_actual ?? salary_planned;
     setSalary(s ? String(s) : '');
-  }, [trackerData, filterCategory]);
+  }, [trackerData, filterCategory, baseCurrency]);
 
   // Cancel in-progress edits when month or filter changes
   useEffect(() => {
@@ -259,7 +269,7 @@ const MonthlyTracker = () => {
 
   const addRow = () => setRows(prev => [
     ...prev,
-    { id: null, category: 'Other', projected: '', actual: '', builtin: false, name: '' },
+    { id: null, category: 'Other', projected: '', actual: '', builtin: false, name: '', currency: baseCurrency },
   ]);
 
   const removeRow = (index) => setRows(prev => prev.filter((_, i) => i !== index));
@@ -273,6 +283,7 @@ const MonthlyTracker = () => {
       category: row.category || '',
       projected: row.projected || '',
       actual: row.actual || '',
+      currency: row.currency || baseCurrency,
     });
   };
 
@@ -293,6 +304,7 @@ const MonthlyTracker = () => {
       category: draft.category,
       projected: draft.projected,
       actual: draft.actual,
+      currency: draft.currency || baseCurrency,
     };
     setRows(newRows);
     setEditingIndex(null);
@@ -307,6 +319,7 @@ const MonthlyTracker = () => {
             category: draft.category || null,
             planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
             actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
+            currency: draft.currency || baseCurrency,
           },
         });
       } catch {
@@ -396,7 +409,7 @@ const MonthlyTracker = () => {
 
       {/* Salary input */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 gap-2">
-        <label className="text-gray-700 dark:text-gray-300 font-medium">Monthly Salary (£):</label>
+        <label className="text-gray-700 dark:text-gray-300 font-medium">Monthly Salary ({sym}):</label>
         <input
           type="text"
           inputMode="decimal"
@@ -520,7 +533,7 @@ const MonthlyTracker = () => {
                   {/* Projected + Actual */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Projected (£)</label>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Projected ({isEditing ? currencySymbol(editDraft.currency || baseCurrency) : currencySymbol(row.currency || baseCurrency)})</label>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -531,12 +544,12 @@ const MonthlyTracker = () => {
                             : (e) => handleUpdate(i, 'projected', e.target.value)
                         }
                         className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
-                        placeholder="£"
+                        placeholder={sym}
                         disabled={!isEditing && row.id != null}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Actual (£)</label>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Actual ({isEditing ? currencySymbol(editDraft.currency || baseCurrency) : currencySymbol(row.currency || baseCurrency)})</label>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -547,16 +560,40 @@ const MonthlyTracker = () => {
                             : (e) => handleUpdate(i, 'actual', e.target.value)
                         }
                         className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
-                        placeholder="£"
+                        placeholder={sym}
                       />
                     </div>
                   </div>
+
+                  {/* Currency selector (mobile) */}
+                  {(isEditing || row.id == null) && (
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Currency</label>
+                      <select
+                        value={isEditing ? (editDraft.currency || baseCurrency) : (row.currency || baseCurrency)}
+                        onChange={
+                          isEditing
+                            ? (e) => setEditDraft(d => ({ ...d, currency: e.target.value }))
+                            : (e) => handleUpdate(i, 'currency', e.target.value)
+                        }
+                        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                      >
+                        {currencies.length > 0
+                          ? currencies.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>)
+                          : <option value={baseCurrency}>{baseCurrency}</option>
+                        }
+                      </select>
+                    </div>
+                  )}
+                  {(!isEditing && row.id != null && row.currency && row.currency !== baseCurrency) && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">{row.currency}</div>
+                  )}
 
                   {/* Difference + Status */}
                   {hasValues && (
                     <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100 dark:border-gray-700">
                       <span className={`font-semibold ${over ? 'text-red-600' : 'text-green-600'}`}>
-                        {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
+                        {diff === 0 ? `${currencySymbol(row.currency || baseCurrency)}0` : `${over ? '+' : ''}${currencySymbol(row.currency || baseCurrency)}${diff.toFixed(2)}`}
                       </span>
                       <span className={`flex items-center ${over ? 'text-red-600' : 'text-green-600'}`}>
                         {over
@@ -575,16 +612,16 @@ const MonthlyTracker = () => {
               <div className="grid grid-cols-3 gap-2 text-sm font-semibold text-center">
                 <div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Projected</div>
-                  <div>£{projectedTotal.toFixed(2)}</div>
+                  <div>{sym}{projectedTotal.toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Actual</div>
-                  <div>£{actualTotal.toFixed(2)}</div>
+                  <div>{sym}{actualTotal.toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Difference</div>
                   <div className={totalOver ? 'text-red-700' : 'text-green-700'}>
-                    {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
+                    {totalDiff === 0 ? `${sym}0` : `${totalOver ? '+' : ''}${sym}${totalDiff.toFixed(2)}`}
                   </div>
                 </div>
               </div>
@@ -598,8 +635,9 @@ const MonthlyTracker = () => {
                 <tr className="text-sm">
                   <th className="p-3 dark:text-gray-200">Category</th>
                   <th className="p-3 dark:text-gray-200">Name (optional)</th>
-                  <th className="p-3 dark:text-gray-200">Projected (£)</th>
-                  <th className="p-3 dark:text-gray-200">Actual (£)</th>
+                  <th className="p-3 dark:text-gray-200">Projected</th>
+                  <th className="p-3 dark:text-gray-200">Actual</th>
+                  <th className="p-3 dark:text-gray-200">Currency</th>
                   <th className="p-3 dark:text-gray-200">Difference</th>
                   <th className="p-3 dark:text-gray-200">Status</th>
                   <th className="p-3"></th>
@@ -667,7 +705,7 @@ const MonthlyTracker = () => {
                             value={editDraft.projected}
                             onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
                             className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                            placeholder="£"
+                            placeholder={currencySymbol(editDraft.currency || baseCurrency)}
                           />
                         ) : (
                           <input
@@ -676,7 +714,7 @@ const MonthlyTracker = () => {
                             value={row.projected}
                             onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
                             className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                            placeholder="£"
+                            placeholder={currencySymbol(row.currency || baseCurrency)}
                             disabled={row.id != null}
                           />
                         )}
@@ -690,7 +728,7 @@ const MonthlyTracker = () => {
                             value={editDraft.actual}
                             onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
                             className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                            placeholder="£"
+                            placeholder={currencySymbol(editDraft.currency || baseCurrency)}
                           />
                         ) : (
                           <input
@@ -699,15 +737,39 @@ const MonthlyTracker = () => {
                             value={row.actual}
                             onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
                             className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                            placeholder="£"
+                            placeholder={currencySymbol(row.currency || baseCurrency)}
                             disabled={row.id != null}
                           />
                         )}
                       </td>
 
+                      {/* Currency column */}
+                      <td className="p-3">
+                        {isEditing || row.id == null ? (
+                          <select
+                            value={isEditing ? (editDraft.currency || baseCurrency) : (row.currency || baseCurrency)}
+                            onChange={
+                              isEditing
+                                ? (e) => setEditDraft(d => ({ ...d, currency: e.target.value }))
+                                : (e) => handleUpdate(i, 'currency', e.target.value)
+                            }
+                            className="px-2 py-1 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                          >
+                            {currencies.length > 0
+                              ? currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)
+                              : <option value={baseCurrency}>{baseCurrency}</option>
+                            }
+                          </select>
+                        ) : (
+                          <span className={`text-xs font-medium ${(row.currency || baseCurrency) !== baseCurrency ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {row.currency || baseCurrency}
+                          </span>
+                        )}
+                      </td>
+
                       <td className="p-3 whitespace-nowrap">
                         <span className={over ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
-                          {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
+                          {diff === 0 ? `${currencySymbol(row.currency || baseCurrency)}0` : `${over ? '+' : ''}${currencySymbol(row.currency || baseCurrency)}${diff.toFixed(2)}`}
                         </span>
                       </td>
 
@@ -784,11 +846,12 @@ const MonthlyTracker = () => {
                 <tr className="border-t bg-gray-50 dark:bg-gray-700 font-semibold dark:text-gray-200">
                   <td className="p-3">Totals</td>
                   <td className="p-3"></td>
-                  <td className="p-3">£{projectedTotal.toFixed(2)}</td>
-                  <td className="p-3">£{actualTotal.toFixed(2)}</td>
+                  <td className="p-3">{sym}{projectedTotal.toFixed(2)}</td>
+                  <td className="p-3">{sym}{actualTotal.toFixed(2)}</td>
+                  <td className="p-3"></td>
                   <td className="p-3">
                     <span className={totalOver ? 'text-red-700' : 'text-green-700'}>
-                      {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
+                      {totalDiff === 0 ? `${sym}0` : `${totalOver ? '+' : ''}${sym}${totalDiff.toFixed(2)}`}
                     </span>
                   </td>
                   <td className="p-3">{totalOver ? 'Over' : 'Under'}</td>
@@ -887,7 +950,7 @@ const MonthlyTracker = () => {
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip wrapperStyle={{ zIndex: 10 }} formatter={(v, n) => [`£${Number(v).toLocaleString()}`, n]} />
+                  <Tooltip wrapperStyle={{ zIndex: 10 }} formatter={(v, n) => [`${sym}${Number(v).toLocaleString()}`, n]} />
                   <Legend verticalAlign="bottom" align="center" />
                 </PieChart>
               </ResponsiveContainer>
@@ -896,15 +959,15 @@ const MonthlyTracker = () => {
             <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Salary</span>
-                <span className="font-semibold">£{lastSaved.salary.toLocaleString()}</span>
+                <span className="font-semibold">{sym}{lastSaved.salary.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Spent</span>
-                <span className="font-semibold text-red-600">£{lastSaved.spent.toLocaleString()}</span>
+                <span className="font-semibold text-red-600">{sym}{lastSaved.spent.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Saved</span>
-                <span className="font-semibold text-green-600">£{lastSaved.saved.toLocaleString()}</span>
+                <span className="font-semibold text-green-600">{sym}{lastSaved.saved.toLocaleString()}</span>
               </div>
             </div>
           </div>

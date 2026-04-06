@@ -51,6 +51,7 @@ export function useSaveMonthlyTracker(month) {
           name: r.name?.trim() || r.category,
           amount: Number(r.actual) || 0,
           category: r.category,
+          ...(r.currency ? { currency: r.currency } : {}),
         }));
 
       return saveMonthlyTracker(month, {

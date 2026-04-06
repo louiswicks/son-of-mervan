@@ -21,9 +21,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 class UserProfileResponse(BaseModel):
     email: str
     username: str | None
+    base_currency: str
 
 class UpdateProfileRequest(BaseModel):
     username: str | None = None
+    base_currency: str | None = None
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
@@ -55,7 +57,7 @@ def _get_current_user(email: str = Depends(verify_token), db: Session = Depends(
 @router.get("/me", response_model=UserProfileResponse)
 def get_profile(user: User = Depends(_get_current_user)):
     """Return the authenticated user's profile."""
-    return {"email": user.email, "username": user.username}
+    return {"email": user.email, "username": user.username, "base_currency": user.base_currency or "GBP"}
 
 
 @router.put("/me", response_model=UserProfileResponse)
@@ -64,12 +66,18 @@ def update_profile(
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the authenticated user's profile (username only for now)."""
+    """Update the authenticated user's profile (username and base_currency)."""
+    from routers.currency import VALID_CURRENCY_CODES
     if payload.username is not None:
         user.username = payload.username if payload.username.strip() else None
+    if payload.base_currency is not None:
+        code = payload.base_currency.upper()
+        if code not in VALID_CURRENCY_CODES:
+            raise HTTPException(status_code=400, detail=f"Unsupported currency code: {code}")
+        user.base_currency = code
     db.commit()
     db.refresh(user)
-    return {"email": user.email, "username": user.username}
+    return {"email": user.email, "username": user.username, "base_currency": user.base_currency or "GBP"}
 
 
 @router.put("/me/password", response_model=MessageResponse)

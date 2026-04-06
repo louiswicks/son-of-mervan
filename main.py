@@ -23,12 +23,12 @@ from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification, AuditLog
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification, AuditLog, ExchangeRate
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router
 from collections import defaultdict
 
 setup_logging()
@@ -91,6 +91,7 @@ class ActualExpenseItem(BaseModel):
     name: str
     amount: float
     category: str
+    currency: Optional[str] = None  # ISO 4217 code; defaults to user's base_currency
 
 class ActualBudgetRequest(BaseModel):
     salary: Optional[float] = None
@@ -301,6 +302,7 @@ async def calculate_budget(
             expense.category = e.category
             expense.planned_amount = e.amount
             expense.actual_amount = 0.0
+            expense.currency = user.base_currency or "GBP"
             db.add(expense)
             db.flush()  # populate expense.id before audit log
             _write_audit(db, user.id, expense.id, "create", None, {
@@ -308,6 +310,7 @@ async def calculate_budget(
                 "category": e.category,
                 "planned_amount": float(e.amount),
                 "actual_amount": 0.0,
+                "currency": user.base_currency or "GBP",
             })
             existing_expenses.append(expense)
 
@@ -361,9 +364,12 @@ async def save_actuals(
     for item in items:
         exp = find_expense_by_values(existing_expenses, item.name, item.category)
         
+        item_currency = (item.currency or "").upper() or (user.base_currency or "GBP")
         if exp:
-            # Update ONLY actual_amount, preserve planned_amount
+            # Update ONLY actual_amount (and currency if provided), preserve planned_amount
             exp.actual_amount = float(item.amount or 0.0)
+            if item.currency:
+                exp.currency = item_currency
         else:
             # Create new expense with actual only
             new_expense = MonthlyExpense(monthly_data_id=month_row.id)
@@ -371,6 +377,7 @@ async def save_actuals(
             new_expense.category = item.category
             new_expense.planned_amount = 0.0  # No planned data for this new line
             new_expense.actual_amount = float(item.amount or 0.0)
+            new_expense.currency = item_currency
             db.add(new_expense)
             db.flush()  # populate new_expense.id before audit log
             _write_audit(db, user.id, new_expense.id, "create", None, {
@@ -378,6 +385,7 @@ async def save_actuals(
                 "category": item.category,
                 "planned_amount": 0.0,
                 "actual_amount": float(item.amount or 0.0),
+                "currency": item_currency,
             })
             existing_expenses.append(new_expense)
 
@@ -470,6 +478,7 @@ async def get_monthly_tracker(
             "category": e.category or "",
             "planned_amount": float(e.planned_amount or 0.0),
             "actual_amount": float(e.actual_amount or 0.0),
+            "currency": e.currency or user.base_currency or "GBP",
         }
         for e in all_expenses
     ]
@@ -498,6 +507,7 @@ async def get_monthly_tracker(
         "month": month_norm,
         "salary_planned": float(month_row.salary_planned or 0.0),
         "salary_actual": float(month_row.salary_actual or 0.0),
+        "base_currency": user.base_currency or "GBP",
         "rows": rows,
         "expenses": {
             "items": page_items,
@@ -530,6 +540,7 @@ def _expense_snapshot(expense: MonthlyExpense) -> dict:
         "category": expense.category,
         "planned_amount": float(expense.planned_amount or 0.0),
         "actual_amount": float(expense.actual_amount or 0.0),
+        "currency": expense.currency or "GBP",
     }
 
 
@@ -573,6 +584,12 @@ async def update_expense(
         expense.planned_amount = data.planned_amount
     if data.actual_amount is not None:
         expense.actual_amount = data.actual_amount
+    if data.currency is not None:
+        from routers.currency import VALID_CURRENCY_CODES
+        code = data.currency.upper()
+        if code not in VALID_CURRENCY_CODES:
+            raise HTTPException(status_code=400, detail=f"Unsupported currency code: {code}")
+        expense.currency = code
 
     after = _expense_snapshot(expense)
     _write_audit(db, user.id, expense.id, "update", before, after)
@@ -585,6 +602,7 @@ async def update_expense(
         "category": expense.category,
         "planned_amount": float(expense.planned_amount or 0.0),
         "actual_amount": float(expense.actual_amount or 0.0),
+        "currency": expense.currency or "GBP",
     }
 
 
@@ -622,6 +640,7 @@ app.include_router(alerts_router.router)
 app.include_router(insights_router.router)
 app.include_router(export_router.router)
 app.include_router(audit_router.router)
+app.include_router(currency_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)
@@ -631,6 +650,16 @@ _scheduler = BackgroundScheduler(daemon=True)
 def _start_scheduler():
     from routers.recurring import generate_all_recurring
     from routers.alerts import check_budget_alerts
+    from routers.currency import sync_exchange_rates
+    _scheduler.add_job(
+        sync_exchange_rates,
+        "cron",
+        hour=0,
+        minute=15,
+        id="sync_exchange_rates",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.add_job(
         generate_all_recurring,
         "cron",
@@ -652,7 +681,7 @@ def _start_scheduler():
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
-        "budget alert checks at 00:10 UTC"
+        "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC"
     )
 
 
