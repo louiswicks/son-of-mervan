@@ -332,3 +332,13 @@
 - Fixed `web/src/tests/MonthlyTracker.test.jsx` and `web/src/tests/AuthGuard.test.jsx`: moved component import statements to the top of each file — Babel requires all `import` statements at module level; having an `import` after `let` declarations caused Babel to skip transpilation
 - Test results: 94 backend tests, 67% coverage (≥65% threshold met); 25 frontend tests across 5 suites (all passing); ruff 0 errors; bandit 0 medium/high issues; eslint 0 errors
 - Files changed: .github/workflows/ci.yml (new), .github/workflows/deploy.yml (new), ruff.toml (new), requirements.txt, pytest.ini, web/package.json, tests/test_expenses.py, web/src/tests/MonthlyTracker.test.jsx, web/src/tests/AuthGuard.test.jsx, main.py (nosec + unused import fixes), routers/audit.py, routers/currency.py, routers/overview.py, routers/savings.py, routers/signup.py, routers/users.py
+
+## Phase 5.3 — Monitoring and Error Tracking [DONE] 2026-04-06
+- Added `sentry-sdk[fastapi]>=1.40.0` and `structlog>=24.1.0` to `requirements.txt`
+- Added `SENTRY_DSN: str = ""` to `core/config.py` — empty string disables Sentry in local dev; set to a real DSN in production
+- Rewrote `core/logging_config.py` to use structlog: in production (`ENVIRONMENT=production` or `LOG_FORMAT=json`), emits newline-delimited JSON via `structlog.processors.JSONRenderer` (compatible with Railway log drain / Datadog); stdlib logging redirected through a `ProcessorFormatter` so uvicorn/SQLAlchemy records appear in the same stream; in development emits human-readable coloured output via `structlog.dev.ConsoleRenderer`
+- Updated `main.py`: imported `sentry_sdk`, `FastApiIntegration`, `SqlalchemyIntegration`; after `setup_logging()`, conditionally calls `sentry_sdk.init(dsn=settings.SENTRY_DSN, integrations=[FastApiIntegration(), SqlalchemyIntegration()], environment=settings.ENVIRONMENT, release="son-of-mervan@1.0.0", traces_sample_rate=1.0 in prod else 0.0)` — no-op when DSN is unset; logs a startup message confirming Sentry is active
+- Added `"@sentry/react": "^8.0.0"` to `web/package.json` dependencies
+- Updated `web/src/index.js`: imports `* as Sentry from '@sentry/react'`; conditionally calls `Sentry.init(...)` with `REACT_APP_SENTRY_DSN`, `REACT_APP_ENVIRONMENT`, `REACT_APP_VERSION` build-time env vars and `browserTracingIntegration()`; no-op when DSN env var is absent
+- Test results: 94 backend tests pass unchanged; frontend build clean (281.76 kB gzip, +37 kB from Sentry bundle)
+- Files changed: requirements.txt, core/config.py, core/logging_config.py, main.py, web/package.json, web/src/index.js

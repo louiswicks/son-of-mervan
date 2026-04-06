@@ -4,6 +4,7 @@
   "private": true,
   "homepage": "https://louiswicks.github.io/son-of-mervan",
   "dependencies": {
+    "@sentry/react": "^8.0.0",
     "@tanstack/react-query": "^5.96.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",

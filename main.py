@@ -17,6 +17,10 @@ from starlette import status
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
 from core.logging_config import setup_logging
 from core.config import settings
 from core.limiter import limiter
@@ -33,6 +37,23 @@ from collections import defaultdict
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# Sentry — only active when SENTRY_DSN is configured (no-op in local dev)
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[
+            FastApiIntegration(),
+            SqlalchemyIntegration(),
+        ],
+        environment=settings.ENVIRONMENT,
+        release="son-of-mervan@1.0.0",
+        # Capture 100% of transactions in production for now; tune down later
+        traces_sample_rate=1.0 if settings.ENVIRONMENT == "production" else 0.0,
+        # Attach the authenticated user's id to every error event
+        send_default_pii=False,
+    )
+    logger.info("Sentry initialised (environment=%s)", settings.ENVIRONMENT)
 
 # -------------------- App Setup --------------------
 app = FastAPI(title="Son of Mervan - Budget API", version="1.0.0")

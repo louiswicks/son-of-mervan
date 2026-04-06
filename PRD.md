@@ -252,7 +252,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Acceptance Criteria:** Broken code is blocked from reaching `main`. Merge to `main` automatically deploys within 5 minutes.  
 **Result:** All CI gates pass locally — 94 backend tests (67% coverage), 25 frontend tests (5 suites), ruff clean, bandit clean, eslint 0 errors.
 
-### 5.3 Monitoring and Error Tracking
+### 5.3 Monitoring and Error Tracking [DONE 2026-04-06]
 **Solution:** Sentry `sentry-sdk[fastapi]` on backend; `@sentry/react` on frontend. Both report errors with user context and stack traces. Structured JSON logging via `structlog`. `GET /health` endpoint returning `{ status, db, version }` for Railway health checks.  
 **Acceptance Criteria:** A deliberate 500 error appears in Sentry within 60 seconds. Railway restarts unhealthy instances automatically.
 

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     # "production" enables HSTS and other prod-only security headers
     ENVIRONMENT: str = "development"
+    # Sentry DSN — leave empty to disable error reporting (safe for local dev)
+    SENTRY_DSN: str = ""
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
