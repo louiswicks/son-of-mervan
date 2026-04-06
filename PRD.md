@@ -97,7 +97,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `alembic/` directory, `alembic.ini`, deploy configuration  
 **Acceptance Criteria:** `alembic upgrade head` runs without error on a fresh database. `alembic downgrade -1` successfully rolls back the last migration.
 
-### 2.2 Full CRUD for Expenses and Income
+### 2.2 Full CRUD for Expenses and Income [DONE 2026-04-06]
 **Problem:** Users cannot edit or delete expenses/income entries. A mis-typed amount is permanent.  
 **Solution:** Add `PUT /expenses/{id}` and `DELETE /expenses/{id}` endpoints with user ownership validation. Implement soft-delete (`deleted_at` column) so data is never physically removed. Frontend: edit (pencil) and delete (trash) icons per row; confirmation modal before delete.  
 **Files:** `routers/tracker.py`, `models.py`, `crud.py`, `web/src/components/ExpenseRow.jsx`, new `web/src/components/ConfirmModal.jsx`  

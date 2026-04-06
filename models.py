@@ -6,6 +6,19 @@ class ExpenseItem(BaseModel):
     amount: float
     category: str
 
+class ExpenseUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    planned_amount: Optional[float] = None
+    actual_amount: Optional[float] = None
+
+class ExpenseResponse(BaseModel):
+    id: int
+    name: str
+    category: str
+    planned_amount: float
+    actual_amount: float
+
 class MonthlyTrackerRequest(BaseModel):
     month: str   # e.g. "2025-08"
     salary: float

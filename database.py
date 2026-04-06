@@ -202,7 +202,10 @@ class MonthlyExpense(Base):
     _category_encrypted = Column("category_encrypted", String(512), nullable=False)
     _planned_amount_encrypted = Column("planned_amount_encrypted", String(512), default=None)
     _actual_amount_encrypted = Column("actual_amount_encrypted", String(512), default=None)
-    
+
+    # Soft-delete timestamp — NULL means not deleted
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
     monthly = relationship("MonthlyData", back_populates="expenses")
     
     # Hybrid properties

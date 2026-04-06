@@ -1,7 +1,7 @@
 import logging
 import os
 import uvicorn
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import Path
 from fastapi import Body
@@ -22,6 +22,7 @@ from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
 from database import get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
+from models import ExpenseUpdateRequest
 from routers import tracker, overview, signup
 from collections import defaultdict
 
@@ -236,10 +237,13 @@ async def calculate_budget(
 
     existing_expenses = (
         db.query(MonthlyExpense)
-        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .filter(
+            MonthlyExpense.monthly_data_id == month_row.id,
+            MonthlyExpense.deleted_at == None,
+        )
         .all()
     )
-    
+
     for e in budget_data.expenses:
         existing = find_expense_by_values(existing_expenses, e.name, e.category)
 
@@ -300,7 +304,10 @@ async def save_actuals(
     items = (data.expenses if data and data.expenses else [])
     existing_expenses = (
         db.query(MonthlyExpense)
-        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .filter(
+            MonthlyExpense.monthly_data_id == month_row.id,
+            MonthlyExpense.deleted_at == None,
+        )
         .all()
     )
     for item in items:
@@ -322,10 +329,13 @@ async def save_actuals(
 
     db.commit()
 
-    # Recalculate totals
+    # Recalculate totals (exclude soft-deleted)
     refreshed_expenses = (
         db.query(MonthlyExpense)
-        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .filter(
+            MonthlyExpense.monthly_data_id == month_row.id,
+            MonthlyExpense.deleted_at == None,
+        )
         .all()
     )
 
@@ -386,11 +396,14 @@ async def get_monthly_tracker(
 
     expenses = (
         db.query(MonthlyExpense)
-        .filter(MonthlyExpense.monthly_data_id == month_row.id)
+        .filter(
+            MonthlyExpense.monthly_data_id == month_row.id,
+            MonthlyExpense.deleted_at == None,
+        )
         .all()
     )
 
-    # Group by category (decrypt the category for grouping)
+    # Group by category (for backward-compatible `rows` field)
     sums = defaultdict(lambda: {"projected": 0.0, "actual": 0.0})
     for e in expenses:
         sums[e.category]["projected"] += float(e.planned_amount or 0.0)
@@ -401,12 +414,87 @@ async def get_monthly_tracker(
         for cat, v in sums.items()
     ]
 
+    # Individual expense rows with IDs (for CRUD)
+    expense_list = [
+        {
+            "id": e.id,
+            "name": e.name or "",
+            "category": e.category or "",
+            "planned_amount": float(e.planned_amount or 0.0),
+            "actual_amount": float(e.actual_amount or 0.0),
+        }
+        for e in expenses
+    ]
+
     return {
         "month": month_norm,
         "salary_planned": float(month_row.salary_planned or 0.0),
         "salary_actual": float(month_row.salary_actual or 0.0),
         "rows": rows,
+        "expenses": expense_list,
     }
+
+def _get_owned_expense(expense_id: int, current_user_email: str, db: Session) -> MonthlyExpense:
+    """Fetch an expense and verify the current user owns it. Raises 404/403 as appropriate."""
+    expense = db.query(MonthlyExpense).filter(MonthlyExpense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    # Walk up to MonthlyData to verify ownership
+    month_data = db.query(MonthlyData).filter(MonthlyData.id == expense.monthly_data_id).first()
+    if not month_data:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    user = get_user_by_email(db, current_user_email)
+    if not user or month_data.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorised to modify this expense")
+    return expense
+
+
+@app.put("/expenses/{expense_id}")
+async def update_expense(
+    expense_id: int = Path(...),
+    data: ExpenseUpdateRequest = Body(...),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    expense = _get_owned_expense(expense_id, current_user, db)
+    if expense.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if data.name is not None:
+        expense.name = data.name
+    if data.category is not None:
+        expense.category = data.category
+    if data.planned_amount is not None:
+        expense.planned_amount = data.planned_amount
+    if data.actual_amount is not None:
+        expense.actual_amount = data.actual_amount
+
+    db.commit()
+    db.refresh(expense)
+
+    return {
+        "id": expense.id,
+        "name": expense.name,
+        "category": expense.category,
+        "planned_amount": float(expense.planned_amount or 0.0),
+        "actual_amount": float(expense.actual_amount or 0.0),
+    }
+
+
+@app.delete("/expenses/{expense_id}", status_code=204)
+async def delete_expense(
+    expense_id: int = Path(...),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    expense = _get_owned_expense(expense_id, current_user, db)
+    if expense.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    expense.deleted_at = datetime.utcnow()
+    db.commit()
+    # 204 No Content — no response body
+
 
 @app.get("/verify-token")
 async def verify_user_token(current_user: str = Depends(verify_token)):

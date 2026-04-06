@@ -1,3 +1,19 @@
+## Phase 2.2 — Full CRUD for Expenses and Income [DONE] 2026-04-06
+- Added `deleted_at` (nullable DateTime) column to `MonthlyExpense` in database.py for soft-delete
+- Created Alembic migration b2e4f5a6c7d8 to add `deleted_at`; upgrade/downgrade verified against SQLite
+- Added `ExpenseUpdateRequest` and `ExpenseResponse` Pydantic schemas to models.py
+- Added `PUT /expenses/{id}` endpoint: updates name/category/planned_amount/actual_amount, validates ownership (403 if wrong user)
+- Added `DELETE /expenses/{id}` endpoint: soft-delete (sets `deleted_at`), returns 204, validates ownership
+- Updated all existing expense queries in `calculate-budget`, `save_actuals`, and `get_monthly_tracker` to filter `deleted_at == None`
+- Updated `GET /monthly-tracker/{month}` to return an `expenses` array with individual rows including DB `id` fields
+- Created `web/src/components/ConfirmModal.jsx`: generic confirmation dialog with Cancel/Confirm buttons
+- Updated `web/src/components/MonthlyTracker.jsx`:
+  - Loads individual expenses from server `expenses` array; stores DB id per row
+  - Pencil icon on saved rows triggers inline edit mode; Check/X icons to save/cancel
+  - Inline save calls `PUT /expenses/{id}`; trash on saved rows opens ConfirmModal → `DELETE /expenses/{id}`
+  - After batch save, re-fetches server data so new DB ids populate rows
+- Files changed: database.py, alembic/versions/b2e4f5a6c7d8_add_deleted_at_to_monthly_expenses.py (new), models.py, main.py, web/src/components/ConfirmModal.jsx (new), web/src/components/MonthlyTracker.jsx
+
 ## Phase 2.1 — Alembic Database Migrations [DONE] 2026-04-06
 - Added alembic>=1.13.0 and pinned sqlalchemy>=2.0.0 to requirements.txt
 - Ran `alembic init alembic` to create scaffold (alembic/ dir + alembic.ini)

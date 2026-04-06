@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2 } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Toast from "./Toast";
+import ConfirmModal from "./ConfirmModal";
 
 const API_BASE_URL = import.meta?.env?.VITE_API_URL || 'https://son-of-mervan-production.up.railway.app';
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
@@ -17,8 +18,13 @@ const MonthlyTracker = ({ token, onSaved }) => {
   const [username, setUsername] = useState('anon');
   const [toast, setToast] = useState({ open: false, type: "success", title: "", message: "" });
   const [rows, setRows] = useState(
-    BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '' }))
+    BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null }))
   );
+  // Edit state: { rowIndex, name, category, projected, actual }
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+  // Delete confirm modal state
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, expenseId: null, rowIndex: null });
 
   const computeSnapshot = (rows, salaryStr) => {
     const spent = rows.reduce((s, r) => s + (Number(r.actual) || 0), 0);
@@ -36,6 +42,10 @@ const MonthlyTracker = ({ token, onSaved }) => {
     }
   };
 
+  const authHeader = () => ({
+    Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
+  });
+
   const showToast = (type, title, message, autoHideMs = 2600) => {
     setToast({ open: true, type, title, message });
     if (autoHideMs) {
@@ -51,6 +61,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
 
   useEffect(() => {
     const load = async () => {
+      const hdr = { Authorization: `Bearer ${token || localStorage.getItem('authToken')}` };
       try {
         if (!username) return;
         const raw = localStorage.getItem(storageKey(username, selectedMonth));
@@ -66,32 +77,44 @@ const MonthlyTracker = ({ token, onSaved }) => {
 
       try {
         const res = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
-          headers: { Authorization: `Bearer ${token || localStorage.getItem('authToken')}` },
+          headers: hdr,
           params: { _r: Date.now() },
         });
 
-        const { salary_planned, salary_actual, rows: serverRows = [] } = res.data || {};
-        const byCat = Object.fromEntries(serverRows.map(r => [r.category, r]));
+        const { salary_planned, salary_actual, expenses: serverExpenses = [] } = res.data || {};
 
-        const builtins = BASE_CATEGORIES.map(cat => ({
-          category: cat,
-          projected: byCat[cat]?.projected !== undefined ? String(byCat[cat].projected) : '',
-          actual:    byCat[cat]?.actual    !== undefined ? String(byCat[cat].actual)    : '',
-          builtin: true,
-          name: '',
+        // Build rows from individual server expenses (each has id, name, category, planned_amount, actual_amount)
+        const serverRows = serverExpenses.map(e => ({
+          id: e.id,
+          category: e.category,
+          projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+          actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+          builtin: BASE_CATEGORIES.includes(e.category),
+          name: e.name || '',
         }));
 
-        setRows(builtins);
+        // Add empty builtin rows for categories not yet in the server data
+        const presentCategories = new Set(serverRows.map(r => r.category));
+        const missingBuiltins = BASE_CATEGORIES
+          .filter(cat => !presentCategories.has(cat))
+          .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+
+        const allRows = [...serverRows, ...missingBuiltins];
+        setRows(allRows);
+
         const s = (salary_actual ?? salary_planned);
         const salaryStr = s ? String(s) : '';
         setSalary(salaryStr);
 
-        const snap = computeSnapshot(builtins, salaryStr);
+        const snap = computeSnapshot(allRows, salaryStr);
         setLastSaved(snap);
       } catch {}
     };
 
     load();
+    // Cancel any in-progress edit when month changes
+    setEditingIndex(null);
+    setEditDraft({});
   }, [selectedMonth, token, username]);
 
   useEffect(() => {
@@ -111,8 +134,90 @@ const MonthlyTracker = ({ token, onSaved }) => {
     setRows(newRows);
   };
 
-  const addRow = () => setRows(prev => [...prev, { category: 'Other', projected: '', actual: '', builtin: false, name: '' }]);
+  const addRow = () => setRows(prev => [
+    ...prev,
+    { id: null, category: 'Other', projected: '', actual: '', builtin: false, name: '' },
+  ]);
+
   const removeRow = (index) => setRows(prev => prev.filter((_, i) => i !== index));
+
+  // ---- Inline edit handlers ----
+  const startEdit = (index) => {
+    const row = rows[index];
+    setEditingIndex(index);
+    setEditDraft({
+      name: row.name || '',
+      category: row.category || '',
+      projected: row.projected || '',
+      actual: row.actual || '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditDraft({});
+  };
+
+  const saveEdit = async (index) => {
+    const row = rows[index];
+    const draft = editDraft;
+
+    if (row.id) {
+      // Persist to server via PUT
+      try {
+        await axios.put(
+          `${API_BASE_URL}/expenses/${row.id}`,
+          {
+            name: draft.name || null,
+            category: draft.category || null,
+            planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
+            actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
+          },
+          { headers: { ...authHeader(), 'Content-Type': 'application/json' } },
+        );
+      } catch {
+        showToast("error", "Update failed", "Couldn't save changes. Please try again.");
+        return;
+      }
+    }
+
+    // Update local state
+    const newRows = [...rows];
+    newRows[index] = {
+      ...row,
+      name: draft.name,
+      category: draft.category,
+      projected: draft.projected,
+      actual: draft.actual,
+    };
+    setRows(newRows);
+    setEditingIndex(null);
+    setEditDraft({});
+    showToast("success", "Updated", "Expense updated successfully.");
+  };
+
+  // ---- Delete handlers ----
+  const requestDelete = (index) => {
+    const row = rows[index];
+    if (row.id) {
+      setDeleteConfirm({ open: true, expenseId: row.id, rowIndex: index });
+    } else {
+      // Local-only row — just remove from state
+      removeRow(index);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const { expenseId, rowIndex } = deleteConfirm;
+    setDeleteConfirm({ open: false, expenseId: null, rowIndex: null });
+    try {
+      await axios.delete(`${API_BASE_URL}/expenses/${expenseId}`, { headers: authHeader() });
+      setRows(prev => prev.filter((_, i) => i !== rowIndex));
+      showToast("success", "Deleted", "Expense removed.");
+    } catch {
+      showToast("error", "Delete failed", "Couldn't delete the expense. Please try again.");
+    }
+  };
 
   const projectedTotal = rows.reduce((sum, r) => sum + (Number(r.projected) || 0), 0);
   const actualTotal = rows.reduce((sum, r) => sum + (Number(r.actual) || 0), 0);
@@ -127,8 +232,6 @@ const MonthlyTracker = ({ token, onSaved }) => {
         .filter(r => r.projected !== '' && !isNaN(Number(r.projected)))
         .map(r => ({ name: r.name?.trim() ? r.name.trim() : r.category, amount: Number(r.projected) || 0, category: r.category }));
 
-      // Only commit planned budget if the user has actually entered projected amounts.
-      // Skipping this when empty prevents zeroing out planned data saved from the budget planner.
       if (plannedExpenses.some(e => e.amount > 0)) {
         const plannedPayload = {
           month: selectedMonth,
@@ -139,7 +242,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
         await axios.post(`${API_BASE_URL}/calculate-budget?commit=true`, plannedPayload, {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
+            ...authHeader(),
           },
         });
       }
@@ -153,7 +256,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
       const res = await axios.post(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, actualPayload, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
+          ...authHeader(),
         },
       });
 
@@ -162,16 +265,37 @@ const MonthlyTracker = ({ token, onSaved }) => {
       const apiSaved  = Number(res?.data?.remaining_actual ?? Math.max(apiSalary - apiSpent, 0));
       setLastSaved({ salary: apiSalary, spent: apiSpent, saved: apiSaved });
 
+      // Refresh rows from server so new DB ids are populated
+      try {
+        const refreshed = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
+          headers: authHeader(),
+          params: { _r: Date.now() },
+        });
+        const { expenses: serverExpenses = [] } = refreshed.data || {};
+        const serverRows = serverExpenses.map(e => ({
+          id: e.id,
+          category: e.category,
+          projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+          actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+          builtin: BASE_CATEGORIES.includes(e.category),
+          name: e.name || '',
+        }));
+        const presentCategories = new Set(serverRows.map(r => r.category));
+        const missingBuiltins = BASE_CATEGORIES
+          .filter(cat => !presentCategories.has(cat))
+          .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+        setRows([...serverRows, ...missingBuiltins]);
+      } catch {}
+
       try {
         const key = storageKey(username, selectedMonth);
-        const cached = JSON.parse(localStorage.getItem(key) || "{}");
-        localStorage.setItem(key, JSON.stringify({ ...cached, rows, salary, lastSaved: { salary: apiSalary, spent: apiSpent, saved: apiSaved } }));
+        localStorage.removeItem(key); // force server reload next time
       } catch {}
 
       if (typeof onSaved === 'function') onSaved();
       showToast("success", "Saved monthly data", `${selectedMonth} totals are updated.`);
     } catch (err) {
-      showToast("error", "Save failed", "Couldn’t save monthly data. Please try again.");
+      showToast("error", "Save failed", "Couldn't save monthly data. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -222,15 +346,24 @@ const MonthlyTracker = ({ token, onSaved }) => {
           </thead>
           <tbody className="text-[13px] sm:text-sm">
             {rows.map((row, i) => {
-              const projectedNum = Number(row.projected) || 0;
-              const actualNum = Number(row.actual) || 0;
+              const isEditing = editingIndex === i;
+              const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
+              const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
               const diff = actualNum - projectedNum;
               const over = diff > 0;
 
               return (
-                <tr key={`${row.builtin ? 'base' : 'extra'}-${row.category}-${i}`} className="border-t">
+                <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t">
                   <td className="p-3 font-medium whitespace-nowrap">
-                    {row.builtin ? (
+                    {isEditing ? (
+                      <select
+                        value={editDraft.category}
+                        onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                        className="px-2 py-1 border rounded-lg"
+                      >
+                        {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    ) : row.builtin && !isEditing ? (
                       row.category
                     ) : (
                       <select
@@ -244,35 +377,71 @@ const MonthlyTracker = ({ token, onSaved }) => {
                   </td>
 
                   <td className="p-3">
-                    <input
-                      type="text"
-                      value={row.name || ''}
-                      onChange={(e) => handleUpdate(i, 'name', e.target.value)}
-                      className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
-                      placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft(d => ({ ...d, name: e.target.value }))}
+                        className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
+                        placeholder="(optional)"
+                        autoFocus
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={row.name || ''}
+                        onChange={(e) => handleUpdate(i, 'name', e.target.value)}
+                        className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
+                        placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
+                        disabled={row.id != null}
+                      />
+                    )}
                   </td>
 
                   <td className="p-3">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={row.projected}
-                      onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
-                      className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                      placeholder="£"
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editDraft.projected}
+                        onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
+                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                        placeholder="£"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.projected}
+                        onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
+                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                        placeholder="£"
+                        disabled={row.id != null}
+                      />
+                    )}
                   </td>
 
                   <td className="p-3">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={row.actual}
-                      onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
-                      className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                      placeholder="£"
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editDraft.actual}
+                        onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
+                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                        placeholder="£"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.actual}
+                        onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
+                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                        placeholder="£"
+                        disabled={row.id != null}
+                      />
+                    )}
                   </td>
 
                   <td className="p-3 whitespace-nowrap">
@@ -294,15 +463,49 @@ const MonthlyTracker = ({ token, onSaved }) => {
                   </td>
 
                   <td className="p-3">
-                    {!row.builtin && (
-                      <button
-                        onClick={() => removeRow(i)}
-                        className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
-                        title="Remove row"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => saveEdit(i)}
+                            className="text-green-600 hover:text-green-800 p-1.5 hover:bg-green-50 rounded-lg"
+                            title="Save changes"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-lg"
+                            title="Cancel"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {/* Show pencil only for rows with a DB id */}
+                          {row.id != null && (
+                            <button
+                              onClick={() => startEdit(i)}
+                              className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg"
+                              title="Edit expense"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {/* Show trash for non-builtin local rows OR any saved row */}
+                          {(!row.builtin || row.id != null) && (
+                            <button
+                              onClick={() => requestDelete(i)}
+                              className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg"
+                              title="Delete expense"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -331,7 +534,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
       {/* Add row + Save */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs sm:text-sm text-gray-500">
-          Extra rows are rolled up by category after reload.
+          Edit saved rows with the pencil icon, or add new rows below.
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <button
@@ -358,6 +561,14 @@ const MonthlyTracker = ({ token, onSaved }) => {
         title={toast.title}
         message={toast.message}
         onClose={() => setToast((t) => ({ ...t, open: false }))}
+      />
+
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title="Delete expense?"
+        message="This expense will be removed and cannot be recovered."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ open: false, expenseId: null, rowIndex: null })}
       />
 
       {lastSaved && (
