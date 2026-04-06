@@ -160,3 +160,12 @@ class NotificationResponse(BaseModel):
 class NotificationListResponse(BaseModel):
     items: List[NotificationResponse]
     unread_count: int
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    expense_id: int
+    action: str  # "create" | "update" | "delete"
+    # {"before": null|{...}, "after": null|{...}}
+    changed_fields: Optional[Dict] = None
+    timestamp: datetime

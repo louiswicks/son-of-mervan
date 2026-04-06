@@ -222,9 +222,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `routers/export.py` (new), `main.py` (import + `app.include_router`), `requirements.txt` (fpdf2≥2.7.0), `web/src/api/export.js` (new — `exportCSV`, `exportPDF`), `web/src/components/MonthlyTracker.jsx` (ExportMenu component + import), `web/src/components/AnnualOverview.jsx` (AnnualExportButton component + import)  
 **User Benefit:** Unlocks use cases beyond the app itself.
 
-### 4.6 Audit Trail / Transaction History
+### 4.6 Audit Trail / Transaction History [DONE 2026-04-06]
 **Problem:** No visibility into what changed and when. Recurring generation and soft-deletes create a need for a visible history.  
-**Solution:** `AuditLog` model populated by SQLAlchemy event listeners on all CRUD operations. Stores `action`, `changed_fields` (JSONB), `timestamp`, `user_id`. History drawer on each expense row showing all past versions.  
+**Solution:** `AuditLog` model in `database.py` (plaintext fields so history survives encryption-key rotation; `expense_id` intentionally not a FK so rows persist after soft-delete). `_write_audit` helper called inline in `POST /monthly-tracker/{month}` (create), `PUT /expenses/{id}` (update), `DELETE /expenses/{id}` (delete). `GET /audit/expenses/{id}` endpoint in `routers/audit.py` returns entries newest-first with ownership check. History drawer in `MonthlyTracker.jsx` (clock icon per row, slide-over panel using `useExpenseAudit` hook).  
+**Files:** `database.py` (AuditLog model), `models.py` (AuditLogResponse schema), `main.py` (`_expense_snapshot`, `_write_audit`, audit calls on CRUD), `routers/audit.py` (new), `alembic/versions/g7h8i9j0k1l2_add_audit_logs.py` (new), `web/src/api/audit.js` (new), `web/src/hooks/useAudit.js` (new), `web/src/components/MonthlyTracker.jsx` (HistoryDrawer component + clock button)  
 **User Benefit:** Builds user trust — users can see exactly when an amount was changed and what it was before.
 
 ### 4.7 Multi-Currency Support

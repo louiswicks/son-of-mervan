@@ -3,8 +3,8 @@ import os
 from datetime import datetime
 from cryptography.fernet import Fernet
 from sqlalchemy import (
-    Boolean, create_engine, Column, Integer, String, Float, DateTime, 
-    ForeignKey
+    Boolean, create_engine, Column, Integer, String, Float, DateTime,
+    ForeignKey, Text
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -503,6 +503,28 @@ class Notification(Base):
     @message.setter
     def message(self, value):
         self._message_encrypted = encrypt_value(value) if value else None
+
+
+class AuditLog(Base):
+    """
+    Immutable record of every create/update/delete on a MonthlyExpense row.
+    changed_fields is a JSON string: {"before": {...}, "after": {...}}.
+    Stores plaintext field values (decrypted at write time) so history is
+    readable without the encryption key at query time.
+    expense_id is intentionally NOT a foreign key so history persists after
+    the expense row is soft-deleted.
+    """
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    expense_id = Column(Integer, nullable=False, index=True)
+    # action: "create" | "update" | "delete"
+    action = Column(String(16), nullable=False)
+    # JSON: {"before": null|{...}, "after": null|{...}}
+    changed_fields = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
 
 
 # ---------- Helpers ----------

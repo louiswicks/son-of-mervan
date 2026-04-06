@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import uvicorn
@@ -22,12 +23,12 @@ from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification, AuditLog
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router
 from collections import defaultdict
 
 setup_logging()
@@ -301,6 +302,13 @@ async def calculate_budget(
             expense.planned_amount = e.amount
             expense.actual_amount = 0.0
             db.add(expense)
+            db.flush()  # populate expense.id before audit log
+            _write_audit(db, user.id, expense.id, "create", None, {
+                "name": e.name,
+                "category": e.category,
+                "planned_amount": float(e.amount),
+                "actual_amount": 0.0,
+            })
             existing_expenses.append(expense)
 
     db.commit()
@@ -364,6 +372,13 @@ async def save_actuals(
             new_expense.planned_amount = 0.0  # No planned data for this new line
             new_expense.actual_amount = float(item.amount or 0.0)
             db.add(new_expense)
+            db.flush()  # populate new_expense.id before audit log
+            _write_audit(db, user.id, new_expense.id, "create", None, {
+                "name": item.name,
+                "category": item.category,
+                "planned_amount": 0.0,
+                "actual_amount": float(item.amount or 0.0),
+            })
             existing_expenses.append(new_expense)
 
 
@@ -508,6 +523,34 @@ def _get_owned_expense(expense_id: int, current_user_email: str, db: Session) ->
     return expense
 
 
+def _expense_snapshot(expense: MonthlyExpense) -> dict:
+    """Return a plaintext dict of an expense's auditable fields."""
+    return {
+        "name": expense.name,
+        "category": expense.category,
+        "planned_amount": float(expense.planned_amount or 0.0),
+        "actual_amount": float(expense.actual_amount or 0.0),
+    }
+
+
+def _write_audit(
+    db: Session,
+    user_id: int,
+    expense_id: int,
+    action: str,
+    before: dict | None,
+    after: dict | None,
+) -> None:
+    """Append one immutable audit row. Caller must commit."""
+    log = AuditLog(
+        user_id=user_id,
+        expense_id=expense_id,
+        action=action,
+        changed_fields=json.dumps({"before": before, "after": after}),
+    )
+    db.add(log)
+
+
 @app.put("/expenses/{expense_id}")
 async def update_expense(
     expense_id: int = Path(...),
@@ -519,6 +562,9 @@ async def update_expense(
     if expense.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Expense not found")
 
+    before = _expense_snapshot(expense)
+    user = get_user_by_email(db, current_user)
+
     if data.name is not None:
         expense.name = data.name
     if data.category is not None:
@@ -528,6 +574,8 @@ async def update_expense(
     if data.actual_amount is not None:
         expense.actual_amount = data.actual_amount
 
+    after = _expense_snapshot(expense)
+    _write_audit(db, user.id, expense.id, "update", before, after)
     db.commit()
     db.refresh(expense)
 
@@ -550,7 +598,10 @@ async def delete_expense(
     if expense.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Expense not found")
 
+    before = _expense_snapshot(expense)
+    user = get_user_by_email(db, current_user)
     expense.deleted_at = datetime.utcnow()
+    _write_audit(db, user.id, expense.id, "delete", before, None)
     db.commit()
     # 204 No Content — no response body
 
@@ -570,6 +621,7 @@ app.include_router(savings_router.router)
 app.include_router(alerts_router.router)
 app.include_router(insights_router.router)
 app.include_router(export_router.router)
+app.include_router(audit_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

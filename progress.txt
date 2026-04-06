@@ -275,3 +275,16 @@
 - Updated `web/src/components/MonthlyTracker.jsx`: added `ExportMenu` component (dropdown with "Download CSV" and "Download PDF Report" options, loading state, renders next to month picker) and imports (`Download` icon from lucide-react, `exportCSV`/`exportPDF` from api/export)
 - Updated `web/src/components/AnnualOverview.jsx`: added `AnnualExportButton` component (single "CSV" button that exports the full selected year as `YYYY-01` to `YYYY-12`, loading state) and imports (`Download` icon, `exportCSV`)
 - Tests: 94 backend tests pass unchanged; frontend build clean, 0 errors, 1 pre-existing warning; bundle 242.45 kB gzip (+612 B)
+
+## Phase 4.6 — Audit Trail / Transaction History [DONE] 2026-04-06
+- Added `AuditLog` ORM model to `database.py`: `id`, `user_id` (FK users), `expense_id` (no FK — persists after soft-delete), `action` (create/update/delete), `changed_fields` (JSON text, plaintext values), `timestamp`; `user` relationship
+- Added `AuditLogResponse` Pydantic schema to `models.py`: `id`, `expense_id`, `action`, `changed_fields` (dict | None), `timestamp`
+- Added `_expense_snapshot()` helper and `_write_audit()` helper in `main.py`; wired audit calls into `POST /monthly-tracker/{month}` (create, two code paths), `PUT /expenses/{id}` (update with before/after snapshot), `DELETE /expenses/{id}` (delete with before snapshot)
+- Created `routers/audit.py`: `GET /audit/expenses/{expense_id}` — returns all audit entries for an expense newest-first; verifies caller owns the expense; returns 404 if no history, 403 if unauthorised
+- Registered `audit_router` in `main.py`
+- Created Alembic migration `g7h8i9j0k1l2_add_audit_logs.py`: creates `audit_logs` table with indexes on `id`, `user_id`, `expense_id`; `down_revision` = `c4d5e6f7a8b9`
+- Created `web/src/api/audit.js`: `getExpenseAudit(expenseId)` Axios wrapper
+- Created `web/src/hooks/useAudit.js`: `useExpenseAudit(expenseId, enabled)` React Query hook; enabled only when expenseId is non-null; 30s staleTime
+- Updated `web/src/components/MonthlyTracker.jsx`: added `HistoryDrawer` component (slide-over panel, ACTION_LABEL/ACTION_COLOR maps, timeline list with before/after field diffs); clock icon button on each expense row (both desktop table and mobile card layouts); `historyExpense` state drives drawer open/close
+- Tests: 94 backend tests pass unchanged; frontend build clean (243.42 kB gzip, 0 errors)
+- Files changed: database.py, models.py, main.py, routers/audit.py (new), alembic/versions/g7h8i9j0k1l2_add_audit_logs.py (new), web/src/api/audit.js (new), web/src/hooks/useAudit.js (new), web/src/components/MonthlyTracker.jsx

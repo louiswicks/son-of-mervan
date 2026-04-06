@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download, Clock } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
@@ -11,6 +11,7 @@ import {
   useDeleteExpense,
 } from "../hooks/useExpenses";
 import { exportCSV, exportPDF } from "../api/export";
+import { useExpenseAudit } from "../hooks/useAudit";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
@@ -66,6 +67,103 @@ const ExportMenu = ({ month }) => {
   );
 };
 
+const ACTION_LABEL = { create: 'Created', update: 'Updated', delete: 'Deleted' };
+const ACTION_COLOR = {
+  create: 'text-green-600 dark:text-green-400',
+  update: 'text-blue-600 dark:text-blue-400',
+  delete: 'text-red-600 dark:text-red-400',
+};
+
+const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
+  const { data: entries, isLoading, isError } = useExpenseAudit(expenseId, true);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 h-full shadow-xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b dark:border-gray-700">
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-base">Change History</h2>
+            {expenseName && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[220px]">{expenseName}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Close history"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {isLoading && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Loading history…</p>
+          )}
+          {isError && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No history available for this expense.</p>
+          )}
+          {entries && entries.length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No changes recorded yet.</p>
+          )}
+          {entries && entries.length > 0 && (
+            <ol className="space-y-4">
+              {entries.map((entry) => {
+                const before = entry.changed_fields?.before;
+                const after = entry.changed_fields?.after;
+                const snapshot = after || before;
+                return (
+                  <li key={entry.id} className="border-l-2 border-gray-200 dark:border-gray-700 pl-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${ACTION_COLOR[entry.action] || ''}`}>
+                        {ACTION_LABEL[entry.action] || entry.action}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    {snapshot && (
+                      <div className="text-xs text-gray-700 dark:text-gray-300 space-y-0.5">
+                        {entry.action === 'update' && before && after ? (
+                          <>
+                            {Object.keys(after).map((key) => (
+                              before[key] !== after[key] ? (
+                                <div key={key}>
+                                  <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>{' '}
+                                  <span className="line-through text-gray-400">{String(before[key])}</span>
+                                  {' → '}
+                                  <span className="text-gray-900 dark:text-gray-100">{String(after[key])}</span>
+                                </div>
+                              ) : null
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            <div><span className="font-medium">Name:</span> {snapshot.name || '—'}</div>
+                            <div><span className="font-medium">Category:</span> {snapshot.category}</div>
+                            <div><span className="font-medium">Planned:</span> £{Number(snapshot.planned_amount).toFixed(2)}</div>
+                            <div><span className="font-medium">Actual:</span> £{Number(snapshot.actual_amount).toFixed(2)}</div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const buildRowsFromExpenses = (items) => {
   const serverRows = items.map(e => ({
     id: e.id,
@@ -94,6 +192,7 @@ const MonthlyTracker = () => {
   const [editingIndex, setEditingIndex] = useState(null);
   const [editDraft, setEditDraft] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, expenseId: null, rowIndex: null });
+  const [historyExpense, setHistoryExpense] = useState(null); // { id, name }
   const [filterCategory, setFilterCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 0, page_size: 25 });
@@ -380,6 +479,15 @@ const MonthlyTracker = () => {
                               <Pencil size={18} />
                             </button>
                           )}
+                          {row.id != null && (
+                            <button
+                              onClick={() => setHistoryExpense({ id: row.id, name: row.name || row.category })}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                              aria-label="View change history"
+                            >
+                              <Clock size={18} />
+                            </button>
+                          )}
                           {(!row.builtin || row.id != null) && (
                             <button
                               onClick={() => requestDelete(i)}
@@ -645,6 +753,15 @@ const MonthlyTracker = () => {
                                   <Pencil size={15} />
                                 </button>
                               )}
+                              {row.id != null && (
+                                <button
+                                  onClick={() => setHistoryExpense({ id: row.id, name: row.name || row.category })}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                  title="View change history"
+                                >
+                                  <Clock size={15} />
+                                </button>
+                              )}
                               {(!row.builtin || row.id != null) && (
                                 <button
                                   onClick={() => requestDelete(i)}
@@ -737,6 +854,14 @@ const MonthlyTracker = () => {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirm({ open: false, expenseId: null, rowIndex: null })}
       />
+
+      {historyExpense && (
+        <AuditDrawer
+          expenseId={historyExpense.id}
+          expenseName={historyExpense.name}
+          onClose={() => setHistoryExpense(null)}
+        />
+      )}
 
       {lastSaved && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border dark:border-gray-700 p-5 sm:p-6">
