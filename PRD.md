@@ -103,10 +103,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `routers/tracker.py`, `models.py`, `crud.py`, `web/src/components/ExpenseRow.jsx`, new `web/src/components/ConfirmModal.jsx`  
 **Acceptance Criteria:** User can edit any expense they own. User cannot edit another user's expense (returns 403). Deleted expenses disappear from UI but remain in DB with `deleted_at` set.
 
-### 2.3 Password Reset Flow
+### 2.3 Password Reset Flow [DONE 2026-04-06]
 **Problem:** No password recovery exists. A user who forgets their password is permanently locked out.  
 **Solution:** `POST /auth/password-reset-request` sends a SendGrid email with a signed, time-limited token link (1-hour TTL). `POST /auth/password-reset-confirm` validates the token (single-use) and updates the password. Frontend: "Forgot password?" link on login page; two new pages for request and confirm flows.  
-**Files:** `routers/signup.py`, `models.py` (PasswordResetToken), `email_utils.py`, new frontend pages  
+**Files:** `routers/signup.py`, `database.py` (PasswordResetToken), `email_utils.py`, `core/config.py`, new `alembic/versions/c3d4e5f6a7b8`, new `web/src/components/ForgotPasswordPage.jsx`, new `web/src/components/ResetPasswordPage.jsx`, `web/src/components/LoginPage.jsx`, `web/src/App.js`  
 **Acceptance Criteria:** User receives email within 30 seconds of request. Token link works once only. Expired tokens return a clear error. Reused tokens are rejected.
 
 ### 2.4 JWT Refresh Token Mechanism

@@ -244,6 +244,22 @@ class MonthlyExpense(Base):
         self._actual_amount_encrypted = encrypt_value(str(value))
 
 
+class PasswordResetToken(Base):
+    """
+    Single-use password reset tokens. Raw token is sent in email;
+    only a SHA-256 hash is stored here to prevent DB leakage attacks.
+    """
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)

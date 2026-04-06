@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173,https://louiswicks.github.io"
     EMAIL_VERIFY_TTL_MIN: int = 60
+    PASSWORD_RESET_TTL_MIN: int = 60
     LOG_LEVEL: str = "INFO"
     # "production" enables HSTS and other prod-only security headers
     ENVIRONMENT: str = "development"

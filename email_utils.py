@@ -12,6 +12,44 @@ SENDGRID_API_KEY = (
 )
 EMAIL_FROM = os.getenv("EMAIL_FROM") or "no-reply@example.com"
 
+def send_password_reset_email(to_email: str, reset_url: str):
+    if not SENDGRID_API_KEY:
+        logger.info("[DEV] Password reset link for %s: %s", to_email, reset_url)
+        return
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": "Reset your password — Son of Mervan",
+        "content": [{
+            "type": "text/plain",
+            "value": (
+                "You requested a password reset for your Son of Mervan account.\n\n"
+                f"Click the link below to set a new password:\n{reset_url}\n\n"
+                "This link expires in 60 minutes. If you did not request this, you can safely ignore this email."
+            ),
+        }],
+    }
+
+    try:
+        logger.debug("[SG] POST /v3/mail/send (password reset) from=%s to=%s", EMAIL_FROM, to_email)
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] accepted (%d) to=%s", r.status_code, to_email)
+        else:
+            logger.error("[SG] ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending password reset to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

@@ -6,6 +6,8 @@ import SonOfMervan from "./components/SonOfMervan";
 import MonthlyTracker from "./components/MonthlyTracker";
 import AnnualOverview from "./components/AnnualOverview";
 import VerifyEmailPage from "./components/VerifyEmailPage";
+import ForgotPasswordPage from "./components/ForgotPasswordPage";
+import ResetPasswordPage from "./components/ResetPasswordPage";
 import "./App.css";
 
 const API_BASE_URL = "https://son-of-mervan-production.up.railway.app";
@@ -81,7 +83,6 @@ function App() {
 
   // --- PUBLIC ROUTES
   if (!isAuthenticated) {
-    // GitHub Pages hash route for email verification
     if (hash.startsWith("#/verify-email")) {
       return (
         <VerifyEmailPage
@@ -93,10 +94,33 @@ function App() {
       );
     }
 
-    return authMode === "signup" ? (
-      <SignUpPage onLogin={handleLogin} goToLogin={() => setAuthMode("login")} />
-    ) : (
-      <LoginPage onLogin={handleLogin} goToSignup={() => setAuthMode("signup")} />
+    if (hash.startsWith("#/reset-password")) {
+      return (
+        <ResetPasswordPage
+          goToLogin={() => {
+            window.location.hash = "";
+            setAuthMode("login");
+          }}
+        />
+      );
+    }
+
+    if (authMode === "signup") {
+      return <SignUpPage onLogin={handleLogin} goToLogin={() => setAuthMode("login")} />;
+    }
+
+    if (authMode === "forgot-password") {
+      return (
+        <ForgotPasswordPage goToLogin={() => setAuthMode("login")} />
+      );
+    }
+
+    return (
+      <LoginPage
+        onLogin={handleLogin}
+        goToSignup={() => setAuthMode("signup")}
+        goToForgotPassword={() => setAuthMode("forgot-password")}
+      />
     );
   }
 

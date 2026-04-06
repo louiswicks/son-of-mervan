@@ -4,7 +4,7 @@ import React, { useState } from "react";
 const API_BASE_URL =
   import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
 
-export default function LoginPage({ onLogin, goToSignup }) {
+export default function LoginPage({ onLogin, goToSignup, goToForgotPassword }) {
   const [identifier, setIdentifier] = useState(""); // email or username
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +91,13 @@ export default function LoginPage({ onLogin, goToSignup }) {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-4 text-center">
+          <button onClick={goToForgotPassword} className="text-sm text-gray-500 hover:text-blue-600">
+            Forgot password?
+          </button>
+        </div>
+
+        <div className="mt-4 text-center text-sm text-gray-600">
           New here?{" "}
           <button onClick={goToSignup} className="font-semibold text-blue-600 hover:text-blue-800">
             Create an account
