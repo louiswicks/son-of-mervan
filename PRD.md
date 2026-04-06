@@ -91,7 +91,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 
 ## Phase 2: Core Missing Features & Code Quality
 
-### 2.1 Alembic Database Migrations
+### 2.1 Alembic Database Migrations [DONE 2026-04-06]
 **Problem:** Schema changes require a manual migration script with no history or rollback capability.  
 **Solution:** Initialise Alembic; configure `env.py` to use `DATABASE_URL` and `Base.metadata`. Generate initial migration. Run `alembic upgrade head` automatically on deploy.  
 **Files:** new `alembic/` directory, `alembic.ini`, deploy configuration  

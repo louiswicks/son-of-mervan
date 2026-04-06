@@ -9,7 +9,8 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 PyJWT==2.8.0
-sqlalchemy
+sqlalchemy>=2.0.0
+alembic>=1.13.0
 psycopg[binary]==3.1.18
 axios
 requests>=2.31

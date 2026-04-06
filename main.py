@@ -18,7 +18,9 @@ from core.logging_config import setup_logging
 from core.config import settings
 from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
-from database import init_db, get_db, User, MonthlyData, MonthlyExpense, encrypt_value
+from alembic.config import Config as AlembicConfig
+from alembic import command as alembic_command
+from database import get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from routers import tracker, overview, signup
 from collections import defaultdict
@@ -43,7 +45,8 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
-init_db()
+_alembic_cfg = AlembicConfig("alembic.ini")
+alembic_command.upgrade(_alembic_cfg, "head")
 
 # -------------------- Schemas --------------------
 class LoginRequest(BaseModel):

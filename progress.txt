@@ -1,3 +1,12 @@
+## Phase 2.1 — Alembic Database Migrations [DONE] 2026-04-06
+- Added alembic>=1.13.0 and pinned sqlalchemy>=2.0.0 to requirements.txt
+- Ran `alembic init alembic` to create scaffold (alembic/ dir + alembic.ini)
+- Configured alembic/env.py: imports Base and engine from database.py, overrides sqlalchemy.url from DATABASE_URL env var, reuses app engine so PostgreSQL SSL args are inherited
+- Generated initial migration (a047a3ff3bf1) via --autogenerate; captures users, monthly_data, monthly_expenses tables with all columns and indexes
+- Replaced `init_db()` call in main.py with `alembic.command.upgrade(cfg, "head")` — schema is now migration-managed on every startup
+- Verified: `alembic upgrade head` applies cleanly on a fresh DB; `alembic downgrade -1` rolls back; second startup is a no-op (already at head)
+- Files changed: requirements.txt, alembic.ini (new), alembic/env.py (new), alembic/versions/a047a3ff3bf1_initial_schema.py (new), main.py
+
 ## Phase 1.4 — Security Headers & CORS Hardening [DONE] 2026-04-06
 - Created middleware/security.py with SecurityHeadersMiddleware (Starlette BaseHTTPMiddleware)
 - Headers added to every response: X-Content-Type-Options, X-Frame-Options, Content-Security-Policy, Referrer-Policy, Permissions-Policy
