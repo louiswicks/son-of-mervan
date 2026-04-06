@@ -52,6 +52,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
 
         if not user:
             raise HTTPException(status_code=401, detail="User no longer exists")
+        if user.deleted_at is not None:
+            raise HTTPException(status_code=401, detail="Account has been deleted")
 
         return user.email  # return the email
 

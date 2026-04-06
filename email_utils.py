@@ -50,6 +50,43 @@ def send_password_reset_email(to_email: str, reset_url: str):
         logger.exception("[SG] EXCEPTION sending password reset to %s: %s", to_email, e)
 
 
+def send_account_deletion_email(to_email: str):
+    if not SENDGRID_API_KEY:
+        logger.info("[DEV] Account deletion confirmation sent to %s", to_email)
+        return
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": "Account deletion scheduled — Son of Mervan",
+        "content": [{
+            "type": "text/plain",
+            "value": (
+                "Your Son of Mervan account has been scheduled for deletion.\n\n"
+                "Your account and all associated data will be permanently removed after 30 days.\n\n"
+                "If you did not request this, please contact support immediately."
+            ),
+        }],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] deletion confirmation accepted (%d) to=%s", r.status_code, to_email)
+        else:
+            logger.error("[SG] ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending deletion email to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

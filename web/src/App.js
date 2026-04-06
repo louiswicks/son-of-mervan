@@ -8,6 +8,7 @@ import AnnualOverview from "./components/AnnualOverview";
 import VerifyEmailPage from "./components/VerifyEmailPage";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
+import AccountSettings from "./components/AccountSettings";
 import "./App.css";
 
 const API_BASE_URL = "https://son-of-mervan-production.up.railway.app";
@@ -141,6 +142,7 @@ function App() {
                 ["budget", "Current Budget"],
                 ["monthly", "Monthly Tracker"],
                 ["annual", "Annual Overview"],
+                ["settings", "Settings"],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -173,6 +175,7 @@ function App() {
                 <option value="budget">Current Budget</option>
                 <option value="monthly">Monthly Tracker</option>
                 <option value="annual">Annual Overview</option>
+                <option value="settings">Settings</option>
               </select>
               <button
                 onClick={handleLogout}
@@ -190,6 +193,7 @@ function App() {
         {activeTab === "budget" && <SonOfMervan token={token} onSaved={handleAnyDataSaved} />}
         {activeTab === "monthly" && <MonthlyTracker token={token} onSaved={handleAnyDataSaved} />}
         {activeTab === "annual" && <AnnualOverview token={token} refreshKey={refreshKey} />}
+        {activeTab === "settings" && <AccountSettings token={token} onLogout={handleLogout} />}
       </main>
     </div>
   );

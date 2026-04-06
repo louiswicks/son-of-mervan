@@ -78,6 +78,9 @@ class User(Base):
     # Password hash stays as-is (already hashed, not encrypted)
     password_hash = Column(String(255), nullable=False)
     
+    # Soft-delete timestamp — NULL means active, set means pending 30-day data removal
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
     months = relationship("MonthlyData", back_populates="owner", cascade="all, delete-orphan")
     
     # Hybrid property for transparent encryption/decryption

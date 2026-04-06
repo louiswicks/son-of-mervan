@@ -25,7 +25,7 @@ from alembic import command as alembic_command
 from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup
+from routers import tracker, overview, signup, users as users_router
 from collections import defaultdict
 
 setup_logging()
@@ -165,6 +165,10 @@ def login(request: Request, response: Response, payload: LoginRequest, db: Sessi
         import time; time.sleep(0.4)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Incorrect credentials")
+
+    if user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="This account has been deleted.")
 
     if not user.email_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
@@ -558,6 +562,7 @@ async def verify_user_token(current_user: str = Depends(verify_token)):
 app.include_router(tracker.router)
 app.include_router(overview.router)
 app.include_router(signup.router)
+app.include_router(users_router.router)
 
 # -------------------- Entrypoint --------------------
 if __name__ == "__main__":

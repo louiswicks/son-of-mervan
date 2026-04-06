@@ -122,10 +122,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `routers/tracker.py`, `models.py`, `web/src/components/ExpenseList.jsx`, new `web/src/components/FilterBar.jsx`  
 **Acceptance Criteria:** API returns correct page slice. Total count matches unfiltered row count. Response time under 200ms with 10,000 expense rows.
 
-### 2.6 Account Management
+### 2.6 Account Management [DONE 2026-04-06]
 **Problem:** Users cannot update their profile, change their password while logged in, or delete their account.  
 **Solution:** `GET/PUT /users/me` (profile), `PUT /users/me/password` (requires current password), `DELETE /users/me` (30-day soft-delete grace period with confirmation email). Frontend: Account Settings page with Profile, Security, and Danger Zone sections.  
-**Files:** new `routers/users.py`, new `services/user_service.py`, new `web/src/pages/AccountSettings.jsx`  
+**Files:** new `routers/users.py`, new `web/src/components/AccountSettings.jsx`, `database.py`, `security.py`, `main.py`, `email_utils.py`, `web/src/App.js`, new `alembic/versions/f6a7b8c9d0e1`  
 **Acceptance Criteria:** Profile updates persist. Password change requires correct current password. Account deletion sends confirmation email and removes all personal data after 30 days. GDPR-compliant.
 
 ### 2.7 Backend Test Suite (Target: 80% line coverage)
