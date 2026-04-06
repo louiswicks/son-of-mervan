@@ -210,9 +210,10 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `database.py` (BudgetAlert + Notification models with Fernet encryption), `models.py` (schemas), `routers/alerts.py` (new — CRUD + `check_budget_alerts` scheduler job), `alembic/versions/c4d5e6f7a8b9_add_budget_alerts.py` (new migration), `main.py` (router + scheduler), `email_utils.py` (send_budget_alert_email), `web/src/api/alerts.js` (new), `web/src/hooks/useAlerts.js` (new), `web/src/components/BudgetAlertsPage.jsx` (new), `web/src/components/AuthGuard.jsx` (Bell + slide-over), `web/src/router.jsx` (/alerts route)  
 **User Benefit:** Turns the app from a passive record-keeper into an active financial coach.
 
-### 4.4 Spending Insights and Trends
+### 4.4 Spending Insights and Trends [DONE 2026-04-06]
 **Problem:** Data is displayed but not interpreted. Users must draw their own conclusions.  
 **Solution:** Monthly summary endpoint returning: month-over-month % change per category, biggest overspend category, net income for the month. 6-month rolling average trend endpoint. Spending calendar heatmap (GitHub contribution-style). Plain-English insight cards on dashboard: "Your Food spending is up 23% vs last month."  
+**Files:** `routers/insights.py` (new — `/insights/monthly-summary`, `/insights/trends`, `/insights/heatmap`), `main.py` (router registration), `web/src/api/insights.js` (new), `web/src/hooks/useInsights.js` (new), `web/src/components/InsightsPage.jsx` (new), `web/src/router.jsx`, `web/src/components/AuthGuard.jsx`  
 **User Benefit:** The difference between a data viewer and a financial advisor.
 
 ### 4.5 Data Export (CSV and PDF)

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Moon, Sun, LayoutDashboard, Calendar, TrendingUp, Settings,
-  Repeat, PiggyBank, Bell, X, Trash2, BellOff,
+  Repeat, PiggyBank, Bell, X, Trash2, BellOff, Lightbulb,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
@@ -21,6 +21,7 @@ const NAV_TABS = [
   ["/recurring", "Recurring", Repeat],
   ["/savings", "Savings", PiggyBank],
   ["/alerts", "Alerts", Bell],
+  ["/insights", "Insights", Lightbulb],
   ["/settings", "Settings", Settings],
 ];
 

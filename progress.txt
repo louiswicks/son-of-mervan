@@ -1,3 +1,15 @@
+## Phase 4.4 — Spending Insights and Trends [DONE] 2026-04-06
+- Created `routers/insights.py` with three endpoints: `GET /insights/monthly-summary?month=YYYY-MM` (month-over-month % change per category, biggest overspend, net income, ranked plain-English insight cards capped at 5), `GET /insights/trends?months=6` (per-category actual spending per month + 3-month rolling averages + overall income/spending trend), `GET /insights/heatmap?year=YYYY` (monthly spending totals with quartile-based intensity levels 0–4)
+- All three endpoints: decrypt data in Python (Fernet non-deterministic encryption), user-scoped, `verify_token` auth dependency; `_find_month` helper avoids N+1 by fetching all user rows once and filtering in Python
+- Registered `insights_router` in `main.py`
+- Created `web/src/api/insights.js`: `getMonthlySummary`, `getSpendingTrends`, `getSpendingHeatmap` Axios wrappers
+- Created `web/src/hooks/useInsights.js`: `useMonthlySummary`, `useSpendingTrends`, `useSpendingHeatmap` React Query hooks (staleTime 2–5 min)
+- Created `web/src/components/InsightsPage.jsx`: 4-section page — (1) Monthly Summary: month picker, KPI row (income/spent/net), plain-English insight cards (green/red with icons), category breakdown table with planned/actual/prev-month/% change; (2) Income vs Spending Trend: LineChart (income=green, spending=red); (3) Category Trends: multi-line LineChart per category with fixed colour palette; (4) Annual Heatmap: 12-square grid with blue intensity levels and quartile legend; all charts theme-aware; WCAG touch targets
+- Updated `web/src/router.jsx`: added `/insights` route → `InsightsPage` with `withPageBoundary`
+- Updated `web/src/components/AuthGuard.jsx`: imported `Lightbulb` from lucide-react; added `["/insights", "Insights", Lightbulb]` to `NAV_TABS` (desktop + mobile bottom bar)
+- Tests: 94 backend tests pass (unchanged); frontend build clean, 0 errors, 1 pre-existing warning; bundle 241.84 kB gzip (+3.1 kB)
+- Files changed: routers/insights.py (new), main.py, web/src/api/insights.js (new), web/src/hooks/useInsights.js (new), web/src/components/InsightsPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, PRD.md
+
 ## Phase 4.3 — Budget Alerts and In-App Notifications [DONE] 2026-04-06
 - Added `BudgetAlert` ORM model to `database.py`: `id`, `user_id`, `threshold_pct` (int), `active` (bool), `deleted_at`, `created_at`; encrypted field `category_encrypted` with hybrid property for Fernet en/decrypt
 - Added `Notification` ORM model to `database.py`: `id`, `user_id`, `type` (unencrypted string, e.g. "budget_alert"), `read_at` (nullable — NULL = unread), `dedup_key` (unencrypted string e.g. "ba:{alert_id}:{YYYY-MM}" for deduplication), `created_at`; encrypted fields `title_encrypted`, `message_encrypted`
