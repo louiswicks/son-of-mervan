@@ -243,12 +243,14 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `Dockerfile`, `web/Dockerfile`, `web/Dockerfile.dev`, `web/nginx.conf`, `docker-compose.yml`, `docker-compose.override.yml`, `.dockerignore`, `web/.dockerignore`, `main.py` (added `GET /health` endpoint)  
 **Acceptance Criteria:** Fresh clone + `docker compose up` produces a working local environment.
 
-### 5.2 CI/CD Pipeline (GitHub Actions)
+### 5.2 CI/CD Pipeline (GitHub Actions) [DONE 2026-04-06]
 **Solution:**  
-- `ci.yml` (on every PR): backend tests (pytest + coverage), frontend tests (vitest), lint (ruff + eslint), security scan (bandit + npm audit)  
-- `deploy.yml` (on merge to `main`): CI as prerequisite → Railway deploy → smoke test `GET /health`  
+- `ci.yml` (on every PR and push to main): 4 parallel jobs — `backend-test` (pytest + coverage ≥65%), `frontend-test` (Jest, 25 tests), `lint` (ruff + eslint), `security` (bandit + npm audit)  
+- `deploy.yml` (triggered by successful CI run on main): Railway CLI deploy of backend → 30s wait → smoke test `GET /health`  
 - Branch protection: CI must pass, 1 review required before merge  
-**Acceptance Criteria:** Broken code is blocked from reaching `main`. Merge to `main` automatically deploys within 5 minutes.
+**Files:** `.github/workflows/ci.yml` (new), `.github/workflows/deploy.yml` (new), `ruff.toml` (new), `requirements.txt` (ruff + bandit), `pytest.ini` (pythonpath), `web/package.json` (jest transformIgnorePatterns + eslint overrides), `tests/conftest.py`, `tests/test_expenses.py`, `web/src/tests/MonthlyTracker.test.jsx`, `web/src/tests/AuthGuard.test.jsx`  
+**Acceptance Criteria:** Broken code is blocked from reaching `main`. Merge to `main` automatically deploys within 5 minutes.  
+**Result:** All CI gates pass locally — 94 backend tests (67% coverage), 25 frontend tests (5 suites), ruff clean, bandit clean, eslint 0 errors.
 
 ### 5.3 Monitoring and Error Tracking
 **Solution:** Sentry `sentry-sdk[fastapi]` on backend; `@sentry/react` on frontend. Both report errors with user context and stack traces. Structured JSON logging via `structlog`. `GET /health` endpoint returning `{ status, db, version }` for Railway health checks.  

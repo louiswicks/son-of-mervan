@@ -168,7 +168,7 @@ class TestMonthlyTrackerGet:
         assert len(data["expenses"]["items"]) == 2  # remaining 2 items on page 2
 
     def test_includes_salary_totals(self, auth_client, db, verified_user):
-        month = make_month(db, verified_user, "2026-07", salary_planned=3500.0)
+        make_month(db, verified_user, "2026-07", salary_planned=3500.0)
 
         r = auth_client.get("/monthly-tracker/2026-07")
         assert r.json()["salary_planned"] == 3500.0

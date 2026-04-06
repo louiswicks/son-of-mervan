@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import AuthGuard from '../components/AuthGuard';
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -19,8 +20,6 @@ jest.mock('../context/AuthContext', () => ({
 jest.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'light', toggleTheme: jest.fn() }),
 }));
-
-import AuthGuard from '../components/AuthGuard';
 
 function renderAuthGuard(initialPath = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

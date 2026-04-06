@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend to Railway
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service backend --environment production --detach
+
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Smoke test — GET /health
+        run: |
+          curl -sf https://son-of-mervan-production.up.railway.app/health \
+            | grep -q '"status":"ok"' \
+            || (echo "Health check failed" && exit 1)

@@ -1,7 +1,7 @@
 # routers/currency.py — Multi-currency support
 import logging
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException

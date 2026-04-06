@@ -13,7 +13,7 @@ Routes:
   DELETE /savings-goals/{id}/contributions/{contrib_id}   delete contribution
 """
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MonthlyTracker from '../components/MonthlyTracker';
 
 // Mock recharts before any imports that use it
 jest.mock('recharts', () => ({
@@ -54,8 +55,6 @@ jest.mock('../hooks/useExpenses', () => ({
     isPending: false,
   }),
 }));
-
-import MonthlyTracker from '../components/MonthlyTracker';
 
 const mockTrackerDataWithExpense = {
   salary_planned: 3000,

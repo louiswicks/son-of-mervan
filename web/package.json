@@ -32,6 +32,16 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": ["src/tests/**/*.{js,jsx}", "src/**/*.test.{js,jsx}"],
+        "rules": {
+          "import/first": "off",
+          "testing-library/no-wait-for-multiple-assertions": "off",
+          "testing-library/no-node-access": "off"
+        }
+      }
     ]
   },
   "browserslist": {
@@ -48,5 +58,10 @@
   },
   "devDependencies": {
     "gh-pages": "^6.3.0"
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios)/)"
+    ]
   }
 }

@@ -34,7 +34,6 @@ def get_expense_audit(
     Returns 403 if the requesting user does not own any of the audit entries.
     """
     from database import User
-    from crud import get_user_by_email
 
     user = db.query(User).filter(User.email == current_user).first()
     if not user:

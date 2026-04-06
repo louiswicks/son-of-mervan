@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 logger = logging.getLogger(__name__)
 
 from database import get_db, User, PasswordResetToken, RefreshToken
-from security import get_password_hash, verify_password, create_access_token, create_email_verify_token, decode_email_verify_token
+from security import get_password_hash, create_access_token, create_email_verify_token, decode_email_verify_token
 from email_utils import send_verification_email, send_password_reset_email
 from core.limiter import limiter
 from core.config import settings

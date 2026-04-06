@@ -11,7 +11,7 @@ import hashlib
 import secrets
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 from slowapi import _rate_limit_exceeded_handler
@@ -23,10 +23,10 @@ from core.limiter import limiter
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, encrypt_value, BudgetAlert, Notification, AuditLog, ExchangeRate
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, AuditLog
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
-from security import authenticate_user, create_access_token, verify_token, verify_password
+from security import create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
 from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router
 from collections import defaultdict
@@ -700,4 +700,4 @@ def _stop_scheduler():
 
 # -------------------- Entrypoint --------------------
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))  # nosec B104

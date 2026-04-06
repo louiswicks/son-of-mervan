@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel, EmailStr, constr, validator
+from pydantic import BaseModel, constr, validator
 from sqlalchemy.orm import Session
 
 from database import get_db, User, RefreshToken

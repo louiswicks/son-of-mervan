@@ -1,0 +1,11 @@
+[lint]
+# E402 — intentional: env vars set before app imports in main.py / signup.py
+# E701 — style choice: inline raise after single-condition if
+# E702 — style choice: semicolon-separated statements
+# E711 — SQLAlchemy: `col == None` generates IS NULL; `col is None` would not
+# E712 — SQLAlchemy: `col == True` generates = TRUE; `col is True` would not
+ignore = ["E402", "E701", "E702", "E711", "E712"]
+
+[lint.per-file-ignores]
+# Tests import fixtures/helpers that may look unused to the static analyser
+"tests/*" = ["F401", "F811"]

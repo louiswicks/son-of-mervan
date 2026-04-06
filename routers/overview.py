@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from database import get_db, User, MonthlyData, MonthlyExpense
+from database import get_db, User, MonthlyData
 from security import verify_token
 
 router = APIRouter(prefix="/overview", tags=["overview"])

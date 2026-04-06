@@ -317,3 +317,18 @@
 - Created `.dockerignore` (backend) and `web/.dockerignore` (frontend) to exclude venvs, test artifacts, `.env` files, `node_modules`, and `build/` directories
 - Added `GET /health` endpoint to `main.py`: performs `SELECT 1` via SQLAlchemy `text()` to verify DB connectivity; returns `{"status": "ok", "version": "1.0.0"}`; used by Docker healthcheck and pre-wired for Railway health checks (Phase 5.3)
 - Tests: 94 backend tests pass (unchanged), 7 deprecation warnings (pre-existing)
+
+## Phase 5.2 — CI/CD Pipeline (GitHub Actions) [DONE] 2026-04-06
+- Created `.github/workflows/ci.yml`: 4-job pipeline triggered on every PR and push to main — `backend-test` runs `python -m pytest --cov=. --cov-fail-under=65 --cov-report=xml` with artifact upload; `frontend-test` runs `CI=true npm test -- --watchAll=false --forceExit`; `lint` runs `ruff check . --exclude alembic/` and `npx eslint src/ --ext .js,.jsx --max-warnings 50`; `security` runs `bandit -r . --exclude ./tests,./alembic -ll -q` and `npm audit --audit-level=high`
+- Created `.github/workflows/deploy.yml`: triggered by `workflow_run` on CI completion for main branch, requires `conclusion == 'success'`; installs Railway CLI, runs `railway up --service backend --environment production --detach`, waits 30s, smoke-tests `GET /health`
+- Created `ruff.toml`: ignores E402 (intentional env-var-before-import ordering), E701/E702 (inline style), E711/E712 (SQLAlchemy `== None`/`== True` filter patterns); test files excluded from F401/F811
+- Fixed 12 unused imports across `main.py`, `routers/audit.py`, `routers/currency.py`, `routers/overview.py`, `routers/savings.py`, `routers/signup.py`, `routers/users.py` (ruff --fix auto-applied)
+- Fixed `tests/test_expenses.py:171` — removed assignment to unused `month` variable (F841)
+- Added `# nosec B104` to `main.py:703` uvicorn `host="0.0.0.0"` — intentional server binding
+- Added `ruff>=0.4.0` and `bandit[toml]>=1.7.0` to `requirements.txt`
+- Added `pythonpath = .` to `pytest.ini` so `python -m pytest` resolves project modules without PYTHONPATH env var
+- Added `jest.transformIgnorePatterns` to `web/package.json` to transform `axios` (v1.x ships as ESM; CRA/Jest doesn't handle ESM node_modules by default) — fixes MonthlyTracker and AuthGuard test suites which were failing with "Cannot use import statement outside a module"
+- Added ESLint `overrides` to `web/package.json` disabling `import/first`, `testing-library/no-wait-for-multiple-assertions`, `testing-library/no-node-access` for test files (test patterns don't match ESLint's strict rules)
+- Fixed `web/src/tests/MonthlyTracker.test.jsx` and `web/src/tests/AuthGuard.test.jsx`: moved component import statements to the top of each file — Babel requires all `import` statements at module level; having an `import` after `let` declarations caused Babel to skip transpilation
+- Test results: 94 backend tests, 67% coverage (≥65% threshold met); 25 frontend tests across 5 suites (all passing); ruff 0 errors; bandit 0 medium/high issues; eslint 0 errors
+- Files changed: .github/workflows/ci.yml (new), .github/workflows/deploy.yml (new), ruff.toml (new), requirements.txt, pytest.ini, web/package.json, tests/test_expenses.py, web/src/tests/MonthlyTracker.test.jsx, web/src/tests/AuthGuard.test.jsx, main.py (nosec + unused import fixes), routers/audit.py, routers/currency.py, routers/overview.py, routers/savings.py, routers/signup.py, routers/users.py
