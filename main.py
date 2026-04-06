@@ -47,6 +47,20 @@ app.add_middleware(
 )
 
 _alembic_cfg = AlembicConfig("alembic.ini")
+
+# If the DB already has tables but no alembic_version tracking (pre-Alembic deploy),
+# stamp it at the initial revision so the migration history starts from the correct
+# baseline. Without this, `upgrade head` crashes on existing production DBs.
+from sqlalchemy import inspect, text
+from database import engine as _engine
+with _engine.connect() as _conn:
+    _inspector = inspect(_engine)
+    _has_users = _inspector.has_table("users")
+    _has_alembic = _inspector.has_table("alembic_version")
+    if _has_users and not _has_alembic:
+        logger.info("Existing DB detected with no Alembic version — stamping at initial revision")
+        alembic_command.stamp(_alembic_cfg, "a047a3ff3bf1")
+
 alembic_command.upgrade(_alembic_cfg, "head")
 
 # -------------------- Schemas --------------------

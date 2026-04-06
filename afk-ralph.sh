@@ -21,7 +21,7 @@ for ((i=1; i<=$1; i++)); do
   2. Run your tests and type checks. \
   3. Update the PRD with what was done. \
   4. Append your progress to progress.txt. \
-  5. Commit your changes. \
+  5. Commit your changes. \ex
   ONLY WORK ON A SINGLE TASK. \
   If the PRD is complete, output <promise>COMPLETE</promise>.")
 
