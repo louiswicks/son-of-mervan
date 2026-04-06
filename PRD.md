@@ -151,7 +151,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `web/src/router.jsx`, `web/src/App.jsx`, new `web/src/components/AuthGuard.jsx`  
 **Acceptance Criteria:** Browser back/forward work correctly. Bookmarked URLs load the correct page. Unauthenticated users redirected from protected routes.
 
-### 3.3 React Query + Loading States + Optimistic Updates
+### 3.3 React Query + Loading States + Optimistic Updates [DONE 2026-04-06]
 **Problem:** No loading indicators. API calls produce blank UI until resolved.  
 **Solution:** `@tanstack/react-query` for all server state. Skeleton shimmer components during loading. Optimistic updates on expense CRUD with rollback on error. `react-hot-toast` for success/error feedback.  
 **Files:** `web/src/App.jsx`, new hooks (`useExpenses`, `useBudget`, `useAnnualSummary`), new `web/src/components/Skeleton.jsx`  

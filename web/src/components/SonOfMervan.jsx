@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, LineChart, Line, CartesianGrid,
   XAxis, YAxis, Tooltip, BarChart, Bar
 } from "recharts";
-import { calculateBudget } from "../api/budget";
+import { useCalculateBudget } from "../hooks/useBudget";
 
 const CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -21,7 +21,8 @@ export default function SonOfMervan() {
     { name: "", amount: "", category: "Housing" },
   ]);
   const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
+
+  const calculateMutation = useCalculateBudget();
 
   const addExpense = () =>
     setExpenses((xs) => [...xs, { name: "", amount: "", category: "Housing" }]);
@@ -33,11 +34,7 @@ export default function SonOfMervan() {
     setExpenses((xs) => xs.map((x, j) => (j === i ? { ...x, [field]: value } : x)));
 
   const doCalculate = async () => {
-    setLoading(true);
-
-    // Always use current month (YYYY-MM) for "Current Budget"
     const currentMonth = new Date().toISOString().slice(0, 7);
-
     const body = {
       month: currentMonth,
       monthly_salary: parseFloat(salary) || 0,
@@ -49,14 +46,11 @@ export default function SonOfMervan() {
           category: e.category,
         })),
     };
-
     try {
-      const data = await calculateBudget(body, false);
+      const data = await calculateMutation.mutateAsync({ payload: body, commit: false });
       setResults(data);
-    } catch (err) {
-      alert(err.response?.data?.detail || err.message || "Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch {
+      // onError in the mutation hook handles the toast
     }
   };
 
@@ -74,6 +68,8 @@ export default function SonOfMervan() {
     const entries = Object.entries(results.expenses_by_category || {});
     return entries.map(([category, amount]) => ({ category, amount }));
   }, [results]);
+
+  const loading = calculateMutation.isPending;
 
   return (
     <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 p-3 sm:p-4">
@@ -93,7 +89,6 @@ export default function SonOfMervan() {
             </h2>
           </div>
 
-          {/* Mobile-first: stack; split into 2 cols on md+ */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Salary */}
             <div className="space-y-2 sm:space-y-3">
@@ -128,21 +123,18 @@ export default function SonOfMervan() {
                 </button>
               </div>
 
-              {/* Each row collapses to a tidy grid on phones */}
               <div className="max-h-72 sm:max-h-64 overflow-y-auto space-y-2.5">
                 {expenses.map((exp, i) => (
                   <div
                     key={i}
                     className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-12 gap-2 bg-gray-50 px-3 py-3 rounded-xl items-center"
                   >
-                    {/* Name */}
                     <input
                       className="md:col-span-5 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       placeholder="Expense name"
                       value={exp.name}
                       onChange={(e) => updateExpense(i, "name", e.target.value)}
                     />
-                    {/* Amount */}
                     <input
                       inputMode="decimal"
                       pattern="[0-9]*[.]?[0-9]*"
@@ -153,7 +145,6 @@ export default function SonOfMervan() {
                         updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))
                       }
                     />
-                    {/* Category */}
                     <select
                       className="md:col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       value={exp.category}
@@ -165,7 +156,6 @@ export default function SonOfMervan() {
                         </option>
                       ))}
                     </select>
-                    {/* Remove */}
                     <div className="md:col-span-2 flex justify-end">
                       {expenses.length > 1 && (
                         <button
@@ -184,7 +174,7 @@ export default function SonOfMervan() {
             </div>
           </div>
 
-          {/* Calculate button (sticky on mobile) */}
+          {/* Calculate button */}
           <div className="mt-5 sm:mt-8">
             <div className="md:hidden sticky bottom-3 z-20">
               <button
@@ -221,7 +211,6 @@ export default function SonOfMervan() {
         {/* Results */}
         {results && (
           <section className="space-y-4 sm:space-y-6">
-            {/* Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 sm:p-6 rounded-2xl shadow-xl">
                 <div className="flex items-center justify-between mb-2">
@@ -263,7 +252,6 @@ export default function SonOfMervan() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {/* Savings projection: hide on tiny screens if no savings */}
               {results.remaining_budget > 0 && (
                 <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100">
                   <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center">

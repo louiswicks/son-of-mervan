@@ -1,3 +1,18 @@
+## Phase 3.3 — React Query + Loading States + Optimistic Updates [DONE] 2026-04-06
+- Installed `@tanstack/react-query@5` (^5.96.2) and `react-hot-toast@2` (^2.6.0)
+- Created `web/src/components/Skeleton.jsx`: `Skeleton` base component (animate-pulse) + `SkeletonCard`, `SkeletonTable`, `SkeletonChart` composites used during loading states
+- Created `web/src/hooks/useAnnualSummary.js`: `useAnnualSummary(year)` — `useQuery` wrapping `getAnnualOverview`, `staleTime: 5 min`
+- Created `web/src/hooks/useProfile.js`: `useProfile()` query + `useUpdateProfile`, `useChangePassword`, `useDeleteAccount` mutations — all with `toast.success/error` callbacks
+- Created `web/src/hooks/useExpenses.js`: `useMonthlyTracker(month, opts)` query + `useSaveMonthlyTracker`, `useUpdateExpense`, `useDeleteExpense` mutations with query invalidation on success
+- Created `web/src/hooks/useBudget.js`: `useCalculateBudget` mutation wrapping `calculateBudget`
+- Updated `web/src/App.jsx`: wrapped app in `QueryClientProvider` + added `<Toaster position="bottom-right" />`; `QueryClient` configured with `retry: 1, refetchOnWindowFocus: false`
+- Updated `AnnualOverview.jsx`: replaced `useState + useEffect` data loading with `useAnnualSummary` hook; shows `SkeletonCard × 3` + `SkeletonChart × 2` + inline row skeletons while loading
+- Updated `AccountSettings.jsx`: replaced `useEffect` profile load with `useProfile` query; replaced manual loading flags with `mutation.isPending`; replaced `StatusBanner` components with `toast.success/error`
+- Updated `SonOfMervan.jsx`: replaced `useState loading + alert()` with `useCalculateBudget` mutation; errors surfaced via toast
+- Updated `MonthlyTracker.jsx`: replaced `useEffect` data fetch with `useMonthlyTracker` query + `useEffect` to sync query data into `rows` state; `SkeletonTable` shown on initial load; `saveEdit` and `confirmDelete` apply changes **optimistically** to `rows` before the API call completes, with rollback on error; removed all localStorage read/write logic (superseded by React Query 30s cache); all success/error feedback via `react-hot-toast` (replaced `Toast.jsx` usage)
+- Build passes with 0 errors, 0 warnings; bundle 224.89 kB gzip (+17.5 kB for React Query + react-hot-toast)
+- Files changed: web/src/components/Skeleton.jsx (new), web/src/hooks/useAnnualSummary.js (new), web/src/hooks/useProfile.js (new), web/src/hooks/useExpenses.js (new), web/src/hooks/useBudget.js (new), web/src/App.jsx, web/src/components/AnnualOverview.jsx, web/src/components/AccountSettings.jsx, web/src/components/SonOfMervan.jsx, web/src/components/MonthlyTracker.jsx, web/package.json, PRD.md
+
 ## Phase 3.2 — React Router v6 [DONE] 2026-04-06
 - Installed `react-router-dom@6` (^6.30.3)
 - Created `web/src/context/AuthContext.jsx`: `AuthProvider` component holds `isAuthenticated`, `token`, `loading` state; performs `refreshSession()` on startup; exposes `handleLogin` / `handleLogout`; registers `setOnUnauthorized` callback so Axios 401 interceptor can clear auth state; `useAuth()` hook for consumer access

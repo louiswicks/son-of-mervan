@@ -1,156 +1,103 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
+import { SkeletonTable } from "./Skeleton";
 import {
-  getMonthlyTracker,
-  saveMonthlyTracker,
-  updateExpense,
-  deleteExpense,
-} from "../api/expenses";
-import { calculateBudget } from "../api/budget";
+  useMonthlyTracker,
+  useSaveMonthlyTracker,
+  useUpdateExpense,
+  useDeleteExpense,
+} from "../hooks/useExpenses";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
-const storageKey = (u, m) => `monthlyTracker:${u}:${m}`;
+
+const buildRowsFromExpenses = (items) => {
+  const serverRows = items.map(e => ({
+    id: e.id,
+    category: e.category,
+    projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+    actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+    builtin: BASE_CATEGORIES.includes(e.category),
+    name: e.name || '',
+  }));
+
+  const presentCategories = new Set(serverRows.map(r => r.category));
+  const missingBuiltins = BASE_CATEGORIES
+    .filter(cat => !presentCategories.has(cat))
+    .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+
+  return [...serverRows, ...missingBuiltins];
+};
 
 const MonthlyTracker = () => {
-  const { token } = useAuth();
+  useAuth(); // ensure auth context is available
   const [selectedMonth, setSelectedMonth] = useState('2025-08');
-  const [saving, setSaving] = useState(false);
   const [salary, setSalary] = useState('');
-  const [lastSaved, setLastSaved] = useState(null);
-  const [username, setUsername] = useState('anon');
-  const [toast, setToast] = useState({ open: false, type: "success", title: "", message: "" });
   const [rows, setRows] = useState(
     BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null }))
   );
-  // Edit state: { rowIndex, name, category, projected, actual }
   const [editingIndex, setEditingIndex] = useState(null);
   const [editDraft, setEditDraft] = useState({});
-  // Delete confirm modal state
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, expenseId: null, rowIndex: null });
-  // Filter & pagination state
   const [filterCategory, setFilterCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 0, page_size: 25 });
 
-  const computeSnapshot = (rows, salaryStr) => {
-    const spent = rows.reduce((s, r) => s + (Number(r.actual) || 0), 0);
-    const salaryNum = Number(salaryStr) || 0;
-    const saved = Math.max(salaryNum - spent, 0);
-    return { salary: salaryNum, spent, saved };
-  };
+  const { data: trackerData, isLoading } = useMonthlyTracker(selectedMonth, {
+    category: filterCategory,
+    page: currentPage,
+  });
 
-  const usernameFromToken = (tok) => {
-    try {
-      const payload = JSON.parse(atob((tok || '').split('.')[1] || ''));
-      return payload?.sub || 'anon';
-    } catch {
-      return 'anon';
-    }
-  };
+  const saveMutation = useSaveMonthlyTracker(selectedMonth);
+  const updateMutation = useUpdateExpense(selectedMonth);
+  const deleteMutation = useDeleteExpense(selectedMonth);
 
-  const showToast = (type, title, message, autoHideMs = 2600) => {
-    setToast({ open: true, type, title, message });
-    if (autoHideMs) {
-      window.clearTimeout(showToast._t);
-      showToast._t = window.setTimeout(() => setToast((t) => ({ ...t, open: false })), autoHideMs);
-    }
-  };
-
+  // Sync query data into local rows state
   useEffect(() => {
-    setUsername(usernameFromToken(token));
-  }, [token]);
+    if (!trackerData) return;
+    const { salary_planned, salary_actual, expenses: expEnvelope = {} } = trackerData;
+    const items = expEnvelope.items || [];
+    setPagination({
+      total: expEnvelope.total ?? 0,
+      pages: expEnvelope.pages ?? 0,
+      page_size: expEnvelope.page_size ?? 25,
+    });
 
-  // Helper: build rows from server expense items and merge with base categories
-  const buildRowsFromExpenses = (items) => {
-    const serverRows = items.map(e => ({
-      id: e.id,
-      category: e.category,
-      projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
-      actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
-      builtin: BASE_CATEGORIES.includes(e.category),
-      name: e.name || '',
-    }));
+    const allRows = filterCategory === 'All'
+      ? buildRowsFromExpenses(items)
+      : items.map(e => ({
+          id: e.id,
+          category: e.category,
+          projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
+          actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
+          builtin: BASE_CATEGORIES.includes(e.category),
+          name: e.name || '',
+        }));
 
-    // Only add missing builtin placeholders when not filtering by category
-    const presentCategories = new Set(serverRows.map(r => r.category));
-    const missingBuiltins = BASE_CATEGORIES
-      .filter(cat => !presentCategories.has(cat))
-      .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '' }));
+    setRows(allRows);
+    const s = salary_actual ?? salary_planned;
+    setSalary(s ? String(s) : '');
+  }, [trackerData, filterCategory]);
 
-    return [...serverRows, ...missingBuiltins];
-  };
-
+  // Cancel in-progress edits when month or filter changes
   useEffect(() => {
-    const load = async () => {
-      // Skip localStorage cache when a filter is active (cache holds unfiltered data)
-      if (filterCategory === 'All' && currentPage === 1) {
-        try {
-          if (!username) return;
-          const raw = localStorage.getItem(storageKey(username, selectedMonth));
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed.rows)) setRows(parsed.rows);
-            if (parsed.salary !== undefined && parsed.salary !== null) setSalary(String(parsed.salary));
-            const snap = computeSnapshot(parsed.rows || [], parsed.salary);
-            setLastSaved(snap);
-            return;
-          }
-        } catch {}
-      }
-
-      try {
-        const params = { _r: Date.now(), page: currentPage, page_size: 25 };
-        if (filterCategory !== 'All') params.category = filterCategory;
-
-        const resData = await getMonthlyTracker(selectedMonth, params);
-
-        const { salary_planned, salary_actual, expenses: expEnvelope = {} } = resData || {};
-        const items = expEnvelope.items || [];
-        const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
-        setPagination(pag);
-
-        const allRows = filterCategory === 'All'
-          ? buildRowsFromExpenses(items)
-          : items.map(e => ({
-              id: e.id,
-              category: e.category,
-              projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
-              actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
-              builtin: BASE_CATEGORIES.includes(e.category),
-              name: e.name || '',
-            }));
-
-        setRows(allRows);
-
-        const s = (salary_actual ?? salary_planned);
-        const salaryStr = s ? String(s) : '';
-        setSalary(salaryStr);
-
-        const snap = computeSnapshot(allRows, salaryStr);
-        setLastSaved(snap);
-      } catch {}
-    };
-
-    load();
-    // Cancel any in-progress edit when month or filter changes
     setEditingIndex(null);
     setEditDraft({});
-  }, [selectedMonth, token, username, filterCategory, currentPage]);
+  }, [selectedMonth, filterCategory]);
 
-  useEffect(() => {
-    try {
-      if (!username) return;
-      const snap = computeSnapshot(rows, salary);
-      setLastSaved(prev => (prev && prev.salary === snap.salary && prev.spent === snap.spent && prev.saved === snap.saved) ? prev : snap);
-      const payload = { rows, salary, lastSaved: snap };
-      localStorage.setItem(storageKey(username, selectedMonth), JSON.stringify(payload));
-    } catch {}
-  }, [rows, salary, selectedMonth, username]);
+  // Derive lastSaved from query data
+  const lastSaved = useMemo(() => {
+    if (!trackerData) return null;
+    const apiSalary = Number(trackerData?.salary_actual ?? trackerData?.salary_planned ?? 0);
+    const apiSpent = Number(trackerData?.total_actual ?? 0);
+    const apiSaved = Number(
+      trackerData?.remaining_actual ?? Math.max(apiSalary - apiSpent, 0)
+    );
+    return { salary: apiSalary, spent: apiSpent, saved: apiSaved };
+  }, [trackerData]);
 
   const handleUpdate = (index, field, value) => {
     const newRows = [...rows];
@@ -166,7 +113,7 @@ const MonthlyTracker = () => {
 
   const removeRow = (index) => setRows(prev => prev.filter((_, i) => i !== index));
 
-  // ---- Inline edit handlers ----
+  // ---- Inline edit handlers (optimistic) ----
   const startEdit = (index) => {
     const row = rows[index];
     setEditingIndex(index);
@@ -187,22 +134,7 @@ const MonthlyTracker = () => {
     const row = rows[index];
     const draft = editDraft;
 
-    if (row.id) {
-      // Persist to server via PUT
-      try {
-        await updateExpense(row.id, {
-          name: draft.name || null,
-          category: draft.category || null,
-          planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
-          actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
-        });
-      } catch {
-        showToast("error", "Update failed", "Couldn't save changes. Please try again.");
-        return;
-      }
-    }
-
-    // Update local state
+    // Optimistically apply edit to UI
     const newRows = [...rows];
     newRows[index] = {
       ...row,
@@ -214,16 +146,35 @@ const MonthlyTracker = () => {
     setRows(newRows);
     setEditingIndex(null);
     setEditDraft({});
-    showToast("success", "Updated", "Expense updated successfully.");
+
+    if (row.id) {
+      try {
+        await updateMutation.mutateAsync({
+          id: row.id,
+          payload: {
+            name: draft.name || null,
+            category: draft.category || null,
+            planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
+            actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
+          },
+        });
+        // onSuccess in hook: invalidates query → rows refresh
+      } catch {
+        // Rollback: restore original row and re-open edit
+        setRows(rows);
+        setEditingIndex(index);
+        setEditDraft(draft);
+        // onError in hook: shows toast error
+      }
+    }
   };
 
-  // ---- Delete handlers ----
+  // ---- Delete handlers (optimistic) ----
   const requestDelete = (index) => {
     const row = rows[index];
     if (row.id) {
       setDeleteConfirm({ open: true, expenseId: row.id, rowIndex: index });
     } else {
-      // Local-only row — just remove from state
       removeRow(index);
     }
   };
@@ -231,71 +182,30 @@ const MonthlyTracker = () => {
   const confirmDelete = async () => {
     const { expenseId, rowIndex } = deleteConfirm;
     setDeleteConfirm({ open: false, expenseId: null, rowIndex: null });
+
+    // Optimistically remove from UI
+    const previousRows = rows;
+    setRows(prev => prev.filter((_, i) => i !== rowIndex));
+
     try {
-      await deleteExpense(expenseId);
-      setRows(prev => prev.filter((_, i) => i !== rowIndex));
-      showToast("success", "Deleted", "Expense removed.");
+      await deleteMutation.mutateAsync(expenseId);
+      // onSuccess in hook: invalidates query, shows toast
     } catch {
-      showToast("error", "Delete failed", "Couldn't delete the expense. Please try again.");
+      // Rollback
+      setRows(previousRows);
+      // onError in hook: shows toast error
     }
+  };
+
+  const handleSave = async () => {
+    await saveMutation.mutateAsync({ salary, rows });
+    // onSuccess: invalidates query (rows refresh via useEffect) + shows toast
   };
 
   const projectedTotal = rows.reduce((sum, r) => sum + (Number(r.projected) || 0), 0);
   const actualTotal = rows.reduce((sum, r) => sum + (Number(r.actual) || 0), 0);
   const totalDiff = actualTotal - projectedTotal;
   const totalOver = totalDiff > 0;
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-
-      const plannedExpenses = rows
-        .filter(r => r.projected !== '' && !isNaN(Number(r.projected)))
-        .map(r => ({ name: r.name?.trim() ? r.name.trim() : r.category, amount: Number(r.projected) || 0, category: r.category }));
-
-      if (plannedExpenses.some(e => e.amount > 0)) {
-        const plannedPayload = {
-          month: selectedMonth,
-          monthly_salary: salary !== '' ? Number(salary) : 0,
-          expenses: plannedExpenses,
-        };
-        await calculateBudget(plannedPayload, true);
-      }
-
-      const actualExpenses = rows
-        .filter(r => r.actual !== '' && !isNaN(Number(r.actual)))
-        .map(r => ({ name: r.name?.trim() ? r.name.trim() : r.category, amount: Number(r.actual) || 0, category: r.category }));
-
-      const actualPayload = { salary: salary !== '' ? Number(salary) : null, expenses: actualExpenses };
-      const resData = await saveMonthlyTracker(selectedMonth, actualPayload);
-
-      const apiSalary = Number(resData?.salary ?? (salary !== '' ? Number(salary) : 0));
-      const apiSpent  = Number(resData?.total_actual ?? 0);
-      const apiSaved  = Number(resData?.remaining_actual ?? Math.max(apiSalary - apiSpent, 0));
-      setLastSaved({ salary: apiSalary, spent: apiSpent, saved: apiSaved });
-
-      // Refresh rows from server so new DB ids are populated
-      try {
-        const refreshed = await getMonthlyTracker(selectedMonth, { _r: Date.now(), page: 1, page_size: 25 });
-        const { expenses: expEnvelope = {} } = refreshed || {};
-        const items = expEnvelope.items || [];
-        const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
-        setPagination(pag);
-        setRows(buildRowsFromExpenses(items));
-      } catch {}
-
-      try {
-        const key = storageKey(username, selectedMonth);
-        localStorage.removeItem(key); // force server reload next time
-      } catch {}
-
-      showToast("success", "Saved monthly data", `${selectedMonth} totals are updated.`);
-    } catch (err) {
-      showToast("error", "Save failed", "Couldn't save monthly data. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -352,206 +262,207 @@ const MonthlyTracker = () => {
         />
       </div>
 
-      {/* Table (mobile scroll) */}
-      <div className="overflow-x-auto -mx-4 sm:mx-0 bg-white rounded-xl shadow-md border">
-        <table className="min-w-full text-left border-collapse">
-          <thead className="bg-gray-100">
-            <tr className="text-[13px] sm:text-sm">
-              <th className="p-3">Category</th>
-              <th className="p-3">Name (optional)</th>
-              <th className="p-3">Projected (£)</th>
-              <th className="p-3">Actual (£)</th>
-              <th className="p-3">Difference</th>
-              <th className="p-3">Status</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody className="text-[13px] sm:text-sm">
-            {rows.map((row, i) => {
-              const isEditing = editingIndex === i;
-              const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
-              const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
-              const diff = actualNum - projectedNum;
-              const over = diff > 0;
+      {/* Table or Skeleton */}
+      {isLoading ? (
+        <SkeletonTable rows={8} />
+      ) : (
+        <div className="overflow-x-auto -mx-4 sm:mx-0 bg-white rounded-xl shadow-md border">
+          <table className="min-w-full text-left border-collapse">
+            <thead className="bg-gray-100">
+              <tr className="text-[13px] sm:text-sm">
+                <th className="p-3">Category</th>
+                <th className="p-3">Name (optional)</th>
+                <th className="p-3">Projected (£)</th>
+                <th className="p-3">Actual (£)</th>
+                <th className="p-3">Difference</th>
+                <th className="p-3">Status</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody className="text-[13px] sm:text-sm">
+              {rows.map((row, i) => {
+                const isEditing = editingIndex === i;
+                const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
+                const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
+                const diff = actualNum - projectedNum;
+                const over = diff > 0;
 
-              return (
-                <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t">
-                  <td className="p-3 font-medium whitespace-nowrap">
-                    {isEditing ? (
-                      <select
-                        value={editDraft.category}
-                        onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
-                        className="px-2 py-1 border rounded-lg"
-                      >
-                        {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    ) : row.builtin && !isEditing ? (
-                      row.category
-                    ) : (
-                      <select
-                        value={row.category}
-                        onChange={(e) => handleUpdate(i, 'category', e.target.value)}
-                        className="px-2 py-1 border rounded-lg"
-                      >
-                        {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    )}
-                  </td>
-
-                  <td className="p-3">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editDraft.name}
-                        onChange={(e) => setEditDraft(d => ({ ...d, name: e.target.value }))}
-                        className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
-                        placeholder="(optional)"
-                        autoFocus
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={row.name || ''}
-                        onChange={(e) => handleUpdate(i, 'name', e.target.value)}
-                        className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
-                        placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
-                        disabled={row.id != null}
-                      />
-                    )}
-                  </td>
-
-                  <td className="p-3">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={editDraft.projected}
-                        onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
-                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                        placeholder="£"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.projected}
-                        onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
-                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                        placeholder="£"
-                        disabled={row.id != null}
-                      />
-                    )}
-                  </td>
-
-                  <td className="p-3">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={editDraft.actual}
-                        onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
-                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                        placeholder="£"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.actual}
-                        onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
-                        className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                        placeholder="£"
-                        disabled={row.id != null}
-                      />
-                    )}
-                  </td>
-
-                  <td className="p-3 whitespace-nowrap">
-                    <span className={over ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
-                      {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
-                    </span>
-                  </td>
-
-                  <td className="p-3">
-                    {over ? (
-                      <span className="flex items-center text-red-600">
-                        <XCircle size={18} className="mr-1" /> Over
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-green-600">
-                        <CheckCircle size={18} className="mr-1" /> Under
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="p-3">
-                    <div className="flex items-center gap-1">
+                return (
+                  <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t">
+                    <td className="p-3 font-medium whitespace-nowrap">
                       {isEditing ? (
-                        <>
-                          <button
-                            onClick={() => saveEdit(i)}
-                            className="text-green-600 hover:text-green-800 p-1.5 hover:bg-green-50 rounded-lg"
-                            title="Save changes"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-lg"
-                            title="Cancel"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
+                        <select
+                          value={editDraft.category}
+                          onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                          className="px-2 py-1 border rounded-lg"
+                        >
+                          {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      ) : row.builtin && !isEditing ? (
+                        row.category
                       ) : (
-                        <>
-                          {/* Show pencil only for rows with a DB id */}
-                          {row.id != null && (
-                            <button
-                              onClick={() => startEdit(i)}
-                              className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg"
-                              title="Edit expense"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                          )}
-                          {/* Show trash for non-builtin local rows OR any saved row */}
-                          {(!row.builtin || row.id != null) && (
-                            <button
-                              onClick={() => requestDelete(i)}
-                              className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg"
-                              title="Delete expense"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          )}
-                        </>
+                        <select
+                          value={row.category}
+                          onChange={(e) => handleUpdate(i, 'category', e.target.value)}
+                          className="px-2 py-1 border rounded-lg"
+                        >
+                          {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+                    </td>
 
-          {/* Totals row */}
-          <tfoot className="text-[13px] sm:text-sm">
-            <tr className="border-t bg-gray-50 font-semibold">
-              <td className="p-3">Totals</td>
-              <td className="p-3"></td>
-              <td className="p-3">£{projectedTotal.toFixed(2)}</td>
-              <td className="p-3">£{actualTotal.toFixed(2)}</td>
-              <td className="p-3">
-                <span className={totalOver ? 'text-red-700' : 'text-green-700'}>
-                  {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
-                </span>
-              </td>
-              <td className="p-3">{totalOver ? 'Over' : 'Under'}</td>
-              <td className="p-3"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                    <td className="p-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editDraft.name}
+                          onChange={(e) => setEditDraft(d => ({ ...d, name: e.target.value }))}
+                          className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
+                          placeholder="(optional)"
+                          autoFocus
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={row.name || ''}
+                          onChange={(e) => handleUpdate(i, 'name', e.target.value)}
+                          className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
+                          placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
+                          disabled={row.id != null}
+                        />
+                      )}
+                    </td>
+
+                    <td className="p-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editDraft.projected}
+                          onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
+                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                          placeholder="£"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={row.projected}
+                          onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
+                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                          placeholder="£"
+                          disabled={row.id != null}
+                        />
+                      )}
+                    </td>
+
+                    <td className="p-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editDraft.actual}
+                          onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
+                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                          placeholder="£"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={row.actual}
+                          onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
+                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
+                          placeholder="£"
+                          disabled={row.id != null}
+                        />
+                      )}
+                    </td>
+
+                    <td className="p-3 whitespace-nowrap">
+                      <span className={over ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                        {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
+                      </span>
+                    </td>
+
+                    <td className="p-3">
+                      {over ? (
+                        <span className="flex items-center text-red-600">
+                          <XCircle size={18} className="mr-1" /> Over
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-green-600">
+                          <CheckCircle size={18} className="mr-1" /> Under
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3">
+                      <div className="flex items-center gap-1">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => saveEdit(i)}
+                              className="text-green-600 hover:text-green-800 p-1.5 hover:bg-green-50 rounded-lg"
+                              title="Save changes"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-lg"
+                              title="Cancel"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {row.id != null && (
+                              <button
+                                onClick={() => startEdit(i)}
+                                className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg"
+                                title="Edit expense"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            )}
+                            {(!row.builtin || row.id != null) && (
+                              <button
+                                onClick={() => requestDelete(i)}
+                                className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg"
+                                title="Delete expense"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+
+            <tfoot className="text-[13px] sm:text-sm">
+              <tr className="border-t bg-gray-50 font-semibold">
+                <td className="p-3">Totals</td>
+                <td className="p-3"></td>
+                <td className="p-3">£{projectedTotal.toFixed(2)}</td>
+                <td className="p-3">£{actualTotal.toFixed(2)}</td>
+                <td className="p-3">
+                  <span className={totalOver ? 'text-red-700' : 'text-green-700'}>
+                    {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
+                  </span>
+                </td>
+                <td className="p-3">{totalOver ? 'Over' : 'Under'}</td>
+                <td className="p-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
 
       {/* Pagination controls */}
       {pagination.pages > 1 && (
@@ -592,21 +503,13 @@ const MonthlyTracker = () => {
 
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saveMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 sm:px-6 py-3 rounded-lg shadow-md disabled:opacity-60 text-[14px] sm:text-base"
           >
-            {saving ? 'Saving...' : 'Save Monthly Data'}
+            {saveMutation.isPending ? 'Saving...' : 'Save Monthly Data'}
           </button>
         </div>
       </div>
-
-      <Toast
-        open={toast.open}
-        type={toast.type}
-        title={toast.title}
-        message={toast.message}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-      />
 
       <ConfirmModal
         open={deleteConfirm.open}

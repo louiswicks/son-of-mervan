@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProfile, updateProfile, changePassword, deleteAccount } from "../api/users";
+import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount } from "../hooks/useProfile";
 
 function Section({ title, children }) {
   return (
@@ -14,108 +15,62 @@ function Section({ title, children }) {
   );
 }
 
-function StatusBanner({ type, message }) {
-  if (!message) return null;
-  const styles =
-    type === "success"
-      ? "bg-green-50 border-green-200 text-green-800"
-      : "bg-red-50 border-red-200 text-red-800";
-  return (
-    <div className={`rounded-lg border px-4 py-3 text-sm mb-4 ${styles}`}>
-      {message}
-    </div>
-  );
-}
-
 export default function AccountSettings() {
   const navigate = useNavigate();
   const { handleLogout } = useAuth();
-  const [profile, setProfile] = useState({ email: "", username: "" });
-  const [usernameInput, setUsernameInput] = useState("");
-  const [profileStatus, setProfileStatus] = useState({ type: "", message: "" });
-  const [profileSaving, setProfileSaving] = useState(false);
 
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+  const changePasswordMutation = useChangePassword();
+  const deleteAccountMutation = useDeleteAccount();
+
+  const [usernameInput, setUsernameInput] = useState("");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
-  const [pwStatus, setPwStatus] = useState({ type: "", message: "" });
-  const [pwSaving, setPwSaving] = useState(false);
-
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [deleteStatus, setDeleteStatus] = useState({ type: "", message: "" });
-  const [deleteInFlight, setDeleteInFlight] = useState(false);
 
-  // Load profile on mount
+  // Sync username input when profile loads
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await getProfile();
-        setProfile(data);
-        setUsernameInput(data.username || "");
-      } catch {
-        // silently fail — non-critical
-      }
-    })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (profile?.username !== undefined) {
+      setUsernameInput(profile.username || "");
+    }
+  }, [profile]);
 
   async function handleProfileSave(e) {
     e.preventDefault();
-    setProfileSaving(true);
-    setProfileStatus({ type: "", message: "" });
-    try {
-      const data = await updateProfile({ username: usernameInput || null });
-      setProfile(data);
-      setProfileStatus({ type: "success", message: "Profile updated." });
-    } catch (err) {
-      const msg = err.response?.data?.detail || err.message || "Update failed.";
-      setProfileStatus({ type: "error", message: msg });
-    } finally {
-      setProfileSaving(false);
-    }
+    updateProfileMutation.mutate({ username: usernameInput || null });
   }
 
   async function handleChangePassword(e) {
     e.preventDefault();
     if (newPw !== confirmPw) {
-      setPwStatus({ type: "error", message: "New passwords do not match." });
+      toast.error("New passwords do not match.");
       return;
     }
-    setPwSaving(true);
-    setPwStatus({ type: "", message: "" });
-    try {
-      await changePassword(currentPw, newPw);
-      setPwStatus({ type: "success", message: "Password changed successfully." });
-      setCurrentPw("");
-      setNewPw("");
-      setConfirmPw("");
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = Array.isArray(detail)
-        ? detail.map((d) => d.msg).join(" ")
-        : detail || err.message || "Update failed.";
-      setPwStatus({ type: "error", message: msg });
-    } finally {
-      setPwSaving(false);
-    }
+    changePasswordMutation.mutate(
+      { currentPw, newPw },
+      {
+        onSuccess: () => {
+          setCurrentPw("");
+          setNewPw("");
+          setConfirmPw("");
+        },
+      },
+    );
   }
 
   async function handleDeleteAccount() {
     if (deleteConfirmText !== "DELETE") return;
-    setDeleteInFlight(true);
-    setDeleteStatus({ type: "", message: "" });
-    try {
-      const data = await deleteAccount();
-      setDeleteStatus({ type: "success", message: data.message });
-      // Give user a moment to read the message, then log out
-      setTimeout(async () => {
-        await handleLogout();
-        navigate("/login");
-      }, 2500);
-    } catch (err) {
-      const msg = err.response?.data?.detail || err.message || "Deletion failed.";
-      setDeleteStatus({ type: "error", message: msg });
-      setDeleteInFlight(false);
-    }
+    deleteAccountMutation.mutate(undefined, {
+      onSuccess: async (data) => {
+        toast.success(data?.message || "Account scheduled for deletion.");
+        setTimeout(async () => {
+          await handleLogout();
+          navigate("/login");
+        }, 2500);
+      },
+    });
   }
 
   return (
@@ -125,14 +80,14 @@ export default function AccountSettings() {
       {/* Profile */}
       <Section title="Profile">
         <form onSubmit={handleProfileSave} className="space-y-4">
-          <StatusBanner {...profileStatus} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
-              value={profile.email}
+              value={profileLoading ? "" : (profile?.email || "")}
               disabled
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
+              placeholder={profileLoading ? "Loading…" : ""}
             />
             <p className="text-xs text-gray-400 mt-1">Email cannot be changed.</p>
           </div>
@@ -144,15 +99,16 @@ export default function AccountSettings() {
               onChange={(e) => setUsernameInput(e.target.value)}
               placeholder="Optional display name"
               maxLength={64}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={profileLoading}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
             />
           </div>
           <button
             type="submit"
-            disabled={profileSaving}
+            disabled={updateProfileMutation.isPending || profileLoading}
             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
-            {profileSaving ? "Saving…" : "Save Profile"}
+            {updateProfileMutation.isPending ? "Saving…" : "Save Profile"}
           </button>
         </form>
       </Section>
@@ -160,7 +116,6 @@ export default function AccountSettings() {
       {/* Security */}
       <Section title="Security">
         <form onSubmit={handleChangePassword} className="space-y-4">
-          <StatusBanner {...pwStatus} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
             <input
@@ -199,10 +154,10 @@ export default function AccountSettings() {
           </div>
           <button
             type="submit"
-            disabled={pwSaving}
+            disabled={changePasswordMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
-            {pwSaving ? "Updating…" : "Change Password"}
+            {changePasswordMutation.isPending ? "Updating…" : "Change Password"}
           </button>
         </form>
       </Section>
@@ -214,30 +169,25 @@ export default function AccountSettings() {
             Deleting your account will schedule all your data for permanent removal after{" "}
             <strong>30 days</strong>. This action cannot be undone. You will be logged out immediately.
           </p>
-          <StatusBanner {...deleteStatus} />
-          {!deleteStatus.message && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type <span className="font-mono font-bold">DELETE</span> to confirm
-                </label>
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="DELETE"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                />
-              </div>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteConfirmText !== "DELETE" || deleteInFlight}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
-              >
-                {deleteInFlight ? "Deleting…" : "Delete My Account"}
-              </button>
-            </>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type <span className="font-mono font-bold">DELETE</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            />
+          </div>
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleteConfirmText !== "DELETE" || deleteAccountMutation.isPending}
+            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {deleteAccountMutation.isPending ? "Deleting…" : "Delete My Account"}
+          </button>
         </div>
       </Section>
     </div>
