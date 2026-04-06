@@ -1,9 +1,6 @@
 // src/components/VerifyEmailPage.jsx
 import React, { useEffect, useState } from "react";
-
-const API_BASE_URL =
-  import.meta?.env?.VITE_API_URL ||
-  "https://son-of-mervan-production.up.railway.app";
+import { verifyEmail } from "../api/auth";
 
 export default function VerifyEmailPage({ goToLogin }) {
   const [status, setStatus] = useState("verifying"); // verifying | ok | error
@@ -24,16 +21,12 @@ export default function VerifyEmailPage({ goToLogin }) {
 
     (async () => {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/auth/verify-email?token=${encodeURIComponent(token)}`
-        );
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j.detail || "Verification failed.");
+        const data = await verifyEmail(token);
         setStatus("ok");
-        setMsg(j.message || "Email verified. You can now log in.");
+        setMsg(data.message || "Email verified. You can now log in.");
       } catch (e) {
         setStatus("error");
-        setMsg(e.message || "Verification failed.");
+        setMsg(e.response?.data?.detail || e.message || "Verification failed.");
       }
     })();
   }, []);

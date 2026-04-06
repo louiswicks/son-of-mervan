@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { BarChart3, Calendar, LineChart as LineIcon, PiggyBank } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -11,8 +10,8 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { getAnnualOverview } from "../api/expenses";
 
-const API_BASE_URL = import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
 const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const AnnualOverview = ({ token, refreshKey = 0 }) => {
@@ -24,14 +23,8 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
   const fetchData = async (y) => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/overview/annual`, {
-        params: { year: y, _r: Date.now() },
-        headers: {
-          Authorization: `Bearer ${token || localStorage.getItem("authToken")}`,
-          "Cache-Control": "no-cache",
-        },
-      });
-      setData(res.data);
+      const resData = await getAnnualOverview(y);
+      setData(resData);
     } catch (e) {
       console.error("Failed to load annual overview", e);
     } finally {
@@ -52,17 +45,6 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
     }));
   }, [data]);
 
-  const savingsChartData = useMemo(() => {
-    return (data.months || []).map((m, i) => ({
-      name: monthLabels[i],
-      Savings: Number(
-        // prefer the backend-calculated remaining_actual; fallback to actual_salary - total_actual
-        (m.remaining_actual ?? (m.actual_salary || 0) - (m.total_actual || 0)) || 0
-      ),
-    }));
-  }, [data]);
-
-  // ----- above your return(), build a clean savings series -----
   const savingsTrendData = useMemo(() => {
     const months = Array.isArray(data?.months) ? data.months : [];
     return months.map((m, i) => {
@@ -160,7 +142,6 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
         </div>
       </div>
 
-      {/* Trend Chart */}
       {/* Savings Trend */}
       <div className="bg-white border rounded-xl p-6 shadow-sm">
         <h3 className="text-lg font-semibold mb-4">Savings Trend (Actual)</h3>
@@ -179,7 +160,7 @@ const AnnualOverview = ({ token, refreshKey = 0 }) => {
               <Line
                 type="monotone"
                 dataKey="Savings"
-                stroke="#ef4444"    // red
+                stroke="#ef4444"
                 strokeWidth={3}
                 dot={false}
               />

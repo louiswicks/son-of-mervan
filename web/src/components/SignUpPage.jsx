@@ -1,8 +1,6 @@
 // src/components/SignUpPage.jsx
 import React, { useState } from "react";
-
-const API_BASE_URL =
-  import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
+import { signup } from "../api/auth";
 
 export default function SignUpPage({ goToLogin }) {
   const [form, setForm] = useState({ email: "", password: "", confirm: "" });
@@ -45,18 +43,11 @@ export default function SignUpPage({ goToLogin }) {
     setDevLink("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.detail || "Sign up failed.");
-
+      const data = await signup(form.email, form.password);
       setSuccess("Account created. Please check your email to verify.");
-      if (j.dev_verify_url) setDevLink(j.dev_verify_url);
+      if (data.dev_verify_url) setDevLink(data.dev_verify_url);
     } catch (e) {
-      setErr(e.message || "Something went wrong.");
+      setErr(e.response?.data?.detail || e.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,16 @@
+## Phase 3.1 — Centralised API Client [DONE] 2026-04-06
+- Created `web/src/api/client.js`: single Axios instance reading base URL from `REACT_APP_API_URL` (falls back to Railway prod URL); `withCredentials: true` sends httpOnly cookie on every request; request interceptor injects in-memory access token via `setAccessToken()`; response interceptor catches 401, calls `/auth/refresh` (deduplicating concurrent retries), retries the original request with the new token, calls `setOnUnauthorized()` callback on refresh failure (skips retry for `/auth/refresh`, `/login`, `/auth/signup`)
+- Created `web/src/api/auth.js`: `login`, `signup`, `verifyEmail`, `requestPasswordReset`, `confirmPasswordReset`, `refreshSession`, `logout` — all returning unwrapped data
+- Created `web/src/api/budget.js`: `calculateBudget(payload, commit)`
+- Created `web/src/api/expenses.js`: `getMonthlyTracker`, `saveMonthlyTracker`, `updateExpense`, `deleteExpense`, `getAnnualOverview`
+- Created `web/src/api/users.js`: `getProfile`, `updateProfile`, `changePassword`, `deleteAccount`
+- Created `web/.env.example` documenting `REACT_APP_API_URL`
+- Updated `web/src/App.js`: removed hardcoded `API_BASE_URL`; calls `setAccessToken` and `setOnUnauthorized` on startup; uses `refreshSession` and `logout` from `api/auth.js`; removed all direct `fetch()` calls
+- Updated all 9 components to remove local `API_BASE_URL` constants and direct HTTP calls: `LoginPage`, `SignUpPage`, `VerifyEmailPage`, `ForgotPasswordPage`, `ResetPasswordPage`, `SonOfMervan`, `MonthlyTracker`, `AnnualOverview`, `AccountSettings`
+- Removed vestigial `localStorage.getItem('authToken')` fallbacks from `MonthlyTracker` (superseded by Phase 2.4)
+- Build passes: `npm run build` compiles with 0 errors; bundle 187 kB gzip (-1.6 kB)
+- Files changed: web/src/api/client.js (new), web/src/api/auth.js (new), web/src/api/budget.js (new), web/src/api/expenses.js (new), web/src/api/users.js (new), web/.env.example (new), web/src/App.js, web/src/components/LoginPage.jsx, web/src/components/SignUpPage.jsx, web/src/components/VerifyEmailPage.jsx, web/src/components/ForgotPasswordPage.jsx, web/src/components/ResetPasswordPage.jsx, web/src/components/SonOfMervan.jsx, web/src/components/MonthlyTracker.jsx, web/src/components/AnnualOverview.jsx, web/src/components/AccountSettings.jsx, PRD.md
+
 ## Phase 2.7 — Backend Test Suite [DONE] 2026-04-06
 - Created `tests/conftest.py`: sets env vars before import, patches alembic migrations to skip at test startup, creates SQLite test DB with `Base.metadata.create_all`, autouse fixture truncates all tables + resets rate-limiter storage between tests; fixtures: `db`, `verified_user`, `second_user`, `client` (unauthenticated), `auth_client` (overrides `verify_token` + `get_db`); helper functions `make_month` and `make_expense`
 - Created `tests/test_auth.py`: 48 tests covering root health, signup (success + 5 invalid cases), email verification, login (success + wrong password + unverified + soft-deleted + nonexistent), password reset flow (request always-200, confirm success/invalid/expired/used, invalidates old tokens), refresh token (valid/revoked/expired), logout, account management (get/update profile, change password, delete account)

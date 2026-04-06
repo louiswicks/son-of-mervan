@@ -1,8 +1,6 @@
 // src/components/ResetPasswordPage.jsx
 import React, { useState } from "react";
-
-const API_BASE_URL =
-  import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
+import { confirmPasswordReset } from "../api/auth";
 
 function getTokenFromHash() {
   // Hash looks like: #/reset-password?token=abc123
@@ -54,18 +52,14 @@ export default function ResetPasswordPage({ goToLogin }) {
     setMessage(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/password-reset-confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_password: newPassword }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.detail || "Reset failed");
+      const data = await confirmPasswordReset(token, newPassword);
       setSuccess(true);
-      setMessage(body.message || "Password updated successfully.");
+      setMessage(data.message || "Password updated successfully.");
     } catch (err) {
       setIsError(true);
-      setMessage(err.message || "Something went wrong. Please try again.");
+      setMessage(
+        err.response?.data?.detail || err.message || "Something went wrong. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }

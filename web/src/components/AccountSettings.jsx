@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-
-const API_BASE_URL = "https://son-of-mervan-production.up.railway.app";
+import { getProfile, updateProfile, changePassword, deleteAccount } from "../api/users";
 
 function Section({ title, children }) {
   return (
@@ -42,20 +41,13 @@ export default function AccountSettings({ token, onLogout }) {
   const [deleteStatus, setDeleteStatus] = useState({ type: "", message: "" });
   const [deleteInFlight, setDeleteInFlight] = useState(false);
 
-  const authHeaders = { Authorization: `Bearer ${token}` };
-
   // Load profile on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/users/me`, {
-          headers: authHeaders,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data);
-          setUsernameInput(data.username || "");
-        }
+        const data = await getProfile();
+        setProfile(data);
+        setUsernameInput(data.username || "");
       } catch {
         // silently fail — non-critical
       }
@@ -67,20 +59,12 @@ export default function AccountSettings({ token, onLogout }) {
     setProfileSaving(true);
     setProfileStatus({ type: "", message: "" });
     try {
-      const res = await fetch(`${API_BASE_URL}/users/me`, {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usernameInput || null }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setProfile(data);
-        setProfileStatus({ type: "success", message: "Profile updated." });
-      } else {
-        setProfileStatus({ type: "error", message: data.detail || "Update failed." });
-      }
-    } catch {
-      setProfileStatus({ type: "error", message: "Network error. Please try again." });
+      const data = await updateProfile({ username: usernameInput || null });
+      setProfile(data);
+      setProfileStatus({ type: "success", message: "Profile updated." });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || "Update failed.";
+      setProfileStatus({ type: "error", message: msg });
     } finally {
       setProfileSaving(false);
     }
@@ -95,25 +79,17 @@ export default function AccountSettings({ token, onLogout }) {
     setPwSaving(true);
     setPwStatus({ type: "", message: "" });
     try {
-      const res = await fetch(`${API_BASE_URL}/users/me/password`, {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ current_password: currentPw, new_password: newPw }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setPwStatus({ type: "success", message: "Password changed successfully." });
-        setCurrentPw("");
-        setNewPw("");
-        setConfirmPw("");
-      } else {
-        const msg =
-          data.detail ||
-          (Array.isArray(data.detail) ? data.detail.map((d) => d.msg).join(" ") : "Update failed.");
-        setPwStatus({ type: "error", message: msg });
-      }
-    } catch {
-      setPwStatus({ type: "error", message: "Network error. Please try again." });
+      await changePassword(currentPw, newPw);
+      setPwStatus({ type: "success", message: "Password changed successfully." });
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d) => d.msg).join(" ")
+        : detail || err.message || "Update failed.";
+      setPwStatus({ type: "error", message: msg });
     } finally {
       setPwSaving(false);
     }
@@ -124,24 +100,15 @@ export default function AccountSettings({ token, onLogout }) {
     setDeleteInFlight(true);
     setDeleteStatus({ type: "", message: "" });
     try {
-      const res = await fetch(`${API_BASE_URL}/users/me`, {
-        method: "DELETE",
-        headers: authHeaders,
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDeleteStatus({ type: "success", message: data.message });
-        // Give user a moment to read the message, then log out
-        setTimeout(() => {
-          if (onLogout) onLogout();
-        }, 2500);
-      } else {
-        setDeleteStatus({ type: "error", message: data.detail || "Deletion failed." });
-        setDeleteInFlight(false);
-      }
-    } catch {
-      setDeleteStatus({ type: "error", message: "Network error. Please try again." });
+      const data = await deleteAccount();
+      setDeleteStatus({ type: "success", message: data.message });
+      // Give user a moment to read the message, then log out
+      setTimeout(() => {
+        if (onLogout) onLogout();
+      }, 2500);
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || "Deletion failed.";
+      setDeleteStatus({ type: "error", message: msg });
       setDeleteInFlight(false);
     }
   }

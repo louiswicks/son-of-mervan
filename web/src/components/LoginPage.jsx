@@ -1,8 +1,6 @@
 // src/components/LoginPage.jsx
 import React, { useState } from "react";
-
-const API_BASE_URL =
-  import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
+import { login } from "../api/auth";
 
 export default function LoginPage({ onLogin, goToSignup, goToForgotPassword }) {
   const [identifier, setIdentifier] = useState(""); // email or username
@@ -18,20 +16,12 @@ export default function LoginPage({ onLogin, goToSignup, goToForgotPassword }) {
     setMessage(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
-      });
-
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.detail || "Login failed");
-      if (!body?.access_token) throw new Error("No access token returned");
-
-      onLogin?.(body.access_token);
+      const data = await login(identifier, password);
+      if (!data?.access_token) throw new Error("No access token returned");
+      onLogin?.(data.access_token);
     } catch (err) {
       setIsError(true);
-      setMessage(err.message || "Login failed");
+      setMessage(err.response?.data?.detail || err.message || "Login failed");
     } finally {
       setSubmitting(false);
     }

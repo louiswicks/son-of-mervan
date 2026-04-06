@@ -139,9 +139,9 @@ The core logic works but the app has critical security gaps, zero test coverage,
 
 ## Phase 3: Frontend UX Overhaul
 
-### 3.1 Centralised API Client
+### 3.1 Centralised API Client [DONE 2026-04-06]
 **Problem:** API base URL is hardcoded to the production Railway URL. Local development requires source code changes.  
-**Solution:** Single Axios instance in `web/src/api/client.js` configured from `REACT_APP_API_URL` environment variable. Feature modules: `api/expenses.js`, `api/budget.js`, `api/auth.js`. Includes 401 refresh interceptor.  
+**Solution:** Single Axios instance in `web/src/api/client.js` configured from `REACT_APP_API_URL` environment variable. Feature modules: `api/expenses.js`, `api/budget.js`, `api/auth.js`, `api/users.js`. Includes 401 refresh interceptor.  
 **Files:** new `web/src/api/client.js` and feature modules, `web/.env.example`  
 **Acceptance Criteria:** `REACT_APP_API_URL=http://localhost:8000` routes all calls to local backend without code changes.
 

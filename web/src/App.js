@@ -9,9 +9,9 @@ import VerifyEmailPage from "./components/VerifyEmailPage";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import AccountSettings from "./components/AccountSettings";
+import { setAccessToken, setOnUnauthorized } from "./api/client";
+import { refreshSession, logout as apiLogout } from "./api/auth";
 import "./App.css";
-
-const API_BASE_URL = "https://son-of-mervan-production.up.railway.app";
 
 function App() {
   // --- hooks (must be top-level)
@@ -29,20 +29,23 @@ function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // Register an unauthorized callback so the 401 interceptor can log us out
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      setToken(null);
+      setIsAuthenticated(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // On startup: try to restore session from httpOnly refresh token cookie.
   // Access token is never stored in localStorage — memory only.
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: "POST",
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setToken(data.access_token);
-          setIsAuthenticated(true);
-        }
+        const data = await refreshSession();
+        setAccessToken(data.access_token);
+        setToken(data.access_token);
+        setIsAuthenticated(true);
       } catch {
         // No valid session — stay on login page
       } finally {
@@ -53,6 +56,7 @@ function App() {
 
   const handleLogin = (newToken) => {
     // Access token stored in memory only — NOT localStorage
+    setAccessToken(newToken);
     setToken(newToken);
     setIsAuthenticated(true);
     if (window.location.hash.startsWith("#/verify-email")) {
@@ -62,13 +66,11 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await apiLogout();
     } catch {
       // Proceed with local logout even if request fails
     }
+    setAccessToken(null);
     setToken(null);
     setIsAuthenticated(false);
   };

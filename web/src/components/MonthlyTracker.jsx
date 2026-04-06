@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
+import {
+  getMonthlyTracker,
+  saveMonthlyTracker,
+  updateExpense,
+  deleteExpense,
+} from "../api/expenses";
+import { calculateBudget } from "../api/budget";
 
-const API_BASE_URL = import.meta?.env?.VITE_API_URL || 'https://son-of-mervan-production.up.railway.app';
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
 const storageKey = (u, m) => `monthlyTracker:${u}:${m}`;
@@ -46,10 +51,6 @@ const MonthlyTracker = ({ token, onSaved }) => {
     }
   };
 
-  const authHeader = () => ({
-    Authorization: `Bearer ${token || localStorage.getItem('authToken')}`,
-  });
-
   const showToast = (type, title, message, autoHideMs = 2600) => {
     setToast({ open: true, type, title, message });
     if (autoHideMs) {
@@ -59,8 +60,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
   };
 
   useEffect(() => {
-    const t = token || localStorage.getItem('authToken');
-    setUsername(usernameFromToken(t));
+    setUsername(usernameFromToken(token));
   }, [token]);
 
   // Helper: build rows from server expense items and merge with base categories
@@ -85,8 +85,6 @@ const MonthlyTracker = ({ token, onSaved }) => {
 
   useEffect(() => {
     const load = async () => {
-      const hdr = { Authorization: `Bearer ${token || localStorage.getItem('authToken')}` };
-
       // Skip localStorage cache when a filter is active (cache holds unfiltered data)
       if (filterCategory === 'All' && currentPage === 1) {
         try {
@@ -107,12 +105,9 @@ const MonthlyTracker = ({ token, onSaved }) => {
         const params = { _r: Date.now(), page: currentPage, page_size: 25 };
         if (filterCategory !== 'All') params.category = filterCategory;
 
-        const res = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
-          headers: hdr,
-          params,
-        });
+        const resData = await getMonthlyTracker(selectedMonth, params);
 
-        const { salary_planned, salary_actual, expenses: expEnvelope = {} } = res.data || {};
+        const { salary_planned, salary_actual, expenses: expEnvelope = {} } = resData || {};
         const items = expEnvelope.items || [];
         const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
         setPagination(pag);
@@ -193,16 +188,12 @@ const MonthlyTracker = ({ token, onSaved }) => {
     if (row.id) {
       // Persist to server via PUT
       try {
-        await axios.put(
-          `${API_BASE_URL}/expenses/${row.id}`,
-          {
-            name: draft.name || null,
-            category: draft.category || null,
-            planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
-            actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
-          },
-          { headers: { ...authHeader(), 'Content-Type': 'application/json' } },
-        );
+        await updateExpense(row.id, {
+          name: draft.name || null,
+          category: draft.category || null,
+          planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
+          actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
+        });
       } catch {
         showToast("error", "Update failed", "Couldn't save changes. Please try again.");
         return;
@@ -239,7 +230,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
     const { expenseId, rowIndex } = deleteConfirm;
     setDeleteConfirm({ open: false, expenseId: null, rowIndex: null });
     try {
-      await axios.delete(`${API_BASE_URL}/expenses/${expenseId}`, { headers: authHeader() });
+      await deleteExpense(expenseId);
       setRows(prev => prev.filter((_, i) => i !== rowIndex));
       showToast("success", "Deleted", "Expense removed.");
     } catch {
@@ -266,13 +257,7 @@ const MonthlyTracker = ({ token, onSaved }) => {
           monthly_salary: salary !== '' ? Number(salary) : 0,
           expenses: plannedExpenses,
         };
-
-        await axios.post(`${API_BASE_URL}/calculate-budget?commit=true`, plannedPayload, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeader(),
-          },
-        });
+        await calculateBudget(plannedPayload, true);
       }
 
       const actualExpenses = rows
@@ -280,26 +265,17 @@ const MonthlyTracker = ({ token, onSaved }) => {
         .map(r => ({ name: r.name?.trim() ? r.name.trim() : r.category, amount: Number(r.actual) || 0, category: r.category }));
 
       const actualPayload = { salary: salary !== '' ? Number(salary) : null, expenses: actualExpenses };
+      const resData = await saveMonthlyTracker(selectedMonth, actualPayload);
 
-      const res = await axios.post(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, actualPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader(),
-        },
-      });
-
-      const apiSalary = Number(res?.data?.salary ?? (salary !== '' ? Number(salary) : 0));
-      const apiSpent  = Number(res?.data?.total_actual ?? 0);
-      const apiSaved  = Number(res?.data?.remaining_actual ?? Math.max(apiSalary - apiSpent, 0));
+      const apiSalary = Number(resData?.salary ?? (salary !== '' ? Number(salary) : 0));
+      const apiSpent  = Number(resData?.total_actual ?? 0);
+      const apiSaved  = Number(resData?.remaining_actual ?? Math.max(apiSalary - apiSpent, 0));
       setLastSaved({ salary: apiSalary, spent: apiSpent, saved: apiSaved });
 
       // Refresh rows from server so new DB ids are populated
       try {
-        const refreshed = await axios.get(`${API_BASE_URL}/monthly-tracker/${selectedMonth}`, {
-          headers: authHeader(),
-          params: { _r: Date.now(), page: 1, page_size: 25 },
-        });
-        const { expenses: expEnvelope = {} } = refreshed.data || {};
+        const refreshed = await getMonthlyTracker(selectedMonth, { _r: Date.now(), page: 1, page_size: 25 });
+        const { expenses: expEnvelope = {} } = refreshed || {};
         const items = expEnvelope.items || [];
         const pag = { total: expEnvelope.total ?? 0, pages: expEnvelope.pages ?? 0, page_size: expEnvelope.page_size ?? 25 };
         setPagination(pag);

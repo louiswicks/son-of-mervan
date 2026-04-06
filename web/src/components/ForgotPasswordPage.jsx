@@ -1,8 +1,6 @@
 // src/components/ForgotPasswordPage.jsx
 import React, { useState } from "react";
-
-const API_BASE_URL =
-  import.meta?.env?.VITE_API_URL || "https://son-of-mervan-production.up.railway.app";
+import { requestPasswordReset } from "../api/auth";
 
 export default function ForgotPasswordPage({ goToLogin }) {
   const [email, setEmail] = useState("");
@@ -19,18 +17,14 @@ export default function ForgotPasswordPage({ goToLogin }) {
     setDevLink(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/password-reset-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.detail || "Request failed");
-      setMessage(body.message || "If that email is registered, a reset link has been sent.");
-      if (body.dev_verify_url) setDevLink(body.dev_verify_url);
+      const data = await requestPasswordReset(email);
+      setMessage(data.message || "If that email is registered, a reset link has been sent.");
+      if (data.dev_verify_url) setDevLink(data.dev_verify_url);
     } catch (err) {
       setIsError(true);
-      setMessage(err.message || "Something went wrong. Please try again.");
+      setMessage(
+        err.response?.data?.detail || err.message || "Something went wrong. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }

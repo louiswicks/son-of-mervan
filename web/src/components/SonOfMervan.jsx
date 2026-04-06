@@ -8,8 +8,7 @@ import {
   ResponsiveContainer, LineChart, Line, CartesianGrid,
   XAxis, YAxis, Tooltip, BarChart, Bar
 } from "recharts";
-
-const API_BASE_URL = "https://son-of-mervan-production.up.railway.app";
+import { calculateBudget } from "../api/budget";
 
 const CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -33,10 +32,10 @@ export default function SonOfMervan({ token, onSaved }) {
   const updateExpense = (i, field, value) =>
     setExpenses((xs) => xs.map((x, j) => (j === i ? { ...x, [field]: value } : x)));
 
-  const calculateBudget = async () => {
+  const doCalculate = async () => {
     setLoading(true);
 
-    // Always use current month (YYYY-MM) for “Current Budget”
+    // Always use current month (YYYY-MM) for "Current Budget"
     const currentMonth = new Date().toISOString().slice(0, 7);
 
     const body = {
@@ -52,31 +51,11 @@ export default function SonOfMervan({ token, onSaved }) {
     };
 
     try {
-      const res = await fetch(`${API_BASE_URL}/calculate-budget?commit=false`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem("authToken");
-          alert("Session expired. Please login again.");
-          window.location.reload();
-          return;
-        }
-        throw new Error("Failed to calculate budget.");
-      }
-
-      const data = await res.json();
+      const data = await calculateBudget(body, false);
       setResults(data);
-      onSaved?.(); // keep triggering refreshes elsewhere if you want
+      onSaved?.();
     } catch (err) {
-      console.error(err);
-      alert(err.message || "Network error. Please try again.");
+      alert(err.response?.data?.detail || err.message || "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -210,7 +189,7 @@ export default function SonOfMervan({ token, onSaved }) {
           <div className="mt-5 sm:mt-8">
             <div className="md:hidden sticky bottom-3 z-20">
               <button
-                onClick={calculateBudget}
+                onClick={doCalculate}
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-3 rounded-xl shadow-lg active:scale-[.99] transition disabled:opacity-60"
               >
@@ -225,7 +204,7 @@ export default function SonOfMervan({ token, onSaved }) {
 
             <div className="hidden md:flex justify-center">
               <button
-                onClick={calculateBudget}
+                onClick={doCalculate}
                 disabled={loading}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition disabled:opacity-60"
               >
