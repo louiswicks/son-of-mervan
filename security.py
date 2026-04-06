@@ -1,5 +1,4 @@
 # security.py
-import os, secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -11,12 +10,12 @@ from jose import jwt, JWTError, ExpiredSignatureError  # ← use python-jose onl
 from passlib.context import CryptContext
 
 from database import SessionLocal, User
+from core.config import settings
 
 security = HTTPBearer()
 
 # ── JWT config ────────────────────────────────────────────────────────────────
-# IMPORTANT: set JWT_SECRET_KEY in your env so tokens survive restarts
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 
 # ── Password hashing ─────────────────────────────────────────────────────────
@@ -82,7 +81,7 @@ def authenticate_user(username: str, password: str) -> bool:
         db.close()
 
 EMAIL_VERIFY_AUDIENCE = "email-verify"
-EMAIL_VERIFY_TTL_MIN = int(os.getenv("EMAIL_VERIFY_TTL_MIN", "60"))  # 60 minutes
+EMAIL_VERIFY_TTL_MIN = settings.EMAIL_VERIFY_TTL_MIN
 
 def create_email_verify_token(user_id: int, email: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=EMAIL_VERIFY_TTL_MIN)

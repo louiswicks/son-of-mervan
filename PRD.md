@@ -69,7 +69,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** `main.py`, new `scripts/migrate.py`, new `core/logging_config.py`  
 **Acceptance Criteria:** All debug routes return 404 in production. No `print()` calls remain in application code.
 
-### 1.2 Fix JWT Secret Fallback
+### 1.2 Fix JWT Secret Fallback [DONE 2026-04-06]
 **Problem:** If `JWT_SECRET` env var is missing, the app generates a random secret at startup — silently invalidating all user sessions on every restart.  
 **Solution:** Introduce `core/config.py` with Pydantic `BaseSettings`. `JWT_SECRET` is required with no default; app crashes loudly at startup if missing. Add `.env.example` documenting all required variables.  
 **Files:** new `core/config.py`, `security.py`, `main.py`, `.env.example`  

@@ -1,3 +1,11 @@
+## Phase 1.2 — Fix JWT Secret Fallback [DONE] 2026-04-06
+- Added core/config.py with Pydantic BaseSettings; JWT_SECRET_KEY is required (no default)
+- App now exits immediately with a clear [FATAL] message if JWT_SECRET_KEY is missing
+- security.py and main.py updated to import from core.config (no more os.getenv fallbacks)
+- Added pydantic-settings>=2.0.0 to requirements.txt
+- Created .env.example documenting all required and optional variables
+- Files changed: core/config.py (new), security.py, main.py, requirements.txt, .env.example (new)
+
 ## Phase 1.1 — Remove debug/migration HTTP endpoints [DONE] 2026-04-06
 - Removed POST /run-migration, POST /cleanup-old-columns, GET /debug/check-month/{month} from main.py
 - Replaced all print() calls with stdlib logging (LOG_LEVEL env var controlled)

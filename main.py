@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from core.logging_config import setup_logging
+from core.config import settings
 from database import init_db, get_db, User, MonthlyData, MonthlyExpense, encrypt_value
 from security import authenticate_user, create_access_token, verify_token, verify_password
 from routers import tracker, overview, signup
@@ -24,10 +25,7 @@ logger = logging.getLogger(__name__)
 # -------------------- App Setup --------------------
 app = FastAPI(title="Son of Mervan - Budget API", version="1.0.0")
 
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:5173,https://louiswicks.github.io"
-).split(",")
+CORS_ORIGINS = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
