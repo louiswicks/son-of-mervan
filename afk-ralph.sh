@@ -6,6 +6,15 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "Error: GITHUB_TOKEN environment variable is not set."
+  echo "Run: export GITHUB_TOKEN=your_token"
+  exit 1
+fi
+
+# Ensure the token is embedded in the remote URL for every push
+git remote set-url origin "https://louiswicks:${GITHUB_TOKEN}@github.com/louiswicks/son-of-mervan.git"
+
 for ((i=1; i<=$1; i++)); do
   result=$(claude --permission-mode bypassPermissions -p "@PRD.md @progress.txt \
   1. Find the highest-priority task and implement it. \
