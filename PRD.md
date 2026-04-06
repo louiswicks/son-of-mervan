@@ -163,7 +163,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `web/src/components/ErrorBoundary.jsx`, new `web/src/components/AsyncBoundary.jsx`, `web/src/App.jsx`, `web/src/router.jsx`  
 **Acceptance Criteria:** A deliberate thrown error in a chart component shows the page-level error fallback UI without crashing the nav or other pages.
 
-### 3.5 Zustand Global State Management
+### 3.5 Zustand Global State Management [DONE 2026-04-06]
 **Problem:** Auth state and UI state are scattered across components with no clear ownership.  
 **Solution:** Zustand stores: `authStore` (user + in-memory access token), `uiStore` (theme, active modal). React Query owns all server state.  
 **Files:** new `web/src/store/authStore.js`, `web/src/store/uiStore.js`  

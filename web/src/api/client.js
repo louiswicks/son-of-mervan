@@ -1,22 +1,13 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 const BASE_URL =
   process.env.REACT_APP_API_URL ||
   'https://son-of-mervan-production.up.railway.app';
 
-// In-memory access token — never written to localStorage
-let _accessToken = null;
-let _onUnauthorized = null;
+// In-memory access token lives in authStore — never written to localStorage.
+
 let _refreshPromise = null;
-
-export const setAccessToken = (token) => { _accessToken = token; };
-export const getAccessToken = () => _accessToken;
-
-/**
- * Register a callback that fires when a refresh attempt fails (session expired).
- * App.js uses this to redirect to the login page.
- */
-export const setOnUnauthorized = (cb) => { _onUnauthorized = cb; };
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -25,8 +16,9 @@ const client = axios.create({
 
 // Inject the in-memory access token into every outgoing request
 client.interceptors.request.use((config) => {
-  if (_accessToken && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${_accessToken}`;
+  const token = useAuthStore.getState().token;
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -53,12 +45,11 @@ client.interceptors.response.use(
           .post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true })
           .then((res) => {
             const newToken = res.data.access_token;
-            setAccessToken(newToken);
+            useAuthStore.getState().setToken(newToken);
             return newToken;
           })
           .catch(() => {
-            setAccessToken(null);
-            if (_onUnauthorized) _onUnauthorized();
+            useAuthStore.getState().clearAuth();
             return Promise.reject(new Error('Session expired'));
           })
           .finally(() => { _refreshPromise = null; });

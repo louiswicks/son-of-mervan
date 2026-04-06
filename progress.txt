@@ -1,3 +1,13 @@
+## Phase 3.5 — Zustand Global State Management [DONE] 2026-04-06
+- Installed `zustand@5` (^5.0.12)
+- Created `web/src/store/authStore.js`: `useAuthStore` Zustand store with `{ isAuthenticated, token, loading }` + actions `handleLogin(token)`, `setToken(token)`, `clearAuth()`, `setLoading(loading)`; token held in-memory only, never persisted
+- Created `web/src/store/uiStore.js`: `useUiStore` Zustand store with `{ activeModal }` + `openModal(name)` / `closeModal()` — ready for Phase 3.6 modal usage
+- Updated `web/src/api/client.js`: removed module-level `_accessToken`, `setAccessToken`, `getAccessToken`, `_onUnauthorized`, `setOnUnauthorized`; request interceptor now reads `useAuthStore.getState().token`; 401 interceptor calls `useAuthStore.getState().setToken(newToken)` on refresh success and `.clearAuth()` on failure — no callback registration needed
+- Updated `web/src/context/AuthContext.jsx`: removed all `useState` for auth; `AuthProvider` is a thin component that runs `refreshSession()` on mount and calls `handleLogin` / `setLoading` on the store; `useAuth()` reads from `useAuthStore` and adds `handleLogout` locally to avoid circular import (`authStore → api/auth → api/client → authStore`); all existing consumers of `useAuth()` unchanged
+- `web/src/App.jsx` unchanged — `<AuthProvider>` still wraps the tree for the session-restore side effect
+- Build passes: 0 errors, 0 warnings; bundle 225.44 kB gzip (+227 B for zustand)
+- Files changed: web/src/store/authStore.js (new), web/src/store/uiStore.js (new), web/src/api/client.js, web/src/context/AuthContext.jsx, web/package.json, PRD.md
+
 ## Phase 3.4 — Global Error Boundaries [DONE] 2026-04-06
 - Created `web/src/components/ErrorBoundary.jsx`: class component with `getDerivedStateFromError` + `componentDidCatch`; renders "Something went wrong" card UI with "Try again" (reset state) and "Reload page" buttons; accepts optional `fallback` render-prop for custom error UI
 - Created `web/src/components/AsyncBoundary.jsx`: composes `ErrorBoundary` + `Suspense` (falls back to `SkeletonCard`) for async data sections
