@@ -1,0 +1,9 @@
+/* Mobile-first breakpoint reference:
+   sm: 640px  — primary mobile/desktop split
+   md: 768px  — tablet landscape
+   lg: 1024px — desktop */
+
+/* Safe-area inset for iOS home indicator on bottom tab bar */
+.safe-area-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}

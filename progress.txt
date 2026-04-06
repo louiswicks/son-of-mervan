@@ -1,3 +1,12 @@
+## Phase 3.7 — Mobile-First Responsive Design [DONE] 2026-04-06
+- Created `web/src/styles/breakpoints.css`: breakpoint reference comments + `.safe-area-bottom` utility for iOS home indicator padding on bottom tab bar
+- Updated `web/src/App.jsx`: imports `breakpoints.css`; changed toast position `bottom-right` → `top-right` to avoid collision with bottom tab bar
+- Updated `web/src/components/AuthGuard.jsx`: removed mobile select dropdown; replaced with fixed bottom tab bar (`sm:hidden`, `position: fixed; bottom: 0; z-50`) using LayoutDashboard/Calendar/TrendingUp/Settings icons from lucide-react; tabs are 56px min-height (WCAG 2.5.5); mobile header now shows only theme toggle + logout (both `min-h-[44px]`); main content has `pb-24 sm:py-6` to clear the tab bar; desktop nav unchanged
+- Updated `web/src/components/MonthlyTracker.jsx`: added mobile card stack layout (`block sm:hidden`) — each expense row renders as a card with category, optional name input, projected/actual grid, and diff/status row; all card interactive targets `min-w-[44px] min-h-[44px]`; mobile totals summary card at bottom; existing table layout wrapped in `hidden sm:block`; salary/filter/pagination inputs all have `min-h-[44px]`; dark mode classes added throughout
+- Updated `web/src/components/SonOfMervan.jsx`: removed invalid `xs:grid-cols-2` (no xs breakpoint in Tailwind) → `sm:grid-cols-12`; updated col-span prefixes from `md:` to `sm:`; sticky calculate button bottom changed `bottom-3` → `bottom-20 sm:bottom-3` to clear bottom tab bar on mobile; expense input fields have `min-h-[44px]` and dark mode classes
+- Build passes: 0 errors, 1 pre-existing warning; bundle 227.64 kB gzip (+1.02 kB)
+- Files changed: web/src/styles/breakpoints.css (new), web/src/App.jsx, web/src/components/AuthGuard.jsx, web/src/components/MonthlyTracker.jsx, web/src/components/SonOfMervan.jsx, PRD.md
+
 ## Phase 3.6 — Dark Mode [DONE] 2026-04-06
 - Created `web/src/styles/tokens.css`: CSS custom properties for layout (`--color-bg`, `--color-surface`, `--color-text`, `--color-border`, etc.) and Recharts chart colors (`--color-chart-primary/success/danger/grid/axis/tooltip-*`); light defaults on `:root`, dark overrides under `[data-theme="dark"]`
 - Created `web/src/hooks/useTheme.js`: `useTheme()` hook reads `theme` from `useUiStore`; `useEffect` applies `data-theme` attribute + `dark` class to `document.documentElement` on every change; writes to `localStorage`; returns `{ theme, toggleTheme }`

@@ -175,7 +175,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `web/src/styles/tokens.css`, new `web/src/hooks/useTheme.js`, `web/src/components/Nav.jsx`  
 **Acceptance Criteria:** Theme persists across sessions. Automatically matches OS preference on first visit. All Recharts charts use theme-aware colors.
 
-### 3.7 Mobile-First Responsive Design
+### 3.7 Mobile-First Responsive Design [DONE 2026-04-06]
 **Problem:** App likely breaks below ~768px with no explicit responsive design.  
 **Solution:** Fluid CSS Grid replacing fixed-width layouts. Bottom tab bar on mobile (<768px). Expense table → card-stack layout on mobile. WCAG 2.5.5-compliant touch targets (min 44×44px). Tested on iPhone 14 Pro, Pixel 7, iPad, and 320px min width.  
 **Files:** `web/src/components/Nav.jsx`, `web/src/components/ExpenseList.jsx`, `web/src/pages/DashboardPage.jsx`, new `web/src/styles/breakpoints.css`  

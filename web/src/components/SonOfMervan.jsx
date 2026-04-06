@@ -143,10 +143,10 @@ export default function SonOfMervan() {
                 {expenses.map((exp, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-12 gap-2 bg-gray-50 px-3 py-3 rounded-xl items-center"
+                    className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-gray-50 dark:bg-gray-700 px-3 py-3 rounded-xl items-center"
                   >
                     <input
-                      className="md:col-span-5 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="sm:col-span-5 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                       placeholder="Expense name"
                       value={exp.name}
                       onChange={(e) => updateExpense(i, "name", e.target.value)}
@@ -154,7 +154,7 @@ export default function SonOfMervan() {
                     <input
                       inputMode="decimal"
                       pattern="[0-9]*[.]?[0-9]*"
-                      className="md:col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="sm:col-span-2 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                       placeholder="£"
                       value={exp.amount}
                       onChange={(e) =>
@@ -162,7 +162,7 @@ export default function SonOfMervan() {
                       }
                     />
                     <select
-                      className="md:col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="sm:col-span-3 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                       value={exp.category}
                       onChange={(e) => updateExpense(i, "category", e.target.value)}
                     >
@@ -172,7 +172,7 @@ export default function SonOfMervan() {
                         </option>
                       ))}
                     </select>
-                    <div className="md:col-span-2 flex justify-end">
+                    <div className="sm:col-span-2 flex justify-end">
                       {expenses.length > 1 && (
                         <button
                           type="button"
@@ -192,7 +192,7 @@ export default function SonOfMervan() {
 
           {/* Calculate button */}
           <div className="mt-5 sm:mt-8">
-            <div className="md:hidden sticky bottom-3 z-20">
+            <div className="md:hidden sticky bottom-20 sm:bottom-3 z-20">
               <button
                 onClick={doCalculate}
                 disabled={loading}

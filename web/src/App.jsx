@@ -9,6 +9,7 @@ import { router } from "./router";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./App.css";
 import "./styles/tokens.css";
+import "./styles/breakpoints.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +26,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <RouterProvider router={router} />
-          <Toaster position="bottom-right" toastOptions={{ duration: 3000 }} />
+          <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -158,13 +158,10 @@ const MonthlyTracker = () => {
             actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
           },
         });
-        // onSuccess in hook: invalidates query → rows refresh
       } catch {
-        // Rollback: restore original row and re-open edit
         setRows(rows);
         setEditingIndex(index);
         setEditDraft(draft);
-        // onError in hook: shows toast error
       }
     }
   };
@@ -183,23 +180,18 @@ const MonthlyTracker = () => {
     const { expenseId, rowIndex } = deleteConfirm;
     setDeleteConfirm({ open: false, expenseId: null, rowIndex: null });
 
-    // Optimistically remove from UI
     const previousRows = rows;
     setRows(prev => prev.filter((_, i) => i !== rowIndex));
 
     try {
       await deleteMutation.mutateAsync(expenseId);
-      // onSuccess in hook: invalidates query, shows toast
     } catch {
-      // Rollback
       setRows(previousRows);
-      // onError in hook: shows toast error
     }
   };
 
   const handleSave = async () => {
     await saveMutation.mutateAsync({ salary, rows });
-    // onSuccess: invalidates query (rows refresh via useEffect) + shows toast
   };
 
   const projectedTotal = rows.reduce((sum, r) => sum + (Number(r.projected) || 0), 0);
@@ -211,24 +203,24 @@ const MonthlyTracker = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
           <Calendar className="mr-2 text-blue-500" /> Monthly Tracker
         </h2>
         <input
           type="month"
           value={selectedMonth}
           onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); setFilterCategory('All'); }}
-          className="border rounded-lg px-3 py-2 text-[16px] text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="border rounded-lg px-3 py-2 text-[16px] text-gray-700 dark:text-gray-200 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
         />
       </div>
 
       {/* Filter bar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <label className="text-sm font-medium text-gray-700">Filter by category:</label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by category:</label>
         <select
           value={filterCategory}
           onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
-          className="border rounded-lg px-3 py-2 text-[14px] text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-auto"
+          className="border rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 w-full sm:w-auto min-h-[44px]"
         >
           <option value="All">All categories</option>
           {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -236,7 +228,7 @@ const MonthlyTracker = () => {
         {filterCategory !== 'All' && (
           <button
             onClick={() => { setFilterCategory('All'); setCurrentPage(1); }}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-blue-600 hover:underline min-h-[44px] sm:min-h-0 text-left"
           >
             Clear filter
           </button>
@@ -250,218 +242,390 @@ const MonthlyTracker = () => {
 
       {/* Salary input */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 gap-2">
-        <label className="text-gray-700 font-medium">Monthly Salary (£):</label>
+        <label className="text-gray-700 dark:text-gray-300 font-medium">Monthly Salary (£):</label>
         <input
           type="text"
           inputMode="decimal"
           pattern="[0-9]*[.]?[0-9]*"
           value={salary}
           onChange={(e) => setSalary(e.target.value.replace(/[^\d.]/g, ''))}
-          className="px-3 py-2 border rounded-lg w-full sm:w-48 text-[16px]"
+          className="px-3 py-2 border rounded-lg w-full sm:w-48 text-[16px] dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
           placeholder="e.g. 2500"
         />
       </div>
 
-      {/* Table or Skeleton */}
       {isLoading ? (
         <SkeletonTable rows={8} />
       ) : (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 bg-white rounded-xl shadow-md border">
-          <table className="min-w-full text-left border-collapse">
-            <thead className="bg-gray-100">
-              <tr className="text-[13px] sm:text-sm">
-                <th className="p-3">Category</th>
-                <th className="p-3">Name (optional)</th>
-                <th className="p-3">Projected (£)</th>
-                <th className="p-3">Actual (£)</th>
-                <th className="p-3">Difference</th>
-                <th className="p-3">Status</th>
-                <th className="p-3"></th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px] sm:text-sm">
-              {rows.map((row, i) => {
-                const isEditing = editingIndex === i;
-                const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
-                const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
-                const diff = actualNum - projectedNum;
-                const over = diff > 0;
+        <>
+          {/* Mobile card layout (below sm) */}
+          <div className="block sm:hidden space-y-3">
+            {rows.map((row, i) => {
+              const isEditing = editingIndex === i;
+              const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
+              const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
+              const diff = actualNum - projectedNum;
+              const over = diff > 0;
+              const hasValues = projectedNum !== 0 || actualNum !== 0;
 
-                return (
-                  <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t">
-                    <td className="p-3 font-medium whitespace-nowrap">
+              return (
+                <div
+                  key={`${row.id ?? 'new'}-${row.category}-${i}`}
+                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3"
+                >
+                  {/* Category + actions */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
                       {isEditing ? (
                         <select
                           value={editDraft.category}
                           onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
-                          className="px-2 py-1 border rounded-lg"
+                          className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
                         >
                           {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                      ) : row.builtin && !isEditing ? (
-                        row.category
+                      ) : row.builtin ? (
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">{row.category}</span>
                       ) : (
                         <select
                           value={row.category}
                           onChange={(e) => handleUpdate(i, 'category', e.target.value)}
-                          className="px-2 py-1 border rounded-lg"
+                          className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
                         >
                           {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       )}
-                    </td>
-
-                    <td className="p-3">
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {isEditing ? (
-                        <input
-                          type="text"
-                          value={editDraft.name}
-                          onChange={(e) => setEditDraft(d => ({ ...d, name: e.target.value }))}
-                          className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
-                          placeholder="(optional)"
-                          autoFocus
-                        />
+                        <>
+                          <button
+                            onClick={() => saveEdit(i)}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
+                            aria-label="Save changes"
+                          >
+                            <Check size={20} />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                            aria-label="Cancel edit"
+                          >
+                            <X size={20} />
+                          </button>
+                        </>
                       ) : (
-                        <input
-                          type="text"
-                          value={row.name || ''}
-                          onChange={(e) => handleUpdate(i, 'name', e.target.value)}
-                          className="w-40 sm:w-44 px-2 py-1 border rounded-lg"
-                          placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
-                          disabled={row.id != null}
-                        />
+                        <>
+                          {row.id != null && (
+                            <button
+                              onClick={() => startEdit(i)}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
+                              aria-label="Edit expense"
+                            >
+                              <Pencil size={18} />
+                            </button>
+                          )}
+                          {(!row.builtin || row.id != null) && (
+                            <button
+                              onClick={() => requestDelete(i)}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                              aria-label="Delete expense"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </>
                       )}
-                    </td>
+                    </div>
+                  </div>
 
-                    <td className="p-3">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={editDraft.projected}
-                          onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
-                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                          placeholder="£"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={row.projected}
-                          onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
-                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                          placeholder="£"
-                          disabled={row.id != null}
-                        />
-                      )}
-                    </td>
+                  {/* Name input */}
+                  <input
+                    type="text"
+                    value={isEditing ? editDraft.name : (row.name || '')}
+                    onChange={
+                      isEditing
+                        ? (e) => setEditDraft(d => ({ ...d, name: e.target.value }))
+                        : (e) => handleUpdate(i, 'name', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                    placeholder={row.builtin ? 'Name (optional)' : 'e.g. Gym, Gifts'}
+                    disabled={!isEditing && row.id != null}
+                    autoFocus={isEditing}
+                  />
 
-                    <td className="p-3">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={editDraft.actual}
-                          onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
-                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                          placeholder="£"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={row.actual}
-                          onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
-                          className="w-24 sm:w-28 px-2 py-1 border rounded-lg"
-                          placeholder="£"
-                          disabled={row.id != null}
-                        />
-                      )}
-                    </td>
+                  {/* Projected + Actual */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Projected (£)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={isEditing ? editDraft.projected : row.projected}
+                        onChange={
+                          isEditing
+                            ? (e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))
+                            : (e) => handleUpdate(i, 'projected', e.target.value)
+                        }
+                        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                        placeholder="£"
+                        disabled={!isEditing && row.id != null}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Actual (£)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={isEditing ? editDraft.actual : row.actual}
+                        onChange={
+                          isEditing
+                            ? (e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))
+                            : (e) => handleUpdate(i, 'actual', e.target.value)
+                        }
+                        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                        placeholder="£"
+                      />
+                    </div>
+                  </div>
 
-                    <td className="p-3 whitespace-nowrap">
-                      <span className={over ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                  {/* Difference + Status */}
+                  {hasValues && (
+                    <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100 dark:border-gray-700">
+                      <span className={`font-semibold ${over ? 'text-red-600' : 'text-green-600'}`}>
                         {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
                       </span>
-                    </td>
+                      <span className={`flex items-center ${over ? 'text-red-600' : 'text-green-600'}`}>
+                        {over
+                          ? <><XCircle size={15} className="mr-1" /> Over</>
+                          : <><CheckCircle size={15} className="mr-1" /> Under</>
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-                    <td className="p-3">
-                      {over ? (
-                        <span className="flex items-center text-red-600">
-                          <XCircle size={18} className="mr-1" /> Over
-                        </span>
-                      ) : (
-                        <span className="flex items-center text-green-600">
-                          <CheckCircle size={18} className="mr-1" /> Under
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-3">
-                      <div className="flex items-center gap-1">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={() => saveEdit(i)}
-                              className="text-green-600 hover:text-green-800 p-1.5 hover:bg-green-50 rounded-lg"
-                              title="Save changes"
-                            >
-                              <Check size={16} />
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-lg"
-                              title="Cancel"
-                            >
-                              <X size={16} />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {row.id != null && (
-                              <button
-                                onClick={() => startEdit(i)}
-                                className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg"
-                                title="Edit expense"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                            )}
-                            {(!row.builtin || row.id != null) && (
-                              <button
-                                onClick={() => requestDelete(i)}
-                                className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg"
-                                title="Delete expense"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-
-            <tfoot className="text-[13px] sm:text-sm">
-              <tr className="border-t bg-gray-50 font-semibold">
-                <td className="p-3">Totals</td>
-                <td className="p-3"></td>
-                <td className="p-3">£{projectedTotal.toFixed(2)}</td>
-                <td className="p-3">£{actualTotal.toFixed(2)}</td>
-                <td className="p-3">
-                  <span className={totalOver ? 'text-red-700' : 'text-green-700'}>
+            {/* Mobile totals */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <div className="grid grid-cols-3 gap-2 text-sm font-semibold text-center">
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Projected</div>
+                  <div>£{projectedTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Actual</div>
+                  <div>£{actualTotal.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Difference</div>
+                  <div className={totalOver ? 'text-red-700' : 'text-green-700'}>
                     {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
-                  </span>
-                </td>
-                <td className="p-3">{totalOver ? 'Over' : 'Under'}</td>
-                <td className="p-3"></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop table layout (sm and above) */}
+          <div className="hidden sm:block overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-md border dark:border-gray-700">
+            <table className="min-w-full text-left border-collapse">
+              <thead className="bg-gray-100 dark:bg-gray-700">
+                <tr className="text-sm">
+                  <th className="p-3 dark:text-gray-200">Category</th>
+                  <th className="p-3 dark:text-gray-200">Name (optional)</th>
+                  <th className="p-3 dark:text-gray-200">Projected (£)</th>
+                  <th className="p-3 dark:text-gray-200">Actual (£)</th>
+                  <th className="p-3 dark:text-gray-200">Difference</th>
+                  <th className="p-3 dark:text-gray-200">Status</th>
+                  <th className="p-3"></th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {rows.map((row, i) => {
+                  const isEditing = editingIndex === i;
+                  const projectedNum = Number(isEditing ? editDraft.projected : row.projected) || 0;
+                  const actualNum = Number(isEditing ? editDraft.actual : row.actual) || 0;
+                  const diff = actualNum - projectedNum;
+                  const over = diff > 0;
+
+                  return (
+                    <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t dark:border-gray-700 dark:text-gray-200">
+                      <td className="p-3 font-medium whitespace-nowrap">
+                        {isEditing ? (
+                          <select
+                            value={editDraft.category}
+                            onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                            className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                          >
+                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        ) : row.builtin && !isEditing ? (
+                          row.category
+                        ) : (
+                          <select
+                            value={row.category}
+                            onChange={(e) => handleUpdate(i, 'category', e.target.value)}
+                            className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                          >
+                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editDraft.name}
+                            onChange={(e) => setEditDraft(d => ({ ...d, name: e.target.value }))}
+                            className="w-40 sm:w-44 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="(optional)"
+                            autoFocus
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={row.name || ''}
+                            onChange={(e) => handleUpdate(i, 'name', e.target.value)}
+                            className="w-40 sm:w-44 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder={row.builtin ? '(optional)' : 'e.g. Gym, Gifts'}
+                            disabled={row.id != null}
+                          />
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={editDraft.projected}
+                            onChange={(e) => setEditDraft(d => ({ ...d, projected: e.target.value.replace(/[^\d.]/g, '') }))}
+                            className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="£"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.projected}
+                            onChange={(e) => handleUpdate(i, 'projected', e.target.value)}
+                            className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="£"
+                            disabled={row.id != null}
+                          />
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={editDraft.actual}
+                            onChange={(e) => setEditDraft(d => ({ ...d, actual: e.target.value.replace(/[^\d.]/g, '') }))}
+                            className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="£"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.actual}
+                            onChange={(e) => handleUpdate(i, 'actual', e.target.value)}
+                            className="w-24 sm:w-28 px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="£"
+                            disabled={row.id != null}
+                          />
+                        )}
+                      </td>
+
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={over ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                          {diff === 0 ? '£0' : `${over ? '+' : ''}£${diff.toFixed(2)}`}
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        {over ? (
+                          <span className="flex items-center text-red-600">
+                            <XCircle size={18} className="mr-1" /> Over
+                          </span>
+                        ) : (
+                          <span className="flex items-center text-green-600">
+                            <CheckCircle size={18} className="mr-1" /> Under
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => saveEdit(i)}
+                                className="text-green-600 hover:text-green-800 p-1.5 hover:bg-green-50 rounded-lg"
+                                title="Save changes"
+                              >
+                                <Check size={16} />
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-lg"
+                                title="Cancel"
+                              >
+                                <X size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {row.id != null && (
+                                <button
+                                  onClick={() => startEdit(i)}
+                                  className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg"
+                                  title="Edit expense"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
+                              {(!row.builtin || row.id != null) && (
+                                <button
+                                  onClick={() => requestDelete(i)}
+                                  className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg"
+                                  title="Delete expense"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+              <tfoot className="text-sm">
+                <tr className="border-t bg-gray-50 dark:bg-gray-700 font-semibold dark:text-gray-200">
+                  <td className="p-3">Totals</td>
+                  <td className="p-3"></td>
+                  <td className="p-3">£{projectedTotal.toFixed(2)}</td>
+                  <td className="p-3">£{actualTotal.toFixed(2)}</td>
+                  <td className="p-3">
+                    <span className={totalOver ? 'text-red-700' : 'text-green-700'}>
+                      {totalDiff === 0 ? '£0' : `${totalOver ? '+' : ''}£${totalDiff.toFixed(2)}`}
+                    </span>
+                  </td>
+                  <td className="p-3">{totalOver ? 'Over' : 'Under'}</td>
+                  <td className="p-3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Pagination controls */}
@@ -470,17 +634,17 @@ const MonthlyTracker = () => {
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
-            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 min-h-[44px]"
           >
             &larr; Prev
           </button>
-          <span className="text-gray-600">
+          <span className="text-gray-600 dark:text-gray-400">
             Page {currentPage} of {pagination.pages}
           </span>
           <button
             onClick={() => setCurrentPage(p => Math.min(pagination.pages, p + 1))}
             disabled={currentPage >= pagination.pages}
-            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 min-h-[44px]"
           >
             Next &rarr;
           </button>
@@ -489,13 +653,13 @@ const MonthlyTracker = () => {
 
       {/* Add row + Save */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-xs sm:text-sm text-gray-500">
+        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           Edit saved rows with the pencil icon, or add new rows below.
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={addRow}
-            className="inline-flex items-center bg-white border px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 text-[14px] sm:text-sm"
+            className="inline-flex items-center bg-white dark:bg-gray-800 border dark:border-gray-600 px-4 py-2.5 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-sm min-h-[44px]"
           >
             <PlusCircle size={16} className="mr-2" />
             Add expense row
@@ -504,7 +668,7 @@ const MonthlyTracker = () => {
           <button
             onClick={handleSave}
             disabled={saveMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 sm:px-6 py-3 rounded-lg shadow-md disabled:opacity-60 text-[14px] sm:text-base"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 sm:px-6 py-3 rounded-lg shadow-md disabled:opacity-60 text-sm sm:text-base min-h-[44px]"
           >
             {saveMutation.isPending ? 'Saving...' : 'Save Monthly Data'}
           </button>
@@ -520,8 +684,8 @@ const MonthlyTracker = () => {
       />
 
       {lastSaved && (
-        <div className="bg-white rounded-xl shadow-md border p-5 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border dark:border-gray-700 p-5 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4">
             {selectedMonth} — Salary vs Spent/Saved
           </h3>
           <div>
@@ -551,15 +715,15 @@ const MonthlyTracker = () => {
 
             <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
               <div className="flex justify-between">
-                <span className="text-gray-600">Salary</span>
+                <span className="text-gray-600 dark:text-gray-400">Salary</span>
                 <span className="font-semibold">£{lastSaved.salary.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Spent</span>
+                <span className="text-gray-600 dark:text-gray-400">Spent</span>
                 <span className="font-semibold text-red-600">£{lastSaved.spent.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Saved</span>
+                <span className="text-gray-600 dark:text-gray-400">Saved</span>
                 <span className="font-semibold text-green-600">£{lastSaved.saved.toLocaleString()}</span>
               </div>
             </div>
