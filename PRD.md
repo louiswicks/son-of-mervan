@@ -169,7 +169,7 @@ The core logic works but the app has critical security gaps, zero test coverage,
 **Files:** new `web/src/store/authStore.js`, `web/src/store/uiStore.js`  
 **Acceptance Criteria:** Access token never written to localStorage. Auth state accessible from any component without prop drilling.
 
-### 3.6 Dark Mode
+### 3.6 Dark Mode [DONE 2026-04-06]
 **Problem:** No dark mode. Table stakes for any consumer app in 2025+.  
 **Solution:** CSS custom properties (`--color-bg`, `--color-surface`, etc.) applied to `:root` and overridden under `[data-theme="dark"]`. `useTheme` hook reads from `localStorage` and falls back to `prefers-color-scheme`. Moon/Sun toggle in nav bar.  
 **Files:** new `web/src/styles/tokens.css`, new `web/src/hooks/useTheme.js`, `web/src/components/Nav.jsx`  

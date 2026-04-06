@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, Tooltip, BarChart, Bar
 } from "recharts";
 import { useCalculateBudget } from "../hooks/useBudget";
+import { useTheme } from "../hooks/useTheme";
 
 const CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -70,21 +71,36 @@ export default function SonOfMervan() {
   }, [results]);
 
   const loading = calculateMutation.isPending;
+  const { theme } = useTheme();
+  const chartColors = useMemo(() => ({
+    primary:       theme === "dark" ? "#60a5fa" : "#3b82f6",
+    success:       theme === "dark" ? "#34d399" : "#10b981",
+    grid:          theme === "dark" ? "#334155" : "#e5e7eb",
+    axis:          theme === "dark" ? "#94a3b8" : "#6b7280",
+    tooltipBg:     theme === "dark" ? "#1e293b" : "#ffffff",
+    tooltipBorder: theme === "dark" ? "#334155" : "#e5e7eb",
+    tooltipText:   theme === "dark" ? "#f1f5f9" : "#111827",
+  }), [theme]);
+  const tooltipStyle = {
+    backgroundColor: chartColors.tooltipBg,
+    border: `1px solid ${chartColors.tooltipBorder}`,
+    color: chartColors.tooltipText,
+  };
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 p-3 sm:p-4">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-900 p-3 sm:p-4">
       <div className="mx-auto w-full max-w-6xl space-y-4 sm:space-y-6">
         {/* Header */}
         <header className="text-center py-3 sm:py-6">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">Son Of Mervan</h1>
-          <p className="text-gray-600 text-sm sm:text-base">There are two sides to every dollar</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100">Son Of Mervan</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">There are two sides to every dollar</p>
         </header>
 
         {/* Inputs Card */}
-        <section className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4 sm:p-6 md:p-8">
+        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-4 sm:p-6 md:p-8">
           <div className="flex items-center mb-4 sm:mb-6">
             <DollarSign className="text-blue-500 mr-2 sm:mr-3" size={22} />
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
               Financial Information
             </h2>
           </div>
@@ -253,27 +269,30 @@ export default function SonOfMervan() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {results.remaining_budget > 0 && (
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100">
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center">
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 mb-3 sm:mb-4 flex items-center">
                     <TrendingUp className="mr-2 text-green-500" size={20} />
                     Savings Projection
                   </h3>
                   <div className="h-60 sm:h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={savingsData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} />
-                        <Tooltip formatter={(v) => [`£${Number(v).toLocaleString()}`, "Savings"]} />
-                        <Line type="monotone" dataKey="savings" stroke="#10b981" strokeWidth={3} dot={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                        <XAxis dataKey="month" tick={{ fill: chartColors.axis }} />
+                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis }} />
+                        <Tooltip
+                          formatter={(v) => [`£${Number(v).toLocaleString()}`, "Savings"]}
+                          contentStyle={tooltipStyle}
+                        />
+                        <Line type="monotone" dataKey="savings" stroke={chartColors.success} strokeWidth={3} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
               )}
 
-              <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100">
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center">
+              <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 mb-3 sm:mb-4 flex items-center">
                   <PieChart className="mr-2 text-blue-500" size={20} />
                   Expense Breakdown
                 </h3>
@@ -282,11 +301,14 @@ export default function SonOfMervan() {
                   <div className="h-60 sm:h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={categoryData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="category" interval={0} angle={-30} textAnchor="end" height={60} />
-                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} />
-                        <Tooltip formatter={(v) => [`£${Number(v).toLocaleString()}`, "Amount"]} />
-                        <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                        <XAxis dataKey="category" interval={0} angle={-30} textAnchor="end" height={60} tick={{ fill: chartColors.axis }} />
+                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis }} />
+                        <Tooltip
+                          formatter={(v) => [`£${Number(v).toLocaleString()}`, "Amount"]}
+                          contentStyle={tooltipStyle}
+                        />
+                        <Bar dataKey="amount" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -295,8 +317,8 @@ export default function SonOfMervan() {
                 {results?.expenses_by_category && (
                   <ul className="mt-3 sm:mt-4 space-y-2">
                     {Object.entries(results.expenses_by_category).map(([cat, amt]) => (
-                      <li key={cat} className="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                        <span className="font-medium text-gray-700">{cat}</span>
+                      <li key={cat} className="flex justify-between bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-lg">
+                        <span className="font-medium text-gray-700 dark:text-gray-200">{cat}</span>
                         <span className="font-semibold">£{Number(amt).toLocaleString()}</span>
                       </li>
                     ))}

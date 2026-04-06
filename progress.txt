@@ -1,3 +1,15 @@
+## Phase 3.6 — Dark Mode [DONE] 2026-04-06
+- Created `web/src/styles/tokens.css`: CSS custom properties for layout (`--color-bg`, `--color-surface`, `--color-text`, `--color-border`, etc.) and Recharts chart colors (`--color-chart-primary/success/danger/grid/axis/tooltip-*`); light defaults on `:root`, dark overrides under `[data-theme="dark"]`
+- Created `web/src/hooks/useTheme.js`: `useTheme()` hook reads `theme` from `useUiStore`; `useEffect` applies `data-theme` attribute + `dark` class to `document.documentElement` on every change; writes to `localStorage`; returns `{ theme, toggleTheme }`
+- Updated `web/src/store/uiStore.js`: added `theme` state initialised from `localStorage` falling back to `window.matchMedia('(prefers-color-scheme: dark)')`, plus `setTheme` action
+- Updated `web/public/index.html`: added `<script>tailwind.config = { darkMode: 'class' }</script>` after CDN so Tailwind `dark:` variants activate when `<html class="dark">` is set
+- Updated `web/src/components/AuthGuard.jsx`: imported `Moon` and `Sun` from lucide-react and `useTheme`; added Moon/Sun icon toggle button to both desktop and mobile nav bars; added `dark:` Tailwind variants to header, nav buttons, select, and main layout wrapper (`bg-gray-100 dark:bg-gray-950`)
+- Updated `web/src/App.jsx`: imports `./styles/tokens.css`
+- Updated `web/src/components/AnnualOverview.jsx`: imports `useTheme`; derives `chartColors` object (primary, success, danger, grid, axis, tooltip) from `theme`; passes theme-aware stroke/fill/tick/contentStyle props to all Recharts components (two LinCharts); added `dark:` variants to card backgrounds, borders, table rows, skeleton, year select
+- Updated `web/src/components/SonOfMervan.jsx`: imports `useTheme`; same `chartColors` pattern for LineChart (savings projection) and BarChart (expense breakdown); added `dark:` variants to page background, inputs card, chart card wrappers, and category breakdown list items
+- Build passes: 0 errors, 1 pre-existing warning (unused React import in AuthContext); bundle 226.62 kB gzip (+1.18 kB)
+- Files changed: web/src/styles/tokens.css (new), web/src/hooks/useTheme.js (new), web/src/store/uiStore.js, web/public/index.html, web/src/components/AuthGuard.jsx, web/src/App.jsx, web/src/components/AnnualOverview.jsx, web/src/components/SonOfMervan.jsx, PRD.md
+
 ## Phase 3.5 — Zustand Global State Management [DONE] 2026-04-06
 - Installed `zustand@5` (^5.0.12)
 - Created `web/src/store/authStore.js`: `useAuthStore` Zustand store with `{ isAuthenticated, token, loading }` + actions `handleLogin(token)`, `setToken(token)`, `clearAuth()`, `setLoading(loading)`; token held in-memory only, never persisted

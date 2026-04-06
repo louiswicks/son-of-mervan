@@ -8,6 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { router } from "./router";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./App.css";
+import "./styles/tokens.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
