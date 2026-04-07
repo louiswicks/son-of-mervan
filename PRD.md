@@ -282,7 +282,7 @@ All core features, security hardening, infrastructure, and testing are complete.
 **Acceptance Criteria:** `pytest --cov=. --cov-fail-under=80` passes in CI.
 **Result:** 198 tests pass, 85.84% total coverage.
 
-### 6.3 Documentation Refresh
+### 6.3 Documentation Refresh [DONE 2026-04-07]
 **Problem:** All three CLAUDE.md files contain stale references — legacy hash routing description, hardcoded API_BASE_URL noted as a known issue (now fixed), old component list, and missing router modules.
 **Solution:** Rewrite all CLAUDE.md files to reflect the current codebase: modern React Router via `router.jsx`, Zustand auth store, modular `api/` clients, all 11 router modules, correct known-issues list.
 **Files:** `CLAUDE.md`, `routers/CLAUDE.md`, `web/CLAUDE.md`
