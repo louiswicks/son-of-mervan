@@ -444,3 +444,29 @@
   - Case-insensitive matching; cross-user isolation; deleted expenses excluded
 - Test result: 214 tests pass (was 206), 86.41% coverage (was 86.16%)
 - Files changed: routers/insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/MonthlyTracker.jsx, web/src/components/RecurringExpensesPage.jsx, tests/test_insights.py, PRD.md, progress.txt
+
+## Phase 7.5 — Financial Health Score [DONE] 2026-04-07
+- Added `GET /insights/health-score?month=YYYY-MM` endpoint in `routers/insights.py`
+- Score is 0–100, composed of three weighted components:
+  - Savings rate (40%): `(salary_actual - total_actual) / salary_actual × 100`; 20%+ = 100 pts
+  - Budget adherence (30%): % of categories with planned budget that stayed within it; 0 when no data
+  - Emergency fund (30%): months of expenses covered by savings goal contributions; 3 months = 100 pts
+- Score bands: red 0–39, amber 40–69, green 70–100
+- Returns `{ month, score, band, components: {savings_rate, budget_adherence, emergency_fund}, explanations }`
+- Score=0 with no data confirmed (all components 0; budget adherence neutral value changed to 0 not 50)
+- Imported `SavingsGoal`, `SavingsContribution` from `database` into insights router
+- Added `getHealthScore(month)` Axios wrapper in `web/src/api/insights.js`
+- Added `useHealthScore(month)` React Query hook in `web/src/hooks/useInsights.js` (staleTime 5 min)
+- Added `HealthScoreCard` component in `web/src/components/InsightsPage.jsx`:
+  - Rendered at the top of the page, tied to the existing `selectedMonth` state
+  - Score dial (large number + filled progress bar) with colour-coded band label
+  - Three `ComponentRow` entries with per-component scores, weights, progress bars, and detail text
+  - Plain-English explanations list at the bottom
+  - Skeleton loader while data fetches
+- Added 11 new tests in `tests/test_insights.py` (class `TestHealthScore`):
+  - No data → score=0, band=red; missing/invalid month → 422; unauthenticated → 401/403
+  - High savings rate gives savings_component=100; all-within-budget gives adherence=100
+  - Overspending reduces adherence to 50%; savings contributions give emergency_fund=100
+  - Full response structure validated; cross-user data isolation confirmed
+- Test result: 225 tests pass (was 214), 87.04% coverage (was 86.41%)
+- Files changed: routers/insights.py, tests/test_insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/InsightsPage.jsx, PRD.md, progress.txt

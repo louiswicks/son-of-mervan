@@ -319,11 +319,12 @@ These features separate a solid budgeting app from a category leader.
 **Acceptance Criteria:** "At this pace you'll overspend Food by £87 by month end" appears correctly based on actual data. Projection updates each time tracker data is refreshed.
 **Result:** 206 tests pass, 86.16% coverage. Pace endpoint returns per-category projections and flagged warnings. Banner renders in MonthlyTracker when ≥1 category is projected to overspend by >10%.
 
-### 7.5 Financial Health Score
+### 7.5 Financial Health Score [DONE 2026-04-07]
 **Problem:** Users have raw data but no single signal telling them whether their finances are healthy.
 **Solution:** Monthly 0–100 score computed from: savings rate (40% weight), budget adherence per category (30% weight), emergency fund coverage — months of expenses in savings goals (30% weight). Plain-English explanation: "Your score dropped 8 points because Housing exceeded budget by 12%." Backend: `GET /insights/health-score?month=YYYY-MM`. Frontend: score card with colour-coded band (red/amber/green) and explanation list.
 **Inspiration:** Credit score model applied to personal budgeting.
 **Acceptance Criteria:** Score is deterministic given the same inputs. All three component scores are shown with their contribution. Score is 0 with no data (not an error).
+**Result:** 225 tests pass, 87.04% coverage. HealthScoreCard renders at the top of InsightsPage with dial, per-component progress bars, and plain-English explanations. Score=0 with no data confirmed.
 
 ### 7.6 Smart Categorisation [DONE 2026-04-07]
 **Problem:** Users must manually select a category for every expense. Repetitive entries (e.g. "Tesco", "Netflix") are re-categorised from scratch every time.
