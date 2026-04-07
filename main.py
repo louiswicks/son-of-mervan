@@ -34,6 +34,7 @@ from database import SessionLocal
 from security import create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
 from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router
+import email_utils
 from collections import defaultdict
 
 setup_logging()
@@ -685,6 +686,91 @@ app.include_router(currency_router.router)
 _scheduler = BackgroundScheduler(daemon=True)
 
 
+def send_monthly_digests(session_factory):
+    """
+    APScheduler job: runs on the 1st of each month at 08:00 UTC.
+    Sends a budget digest email for the previous month to all opted-in users
+    who have spending data for that month.
+    """
+    from datetime import date
+
+    today = date.today()
+    # Previous month — handle January → December of prior year
+    if today.month == 1:
+        prev_year, prev_month = today.year - 1, 12
+    else:
+        prev_year, prev_month = today.year, today.month - 1
+    month_str = f"{prev_year:04d}-{prev_month:02d}"
+
+    db = session_factory()
+    try:
+        users = (
+            db.query(User)
+            .filter(User.digest_enabled == True, User.deleted_at == None)  # noqa: E711
+            .all()
+        )
+        sent = 0
+        for user in users:
+            # Find this user's MonthlyData for the previous month
+            month_rec = find_month_by_value(db, user, month_str)
+            if not month_rec:
+                continue  # no data → skip
+
+            # Collect non-deleted expenses for the month
+            expenses = (
+                db.query(MonthlyExpense)
+                .filter(
+                    MonthlyExpense.monthly_data_id == month_rec.id,
+                    MonthlyExpense.deleted_at == None,  # noqa: E711
+                )
+                .all()
+            )
+
+            # Aggregate actual spend per category
+            category_totals: dict[str, float] = {}
+            for exp in expenses:
+                cat = exp.category or "Other"
+                amt = exp.actual_amount or 0.0
+                category_totals[cat] = category_totals.get(cat, 0.0) + amt
+
+            total_spent = sum(category_totals.values())
+            income = month_rec.salary_actual or month_rec.salary_planned or 0.0
+            savings_rate = ((income - total_spent) / income * 100) if income > 0 else 0.0
+
+            top_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:3]
+
+            # Find over-budget categories
+            planned_by_cat: dict[str, float] = {}
+            for exp in expenses:
+                cat = exp.category or "Other"
+                planned = exp.planned_amount or 0.0
+                planned_by_cat[cat] = planned_by_cat.get(cat, 0.0) + planned
+
+            over_budget = [
+                cat for cat, actual in category_totals.items()
+                if actual > planned_by_cat.get(cat, float("inf"))
+            ]
+
+            currency = user.base_currency or "GBP"
+            try:
+                email_utils.send_monthly_digest_email(
+                    to_email=user.email,
+                    month=month_str,
+                    income=income,
+                    total_spent=total_spent,
+                    savings_rate=savings_rate,
+                    top_categories=top_categories,
+                    over_budget=over_budget,
+                    currency=currency,
+                )
+                sent += 1
+            except Exception:
+                logger.exception("Failed to send digest to user %s", user.id)
+        logger.info("Monthly digest job complete — sent=%d month=%s", sent, month_str)
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def _start_scheduler():
     from routers.recurring import generate_all_recurring
@@ -717,10 +803,21 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    _scheduler.add_job(
+        send_monthly_digests,
+        "cron",
+        day=1,
+        hour=8,
+        minute=0,
+        id="send_monthly_digests",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
-        "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC"
+        "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC, "
+        "monthly digest on 1st of month at 08:00 UTC"
     )
 
 

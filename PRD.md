@@ -394,6 +394,49 @@ Previously out of scope items now included as future roadmap.
 
 ---
 
+## Phase 9: Retention & Engagement
+
+---
+
+### 9.1 Monthly Budget Email Digest [DONE 2026-04-08]
+**Goal:** Re-engage users who haven't opened the app by delivering a concise monthly spending summary to their inbox.  
+**User story:** As a user, I want to receive a monthly email summarising my previous month's spending so I can stay informed even when I haven't logged in.  
+**Scope:**
+- New `digest_enabled` boolean column on `User` (default `True`)
+- APScheduler job runs on the 1st of each month at 08:00 UTC; fetches all users with `digest_enabled=True` and previous-month data; sends one email per user
+- Digest email contains: month label, total income, total spent, savings rate, top 3 categories by spend, any over-budget categories
+- New `send_monthly_digest_email()` in `email_utils.py`; graceful no-op when `SENDGRID_API_KEY` not set
+- `GET /users/me` response and `PUT /users/me` payload extended with `digest_enabled`
+- Account Settings page gains an "Email Digest" toggle (Email Notifications section)
+- New Alembic migration for the column
+
+**Acceptance Criteria:**
+- [ ] `PUT /users/me` with `{ "digest_enabled": false }` persists the change; subsequent `GET /users/me` returns `digest_enabled: false`
+- [ ] Scheduler job calls `send_monthly_digest_email` exactly once per eligible user
+- [ ] Email contains previous month's income, total spent, savings rate (%), top 3 categories
+- [ ] Job skips users who have no data for the previous month (no email sent)
+- [ ] Account Settings page renders toggle; toggling off disables future emails
+- [ ] 5+ new tests covering: toggle persist, digest content logic, skip-no-data, scheduler integration
+- [ ] All existing tests still pass; coverage ≥ 80%
+
+### 9.2 Onboarding Wizard [PENDING]
+**Goal:** Guide first-time users through setting up their first monthly budget in under 2 minutes.  
+**Scope:** Step 1 — salary entry; Step 2 — pick 3–5 expense categories from presets; Step 3 — confirm & save. Show only on first login (tracked via `has_completed_onboarding` flag on User).
+
+### 9.3 Progressive Web App (PWA) [PENDING]
+**Goal:** Make the app installable and provide offline access to the last-loaded budget page.  
+**Scope:** `manifest.json`, service worker (cache-first for static assets, network-first for API), install prompt banner.
+
+### 9.4 Budget Templates [PENDING]
+**Goal:** Let users bootstrap their budget from popular frameworks (50/30/20, Zero-Based, etc.) rather than starting blank.  
+**Scope:** Template selector on the Budget page pre-fills category rows; user adjusts amounts before saving.
+
+### 9.5 Annual Financial Calendar [PENDING]
+**Goal:** Visualise upcoming recurring expenses and savings goal deadlines on a calendar so users can anticipate cash-flow pressure.  
+**Scope:** Read-only calendar view at `/calendar`; shows recurring expense due dates and savings goal target dates; colour-coded by category.
+
+---
+
 ## 9. Permanently Out of Scope
 
 - Mobile native app (iOS/Android) — web-first; PWA enhancements may be considered later

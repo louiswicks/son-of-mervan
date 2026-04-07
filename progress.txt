@@ -491,3 +491,14 @@
   - Full response structure validated; cross-user data isolation confirmed
 - Test result: 225 tests pass (was 214), 87.04% coverage (was 86.41%)
 - Files changed: routers/insights.py, tests/test_insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/InsightsPage.jsx, PRD.md, progress.txt
+
+**Phase 9.1 — Monthly Budget Email Digest [DONE] 2026-04-08**
+- Added `digest_enabled` (bool, default True) column to `User` model; Alembic migration `j0k1l2m3n4o5`
+- `send_monthly_digest_email()` added to `email_utils.py` — plain-text email with: month label, income, total spent, savings rate, top 3 categories, over-budget categories; graceful no-op when `SENDGRID_API_KEY` not set
+- `send_monthly_digests(session_factory)` function in `main.py` — iterates all opted-in, non-deleted users; skips users with no data for previous month; aggregates category totals and over-budget flags from actual vs planned amounts
+- APScheduler job registered on day=1, hour=8 UTC; logged in startup banner
+- `GET /users/me` and `PUT /users/me` extended with `digest_enabled` field; `UpdateProfileRequest.digest_enabled` is optional so existing callers are unaffected
+- `AccountSettings.jsx` gains "Email Notifications" section with accessible toggle switch (role=switch, aria-checked); auto-saves on click via `updateProfileMutation`
+- 12 new tests in `TestDigestEnabledField`, `TestSendMonthlyDigests`, `TestSendMonthlyDigestEmailDevMode` covering: default true, disable/re-enable persistence, skip no-data, skip opted-out, skip deleted, over-budget detection, multi-user send, dev-mode logging
+- 244 backend tests pass, 86.68% coverage; ruff clean on all changed files
+- Files: `database.py`, `alembic/versions/j0k1l2m3n4o5_*.py`, `email_utils.py`, `main.py`, `routers/users.py`, `web/src/components/AccountSettings.jsx`, `tests/test_digest.py`, `PRD.md`, `progress.txt`

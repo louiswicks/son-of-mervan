@@ -139,6 +139,83 @@ def send_budget_alert_email(
         logger.exception("[SG] EXCEPTION sending budget alert to %s: %s", to_email, e)
 
 
+def send_monthly_digest_email(
+    to_email: str,
+    month: str,
+    income: float,
+    total_spent: float,
+    savings_rate: float,
+    top_categories: list[tuple[str, float]],
+    over_budget: list[str],
+    currency: str = "GBP",
+):
+    """
+    Send the monthly budget digest email.
+
+    Args:
+        to_email: recipient address
+        month: "YYYY-MM" label (e.g. "2026-03")
+        income: planned/actual salary for the month
+        total_spent: total actual spending
+        savings_rate: percentage of income saved (0–100)
+        top_categories: [(category_name, amount), …] sorted descending, max 3
+        over_budget: list of category names where actual > planned
+        currency: ISO 4217 code for the currency symbol label
+    """
+    if not SENDGRID_API_KEY:
+        logger.info(
+            "[DEV] Monthly digest for %s — month=%s income=%.2f spent=%.2f savings=%.1f%%",
+            to_email, month, income, total_spent, savings_rate,
+        )
+        return
+
+    # Build plain-text body
+    top_lines = "\n".join(
+        f"  {i+1}. {cat}: {currency} {amt:.2f}"
+        for i, (cat, amt) in enumerate(top_categories[:3])
+    )
+    over_lines = (
+        "  " + ", ".join(over_budget)
+        if over_budget
+        else "  None — great work!"
+    )
+    body = (
+        f"Hi,\n\n"
+        f"Here's your spending summary for {month}:\n\n"
+        f"  Income:       {currency} {income:.2f}\n"
+        f"  Total spent:  {currency} {total_spent:.2f}\n"
+        f"  Savings rate: {savings_rate:.1f}%\n\n"
+        f"Top 3 categories by spend:\n{top_lines}\n\n"
+        f"Over-budget categories:\n{over_lines}\n\n"
+        f"Log in to Son of Mervan to dive deeper into your finances.\n\n"
+        f"To stop receiving these digests, go to Account Settings → Email Digest and turn it off."
+    )
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": f"Your {month} budget digest — Son of Mervan",
+        "content": [{"type": "text/plain", "value": body}],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] digest accepted (%d) to=%s month=%s", r.status_code, to_email, month)
+        else:
+            logger.error("[SG] digest ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending digest to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

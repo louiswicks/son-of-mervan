@@ -86,6 +86,9 @@ class User(Base):
     # Preferred display currency (ISO 4217 code, e.g. "GBP", "USD", "EUR")
     base_currency = Column(String(3), nullable=False, default="GBP", server_default="GBP")
 
+    # Monthly email digest opt-in (default True — new users receive the digest)
+    digest_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+
     months = relationship("MonthlyData", back_populates="owner", cascade="all, delete-orphan")
     
     # Hybrid property for transparent encryption/decryption

@@ -29,6 +29,7 @@ export default function AccountSettings() {
 
   const [usernameInput, setUsernameInput] = useState("");
   const [baseCurrencyInput, setBaseCurrencyInput] = useState("GBP");
+  const [digestEnabled, setDigestEnabled] = useState(true);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -42,7 +43,16 @@ export default function AccountSettings() {
     if (profile?.base_currency) {
       setBaseCurrencyInput(profile.base_currency);
     }
+    if (profile?.digest_enabled !== undefined) {
+      setDigestEnabled(profile.digest_enabled);
+    }
   }, [profile]);
+
+  function handleDigestToggle() {
+    const next = !digestEnabled;
+    setDigestEnabled(next);
+    updateProfileMutation.mutate({ digest_enabled: next });
+  }
 
   async function handleProfileSave(e) {
     e.preventDefault();
@@ -189,6 +199,35 @@ export default function AccountSettings() {
             {changePasswordMutation.isPending ? "Updating…" : "Change Password"}
           </button>
         </form>
+      </Section>
+
+      {/* Email Notifications */}
+      <Section title="Email Notifications">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Monthly budget digest</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Receive a monthly email summarising your previous month's income, spending, and top
+              categories. Sent on the 1st of each month.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={digestEnabled}
+            onClick={handleDigestToggle}
+            disabled={profileLoading || updateProfileMutation.isPending}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+              digestEnabled ? "bg-blue-600" : "bg-gray-200"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                digestEnabled ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
       </Section>
 
       {/* Danger Zone */}
