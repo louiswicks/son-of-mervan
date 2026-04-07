@@ -390,3 +390,23 @@
 - Rewrote `routers/CLAUDE.md`: added all 8 new routers (users, recurring, savings, alerts, insights, export, audit, currency) with full endpoint tables and implementation notes; kept tracker.py with accurate "legacy/candidate for removal" status
 - Rewrote `web/CLAUDE.md`: replaced entire stale file — updated stack description (React Router v6, React Query, Zustand); complete source layout tree including all api/, hooks/, store/, context/, styles/, and tests/ files with one-line descriptions; updated routing section with all 9 protected routes; rewrote auth state section (in-memory token, Zustand, refresh interceptor); replaced "known issue" API_BASE_URL section with correct env var configuration; replaced "plain hooks" state management section with React Query + Zustand description; added dark mode section; updated key data flows with edit/delete/audit/export additions
 - Files changed: CLAUDE.md, routers/CLAUDE.md, web/CLAUDE.md, PRD.md
+
+## Phase 7.4 — Weekly Spending Pace Indicator [DONE] 2026-04-07
+- Added `GET /insights/pace?month=YYYY-MM` endpoint in `routers/insights.py`:
+  - Computes linear projection: `(actual_so_far / days_elapsed) × days_in_month` per category and overall
+  - Handles edge cases: future month (0 days elapsed, empty warnings), past month (days_elapsed = full month), current month uses `datetime.utcnow().day`
+  - Returns `{ month, days_elapsed, days_in_month, categories:{…}, overall:{…}, warnings:[…] }`
+  - A warning is raised for any category where `projected > planned × 1.10` (>10% over budget)
+  - Warning message format: "At this pace you'll overspend {Category} by £{amount:.2f} by month end."
+- Added `getSpendingPace(month)` Axios wrapper in `web/src/api/insights.js`
+- Added `useSpendingPace(month)` React Query hook in `web/src/hooks/useInsights.js` (staleTime 2 min)
+- Added amber warning banner in `web/src/components/MonthlyTracker.jsx`:
+  - Positioned between the category filter bar and the salary input
+  - Renders only when `paceData.warnings.length > 0`
+  - Lists each category warning message; accessible (role=alert, aria-live=polite)
+  - Dark-mode compatible amber styling
+- Added 8 new tests in `tests/test_insights.py` (class `TestSpendingPace`):
+  - Missing/invalid month → 422; unauthenticated → 401/403
+  - Empty month, future month, over-budget data, within-budget data, cross-user isolation
+- Test result: 206 tests pass (was 198), 86.16% coverage (was 85.84%)
+- Files changed: routers/insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/MonthlyTracker.jsx, tests/test_insights.py, PRD.md, progress.txt

@@ -8,3 +8,6 @@ export const getSpendingTrends = (months = 6) =>
 
 export const getSpendingHeatmap = (year) =>
   client.get("/insights/heatmap", { params: year ? { year } : {} }).then((r) => r.data);
+
+export const getSpendingPace = (month) =>
+  client.get("/insights/pace", { params: { month } }).then((r) => r.data);

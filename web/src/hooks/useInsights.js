@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap } from "../api/insights";
+import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace } from "../api/insights";
 
 export function useMonthlySummary(month) {
   return useQuery({
@@ -23,5 +23,14 @@ export function useSpendingHeatmap(year) {
     queryKey: ["insights-heatmap", year],
     queryFn: () => getSpendingHeatmap(year),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSpendingPace(month) {
+  return useQuery({
+    queryKey: ["insights-pace", month],
+    queryFn: () => getSpendingPace(month),
+    enabled: !!month,
+    staleTime: 2 * 60 * 1000,
   });
 }

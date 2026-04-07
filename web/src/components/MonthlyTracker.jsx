@@ -14,6 +14,7 @@ import { exportCSV, exportPDF } from "../api/export";
 import { useExpenseAudit } from "../hooks/useAudit";
 import { useProfile } from "../hooks/useProfile";
 import { currencySymbol, useCurrencies } from "../hooks/useCurrency";
+import { useSpendingPace } from "../hooks/useInsights";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
@@ -209,6 +210,8 @@ const MonthlyTracker = () => {
     category: filterCategory,
     page: currentPage,
   });
+
+  const { data: paceData } = useSpendingPace(selectedMonth);
 
   const saveMutation = useSaveMonthlyTracker(selectedMonth);
   const updateMutation = useUpdateExpense(selectedMonth);
@@ -406,6 +409,22 @@ const MonthlyTracker = () => {
           </span>
         )}
       </div>
+
+      {/* Spending pace warnings */}
+      {paceData?.warnings?.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-4 space-y-1.5" role="alert" aria-live="polite">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+            <span aria-hidden="true">⚠️</span> Spending pace alert
+          </p>
+          <ul className="space-y-0.5">
+            {paceData.warnings.map((w) => (
+              <li key={w.category} className="text-sm text-amber-700 dark:text-amber-400">
+                {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Salary input */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 gap-2">

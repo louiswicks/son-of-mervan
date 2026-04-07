@@ -1,7 +1,8 @@
 # routers/insights.py
+import calendar
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
@@ -335,4 +336,111 @@ def spending_heatmap(
         "year": str(y),
         "months": heatmap,
         "max_spending": round(max_spending, 2),
+    }
+
+
+@router.get("/pace")
+def spending_pace(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Weekly spending pace indicator.
+
+    Computes a linear projection of month-end spend per category:
+        projected = (actual_so_far / days_elapsed) × days_in_month
+
+    Returns per-category projections and flags any category projected to
+    overspend its planned budget by more than 10%.
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    year, mo = map(int, month_norm.split("-"))
+    days_in_month = calendar.monthrange(year, mo)[1]
+
+    today = datetime.utcnow().date()
+    month_start = today.replace(year=year, month=mo, day=1)
+    month_end = month_start.replace(day=days_in_month)
+
+    if today < month_start:
+        # Future month — no actuals yet
+        return {
+            "month": month_norm,
+            "days_elapsed": 0,
+            "days_in_month": days_in_month,
+            "categories": {},
+            "overall": None,
+            "warnings": [],
+        }
+
+    if today >= month_end:
+        days_elapsed = days_in_month
+    else:
+        days_elapsed = today.day
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+    cat_data = _category_totals(db, month_row)
+
+    categories: Dict[str, Any] = {}
+    warnings: List[Dict[str, Any]] = []
+
+    for cat, totals in cat_data.items():
+        actual = totals["actual"]
+        planned = totals["planned"]
+
+        if days_elapsed > 0:
+            projected = round((actual / days_elapsed) * days_in_month, 2)
+        else:
+            projected = 0.0
+
+        overspend_amount = round(projected - planned, 2) if planned > 0 else None
+        is_warning = (
+            planned > 0
+            and projected > planned * 1.10
+        )
+
+        categories[cat] = {
+            "actual_so_far": round(actual, 2),
+            "planned": round(planned, 2),
+            "projected_month_end": projected,
+            "overspend_amount": overspend_amount,
+            "is_on_pace_to_overspend": is_warning,
+        }
+
+        if is_warning:
+            warnings.append({
+                "category": cat,
+                "projected": projected,
+                "planned": round(planned, 2),
+                "overspend_amount": overspend_amount,
+                "message": (
+                    f"At this pace you'll overspend {cat} by "
+                    f"£{overspend_amount:.2f} by month end."
+                ),
+            })
+
+    # Overall projection
+    total_actual = sum(v["actual"] for v in cat_data.values())
+    total_planned = sum(v["planned"] for v in cat_data.values())
+    if days_elapsed > 0:
+        total_projected = round((total_actual / days_elapsed) * days_in_month, 2)
+    else:
+        total_projected = 0.0
+
+    overall = {
+        "actual_so_far": round(total_actual, 2),
+        "planned": round(total_planned, 2),
+        "projected_month_end": total_projected,
+    }
+
+    return {
+        "month": month_norm,
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "categories": categories,
+        "overall": overall,
+        "warnings": warnings,
     }

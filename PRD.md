@@ -312,10 +312,12 @@ These features separate a solid budgeting app from a category leader.
 **Inspiration:** Unique differentiator — no other mainstream budgeting app has this.
 **Acceptance Criteria:** Adjusting any slider updates the savings projection chart and all goal timelines within 100ms. State is not persisted (preview only).
 
-### 7.4 Weekly Spending Pace Indicator
+### 7.4 Weekly Spending Pace Indicator [DONE 2026-04-07]
 **Problem:** Users only discover overspending at the end of the month when it's too late to course-correct.
 **Solution:** Backend endpoint `GET /insights/pace?month=YYYY-MM` computes linear projection: `(actual_spend_so_far / days_elapsed) × days_in_month`. Returns projected month-end spend per category and overall. Frontend: warning banner on MonthlyTracker when any category is projected to overspend by >10%.
+**Files:** `routers/insights.py`, `web/src/api/insights.js`, `web/src/hooks/useInsights.js`, `web/src/components/MonthlyTracker.jsx`, `tests/test_insights.py`
 **Acceptance Criteria:** "At this pace you'll overspend Food by £87 by month end" appears correctly based on actual data. Projection updates each time tracker data is refreshed.
+**Result:** 206 tests pass, 86.16% coverage. Pace endpoint returns per-category projections and flagged warnings. Banner renders in MonthlyTracker when ≥1 category is projected to overspend by >10%.
 
 ### 7.5 Financial Health Score
 **Problem:** Users have raw data but no single signal telling them whether their finances are healthy.
