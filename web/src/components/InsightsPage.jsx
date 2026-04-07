@@ -6,9 +6,9 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
-  Info, BarChart2,
+  Info, BarChart2, Heart,
 } from "lucide-react";
-import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap } from "../hooks/useInsights";
+import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap, useHealthScore } from "../hooks/useInsights";
 import { SkeletonCard } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
 
@@ -293,6 +293,135 @@ function Heatmap({ data }) {
   );
 }
 
+// -------------------- health score --------------------
+
+const BAND_STYLES = {
+  green: {
+    ring: "ring-green-400 dark:ring-green-500",
+    text: "text-green-600 dark:text-green-400",
+    bg: "bg-green-50 dark:bg-green-900/20",
+    bar: "bg-green-500",
+    label: "Good",
+  },
+  amber: {
+    ring: "ring-amber-400 dark:ring-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-900/20",
+    bar: "bg-amber-400",
+    label: "Fair",
+  },
+  red: {
+    ring: "ring-red-400 dark:ring-red-500",
+    text: "text-red-600 dark:text-red-400",
+    bg: "bg-red-50 dark:bg-red-900/20",
+    bar: "bg-red-500",
+    label: "Needs Work",
+  },
+};
+
+function ComponentRow({ label, score, weight, detail }) {
+  const pct = Math.min(100, Math.max(0, score));
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-gray-700 dark:text-gray-300">{label}</span>
+        <span className="text-gray-500 dark:text-gray-400 text-xs">{score}/100 · {(weight * 100).toFixed(0)}% weight</span>
+      </div>
+      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{detail}</p>
+    </div>
+  );
+}
+
+function HealthScoreCard({ month }) {
+  const { data, isLoading } = useHealthScore(month);
+
+  if (isLoading) {
+    return (
+      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <div className="animate-pulse space-y-3">
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48" />
+          <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!data) return null;
+
+  const band = BAND_STYLES[data.band] || BAND_STYLES.amber;
+
+  return (
+    <section className={`rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 ${band.bg}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <Heart size={22} className={band.text} />
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Financial Health Score</h2>
+        <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ring-1 ${band.ring} ${band.text}`}>
+          {band.label}
+        </span>
+      </div>
+
+      {/* Score dial */}
+      <div className="flex items-center gap-6 mb-5">
+        <div className={`text-6xl font-extrabold tabular-nums ${band.text}`}>
+          {data.score}
+        </div>
+        <div className="flex-1 space-y-1">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+            <span>0</span><span>50</span><span>100</span>
+          </div>
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${band.bar}`}
+              style={{ width: `${data.score}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Red 0–39 · Amber 40–69 · Green 70–100
+          </p>
+        </div>
+      </div>
+
+      {/* Component breakdown */}
+      <div className="space-y-4 mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
+        <ComponentRow
+          label="Savings Rate"
+          score={data.components.savings_rate.score}
+          weight={data.components.savings_rate.weight}
+          detail={data.components.savings_rate.detail}
+        />
+        <ComponentRow
+          label="Budget Adherence"
+          score={data.components.budget_adherence.score}
+          weight={data.components.budget_adherence.weight}
+          detail={data.components.budget_adherence.detail}
+        />
+        <ComponentRow
+          label="Emergency Fund"
+          score={data.components.emergency_fund.score}
+          weight={data.components.emergency_fund.weight}
+          detail={data.components.emergency_fund.detail}
+        />
+      </div>
+
+      {/* Plain-English explanations */}
+      <ul className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-4">
+        {data.explanations.map((text, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <Info size={14} className="flex-shrink-0 mt-0.5 text-gray-400" />
+            {text}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 // -------------------- main page --------------------
 
 export default function InsightsPage() {
@@ -331,6 +460,9 @@ export default function InsightsPage() {
           </p>
         </div>
       </div>
+
+      {/* ---- Health Score ---- */}
+      <HealthScoreCard month={selectedMonth} />
 
       {/* ---- Section 1: Monthly Summary ---- */}
       <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
-from database import get_db, User, MonthlyData, MonthlyExpense
+from database import get_db, User, MonthlyData, MonthlyExpense, SavingsGoal, SavingsContribution
 from security import verify_token
 
 logger = logging.getLogger(__name__)
@@ -336,6 +336,149 @@ def spending_heatmap(
         "year": str(y),
         "months": heatmap,
         "max_spending": round(max_spending, 2),
+    }
+
+
+@router.get("/health-score")
+def financial_health_score(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Monthly Financial Health Score (0–100).
+
+    Three weighted components:
+      - Savings rate    (40%): how much of income was saved this month
+      - Budget adherence (30%): how many expense categories stayed within plan
+      - Emergency fund   (30%): months of expenses covered by savings goals
+
+    Score bands: red 0–39, amber 40–69, green 70–100.
+    Returns score=0 with no data (not an error).
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    # ── 1. Savings rate ──────────────────────────────────────────────────────
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+
+    salary_actual = float(month_row.salary_actual or 0.0) if month_row else 0.0
+    total_actual = float(month_row.total_actual or 0.0) if month_row else 0.0
+
+    if salary_actual > 0:
+        savings_rate_pct = max(0.0, (salary_actual - total_actual) / salary_actual * 100.0)
+        # 20%+ savings = full marks; linear below
+        savings_component = min(100.0, savings_rate_pct / 20.0 * 100.0)
+        savings_detail = f"Saved {savings_rate_pct:.1f}% of income this month"
+    else:
+        savings_rate_pct = 0.0
+        savings_component = 0.0
+        savings_detail = "No income data for this month"
+
+    # ── 2. Budget adherence ──────────────────────────────────────────────────
+    cat_data = _category_totals(db, month_row)
+    cats_with_budget = [(cat, v) for cat, v in cat_data.items() if v["planned"] > 0]
+    if cats_with_budget:
+        within_budget = sum(1 for _, v in cats_with_budget if v["actual"] <= v["planned"])
+        total_with_budget = len(cats_with_budget)
+        adherence_pct = within_budget / total_with_budget * 100.0
+        adherence_component = adherence_pct
+        adherence_detail = f"{within_budget} of {total_with_budget} categories within budget"
+    else:
+        within_budget = 0
+        total_with_budget = 0
+        adherence_component = 0.0  # no data → 0 points
+        adherence_detail = "No planned budget amounts set"
+
+    # ── 3. Emergency fund coverage ───────────────────────────────────────────
+    # Total saved across all active goals
+    goals = (
+        db.query(SavingsGoal)
+        .filter(SavingsGoal.user_id == user.id, SavingsGoal.deleted_at == None)  # noqa: E711
+        .all()
+    )
+    total_savings = 0.0
+    for goal in goals:
+        contribs = db.query(SavingsContribution).filter(
+            SavingsContribution.goal_id == goal.id
+        ).all()
+        total_savings += sum(c.amount for c in contribs)
+
+    # Average monthly actual spend over the last 3 months (including requested month)
+    year, mo = map(int, month_norm.split("-"))
+    last_3_months = []
+    for i in range(3):
+        m_mo = mo - i
+        m_yr = year
+        while m_mo <= 0:
+            m_mo += 12
+            m_yr -= 1
+        last_3_months.append(f"{m_yr:04d}-{m_mo:02d}")
+
+    monthly_expenses = []
+    for ms in last_3_months:
+        row = _find_month(all_rows, ms)
+        if row:
+            monthly_expenses.append(float(row.total_actual or 0.0))
+
+    avg_monthly_expenses = sum(monthly_expenses) / len(monthly_expenses) if monthly_expenses else 0.0
+
+    if avg_monthly_expenses > 0:
+        coverage_months = total_savings / avg_monthly_expenses
+        # 3 months coverage = full marks; linear below
+        emergency_component = min(100.0, coverage_months / 3.0 * 100.0)
+        emergency_detail = f"{coverage_months:.1f} months of expenses covered by savings goals"
+    else:
+        coverage_months = 0.0
+        emergency_component = 0.0
+        emergency_detail = "No expense data to calculate coverage"
+
+    # ── Final score ──────────────────────────────────────────────────────────
+    score = round(savings_component * 0.4 + adherence_component * 0.3 + emergency_component * 0.3)
+    if score >= 70:
+        band = "green"
+    elif score >= 40:
+        band = "amber"
+    else:
+        band = "red"
+
+    # Contribution of each component to the final score
+    savings_pts = round(savings_component * 0.4)
+    adherence_pts = round(adherence_component * 0.3)
+    emergency_pts = round(emergency_component * 0.3)
+
+    explanations = [
+        f"Savings rate ({savings_rate_pct:.1f}%): contributes {savings_pts} of {score} points.",
+        f"Budget adherence: {adherence_detail.lower()}, contributing {adherence_pts} points.",
+        f"Emergency fund: {emergency_detail.lower()}, contributing {emergency_pts} points.",
+    ]
+
+    return {
+        "month": month_norm,
+        "score": score,
+        "band": band,
+        "components": {
+            "savings_rate": {
+                "score": round(savings_component),
+                "weight": 0.4,
+                "detail": savings_detail,
+                "raw_value": round(savings_rate_pct, 2),
+            },
+            "budget_adherence": {
+                "score": round(adherence_component),
+                "weight": 0.3,
+                "detail": adherence_detail,
+                "raw_value": round(adherence_pct if cats_with_budget else 0.0, 2),
+            },
+            "emergency_fund": {
+                "score": round(emergency_component),
+                "weight": 0.3,
+                "detail": emergency_detail,
+                "raw_value": round(coverage_months, 2),
+            },
+        },
+        "explanations": explanations,
     }
 
 

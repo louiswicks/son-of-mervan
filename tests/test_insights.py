@@ -264,3 +264,143 @@ class TestSuggestCategory:
         assert r.status_code == 200
         body = r.json()
         assert body["suggestion"] is None
+
+
+class TestHealthScore:
+    def test_no_data_returns_zero_score(self, auth_client):
+        r = auth_client.get("/insights/health-score?month=2026-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["score"] == 0
+        assert body["band"] == "red"
+        assert "components" in body
+        assert "explanations" in body
+
+    def test_missing_month_returns_422(self, auth_client):
+        r = auth_client.get("/insights/health-score")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        r = auth_client.get("/insights/health-score?month=not-a-month")
+        assert r.status_code == 422
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/health-score?month=2026-01")
+        assert r.status_code in (401, 403)
+
+    def test_high_savings_rate_increases_score(self, auth_client, db, verified_user):
+        # 25% savings rate should give savings_component = 100 (capped)
+        make_month(db, verified_user, month="2026-01", salary_planned=4000.0, total_planned=3000.0)
+        from database import MonthlyData
+        row = db.query(MonthlyData).filter(MonthlyData.user_id == verified_user.id).first()
+        row.salary_actual = 4000.0
+        row.total_actual = 3000.0  # 25% saved
+        db.commit()
+
+        r = auth_client.get("/insights/health-score?month=2026-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["components"]["savings_rate"]["score"] == 100
+        assert body["score"] > 0
+
+    def test_all_categories_within_budget_gives_full_adherence(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-02", salary_planned=3000.0, total_planned=1000.0)
+        from database import MonthlyData
+        row = db.query(MonthlyData).filter(MonthlyData.user_id == verified_user.id).first()
+        row.salary_actual = 3000.0
+        row.total_actual = 900.0
+        db.commit()
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0, actual=750.0)
+        make_expense(db, month, name="Food", category="Food", planned=300.0, actual=150.0)
+
+        r = auth_client.get("/insights/health-score?month=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["components"]["budget_adherence"]["score"] == 100
+
+    def test_overspending_reduces_adherence_score(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-03", salary_planned=3000.0, total_planned=1000.0)
+        from database import MonthlyData
+        row = db.query(MonthlyData).filter(MonthlyData.user_id == verified_user.id).first()
+        row.salary_actual = 3000.0
+        row.total_actual = 1500.0
+        db.commit()
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0, actual=1000.0)  # over
+        make_expense(db, month, name="Food", category="Food", planned=300.0, actual=200.0)       # under
+
+        r = auth_client.get("/insights/health-score?month=2026-03")
+        assert r.status_code == 200
+        body = r.json()
+        # 1 of 2 categories within budget = 50%
+        assert body["components"]["budget_adherence"]["score"] == 50
+
+    def test_savings_goals_improve_emergency_fund_score(self, auth_client, db, verified_user):
+        from database import SavingsGoal, SavingsContribution, MonthlyData
+        from datetime import datetime
+
+        # Set up 3 months of expense data (~£1000/month)
+        for m_str in ["2026-01", "2026-02", "2026-03"]:
+            row = make_month(db, verified_user, month=m_str, salary_planned=3000.0, total_planned=1000.0)
+            row.total_actual = 1000.0
+            db.commit()
+
+        # Create a savings goal with £3000 saved (= 3 months coverage)
+        goal = SavingsGoal(user_id=verified_user.id)
+        goal.name = "Emergency"
+        goal.target_amount = 5000.0
+        db.add(goal)
+        db.commit()
+        db.refresh(goal)
+
+        contrib = SavingsContribution(goal_id=goal.id, contributed_at=datetime.utcnow())
+        contrib.amount = 3000.0
+        contrib.note = "initial"
+        db.add(contrib)
+        db.commit()
+
+        r = auth_client.get("/insights/health-score?month=2026-03")
+        assert r.status_code == 200
+        body = r.json()
+        # coverage_months ≈ 3000 / 1000 = 3.0 → emergency_component = 100
+        assert body["components"]["emergency_fund"]["score"] == 100
+
+    def test_response_structure(self, auth_client):
+        r = auth_client.get("/insights/health-score?month=2026-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert "score" in body
+        assert "band" in body
+        assert "components" in body
+        assert "explanations" in body
+        assert "savings_rate" in body["components"]
+        assert "budget_adherence" in body["components"]
+        assert "emergency_fund" in body["components"]
+        for comp in body["components"].values():
+            assert "score" in comp
+            assert "weight" in comp
+            assert "detail" in comp
+            assert "raw_value" in comp
+        assert isinstance(body["explanations"], list)
+        assert len(body["explanations"]) == 3
+
+    def test_score_band_boundaries(self, auth_client, db, verified_user):
+        # With no data, score=0 → band=red
+        r = auth_client.get("/insights/health-score?month=2026-06")
+        body = r.json()
+        assert body["band"] == "red"
+        assert body["score"] < 40
+
+    def test_only_own_data_counted(self, auth_client, db, second_user):
+        # second_user has 100% adherence data; auth_client user has none
+        make_month(db, second_user, month="2026-05")
+        from database import MonthlyData
+        row = db.query(MonthlyData).filter(MonthlyData.user_id == second_user.id).first()
+        row.salary_actual = 5000.0
+        row.total_actual = 500.0
+        db.commit()
+
+        r = auth_client.get("/insights/health-score?month=2026-05")
+        assert r.status_code == 200
+        body = r.json()
+        # Auth user has no salary data → savings score should be 0
+        assert body["components"]["savings_rate"]["score"] == 0

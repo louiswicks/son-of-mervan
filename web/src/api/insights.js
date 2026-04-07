@@ -14,3 +14,6 @@ export const getSpendingPace = (month) =>
 
 export const suggestCategory = (name) =>
   client.get("/insights/suggest-category", { params: { name } }).then((r) => r.data);
+
+export const getHealthScore = (month) =>
+  client.get("/insights/health-score", { params: { month } }).then((r) => r.data);

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace, suggestCategory } from "../api/insights";
+import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace, suggestCategory, getHealthScore } from "../api/insights";
 
 export function useMonthlySummary(month) {
   return useQuery({
@@ -32,6 +32,15 @@ export function useSpendingPace(month) {
     queryFn: () => getSpendingPace(month),
     enabled: !!month,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useHealthScore(month) {
+  return useQuery({
+    queryKey: ["insights-health-score", month],
+    queryFn: () => getHealthScore(month),
+    enabled: !!month,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
