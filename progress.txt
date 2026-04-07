@@ -417,3 +417,30 @@
   - Empty month, future month, over-budget data, within-budget data, cross-user isolation
 - Test result: 206 tests pass (was 198), 86.16% coverage (was 85.84%)
 - Files changed: routers/insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/MonthlyTracker.jsx, tests/test_insights.py, PRD.md, progress.txt
+
+## Phase 7.6 — Smart Categorisation [DONE] 2026-04-07
+- Added `GET /insights/suggest-category?name=<text>` endpoint in `routers/insights.py`:
+  - `name` query param required, min 2 chars (FastAPI validates; returns 422 if < 2 chars)
+  - Fetches all non-deleted MonthlyExpense records for the authenticated user
+  - Case-insensitive substring match: "tesco" matches "Tesco", "Tesco Express", "Tesco Metro"
+  - Counts category frequency across all matches; returns the most common
+  - Returns `{ suggestion, count, total_matches }` — `suggestion: null` when no history matches
+  - No cross-user data: only queries the authenticated user's own MonthlyData IDs
+- Added `suggestCategory(name)` Axios wrapper in `web/src/api/insights.js`
+- Added `useCategorySuggestion(name)` React Query hook in `web/src/hooks/useInsights.js`:
+  - `enabled: trimmed.length >= 2`; `staleTime: 60s`; `refetchOnWindowFocus: false`
+- Added `CategorySuggestionChip` component in `web/src/components/MonthlyTracker.jsx`:
+  - Self-contained: debounces the name prop 300ms, calls `useCategorySuggestion` internally
+  - Renders a small pill button "Suggested: {category}" when suggestion exists; null otherwise
+  - `aria-label` and `title` (shows past occurrence count) for accessibility
+  - Wired into both mobile card layout and desktop table layout, for new rows (id==null) and
+    edit mode (isEditing), clicking the chip updates the category field
+- Added inline suggestion chip in `RecurringExpensesPage.jsx` FormRow:
+  - 300ms debounce via `useState`/`useEffect` on `value.name`
+  - Chip renders below the category `<select>` when `categorySuggestion.suggestion` is set
+- Added 8 new tests in `tests/test_insights.py` (class `TestSuggestCategory`):
+  - Missing name → 422; name too short (1 char) → 422; unauthenticated → 401/403
+  - No history → null suggestion; most-common category chosen correctly
+  - Case-insensitive matching; cross-user isolation; deleted expenses excluded
+- Test result: 214 tests pass (was 206), 86.41% coverage (was 86.16%)
+- Files changed: routers/insights.py, web/src/api/insights.js, web/src/hooks/useInsights.js, web/src/components/MonthlyTracker.jsx, web/src/components/RecurringExpensesPage.jsx, tests/test_insights.py, PRD.md, progress.txt

@@ -325,11 +325,12 @@ These features separate a solid budgeting app from a category leader.
 **Inspiration:** Credit score model applied to personal budgeting.
 **Acceptance Criteria:** Score is deterministic given the same inputs. All three component scores are shown with their contribution. Score is 0 with no data (not an error).
 
-### 7.6 Smart Categorisation
+### 7.6 Smart Categorisation [DONE 2026-04-07]
 **Problem:** Users must manually select a category for every expense. Repetitive entries (e.g. "Tesco", "Netflix") are re-categorised from scratch every time.
 **Solution:** On expense name input, `GET /insights/suggest-category?name=<text>` returns the most frequently used category for that name from the user's own history. Frontend: subtle suggestion chip below the category dropdown ("Suggested: Food"). User can accept or ignore.
 **Inspiration:** Mint's bank-connected categorisation, reimplemented using the user's own history without requiring bank API access.
 **Acceptance Criteria:** Suggestion appears after 2+ characters are typed with <200ms latency. Suggestion is based only on the authenticated user's own history (no cross-user data). Accepted suggestions are tracked to improve future suggestions.
+**Result:** 214 tests pass, 86.41% coverage. Endpoint uses case-insensitive substring matching; soft-deleted expenses excluded. Frontend: 300ms debounce, chip renders in MonthlyTracker (mobile + desktop, new + edit modes) and RecurringExpensesPage FormRow.
 
 ---
 
