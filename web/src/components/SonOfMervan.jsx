@@ -134,53 +134,73 @@ export default function SonOfMervan() {
               </button>
             </div>
 
-            {/* Column headers */}
+            {/* Column headers — desktop only */}
             <div className="hidden sm:grid grid-cols-12 gap-2 px-1 mb-1">
               <span className="col-span-5 text-xs text-gray-400 dark:text-gray-500 font-medium">Name</span>
               <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Amount</span>
-              <span className="col-span-4 text-xs text-gray-400 dark:text-gray-500 font-medium">Category</span>
+              <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Category</span>
+              <span className="col-span-1" aria-hidden="true" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3 sm:space-y-2">
               {expenses.map((exp, i) => (
-                <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <input
-                    className="sm:col-span-5 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 text-sm"
-                    placeholder="e.g. Rent"
-                    value={exp.name}
-                    onChange={(e) => updateExpense(i, "name", e.target.value)}
-                  />
-                  <div className="sm:col-span-3 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none">£</span>
+                <div
+                  key={i}
+                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:border-0 sm:rounded-none sm:p-0 grid grid-cols-1 sm:grid-cols-12 gap-y-2 sm:gap-2 items-start sm:items-center"
+                >
+                  {/* Name */}
+                  <div className="sm:col-span-5">
+                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Name</label>
                     <input
-                      inputMode="decimal"
-                      pattern="[0-9]*[.]?[0-9]*"
-                      className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 text-sm"
-                      placeholder="0.00"
-                      value={exp.amount}
-                      onChange={(e) => updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))}
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
+                      placeholder="e.g. Rent"
+                      value={exp.name}
+                      onChange={(e) => updateExpense(i, "name", e.target.value)}
                     />
                   </div>
-                  <select
-                    className="sm:col-span-3 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                    value={exp.category}
-                    onChange={(e) => updateExpense(i, "category", e.target.value)}
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <div className="sm:col-span-1 flex justify-end sm:justify-center">
+
+                  {/* Amount */}
+                  <div className="sm:col-span-3">
+                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none">£</span>
+                      <input
+                        inputMode="decimal"
+                        pattern="[0-9]*[.]?[0-9]*"
+                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
+                        placeholder="0.00"
+                        value={exp.amount}
+                        onChange={(e) => updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category */}
+                  <div className="sm:col-span-3">
+                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Category</label>
+                    <select
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm min-h-[44px] sm:min-h-0"
+                      value={exp.category}
+                      onChange={(e) => updateExpense(i, "category", e.target.value)}
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Delete */}
+                  <div className="sm:col-span-1 flex sm:justify-center">
                     {expenses.length > 1 ? (
                       <button
                         type="button"
                         onClick={() => removeExpense(i)}
-                        className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                        className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                         aria-label="Remove row"
                       >
                         <Trash2 size={15} />
                       </button>
-                    ) : <div className="w-8" />}
+                    ) : <div className="hidden sm:block w-8" />}
                   </div>
                 </div>
               ))}
