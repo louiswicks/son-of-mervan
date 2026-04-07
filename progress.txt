@@ -1,3 +1,12 @@
+## Phase 6.1 — Budget Page UI Redesign [DONE] 2026-04-07
+- Fixed column header misalignment in `SonOfMervan.jsx`: Category header was `col-span-4` but the select was `col-span-3`; corrected to `col-span-3` with an explicit `col-span-1` spacer for the delete button column so headers now align exactly with inputs on desktop
+- Added explicit `sm:hidden` labels (Name, Amount, Category) inside each expense row — visible on mobile, hidden on desktop where the shared column header row provides context
+- Mobile expense rows now render in a bordered card (`border border-gray-200 dark:border-gray-700 p-3`) for clear visual separation at 320px
+- Added `dark:placeholder-gray-500` to all expense inputs and selects for consistent dark mode placeholder legibility (previously only the salary input had this)
+- WCAG 44×44px touch targets (`min-h-[44px]`) on all interactive elements on mobile, removed on desktop (`sm:min-h-0`) to avoid inflating row height
+- All 25 frontend tests pass (SonOfMervan: 6/6); build clean at 281.83 kB gzip (+122 B)
+- Files changed: web/src/components/SonOfMervan.jsx, PRD.md
+
 ## Phase 4.4 — Spending Insights and Trends [DONE] 2026-04-06
 - Created `routers/insights.py` with three endpoints: `GET /insights/monthly-summary?month=YYYY-MM` (month-over-month % change per category, biggest overspend, net income, ranked plain-English insight cards capped at 5), `GET /insights/trends?months=6` (per-category actual spending per month + 3-month rolling averages + overall income/spending trend), `GET /insights/heatmap?year=YYYY` (monthly spending totals with quartile-based intensity levels 0–4)
 - All three endpoints: decrypt data in Python (Fernet non-deterministic encryption), user-scoped, `verify_token` auth dependency; `_find_month` helper avoids N+1 by fetching all user rows once and filtering in Python

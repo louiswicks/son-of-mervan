@@ -269,7 +269,7 @@ All core features, security hardening, infrastructure, and testing are complete.
 
 ## Phase 6: Quality & Polish
 
-### 6.1 Budget Page UI Redesign
+### 6.1 Budget Page UI Redesign [DONE 2026-04-07]
 **Problem:** The budget page card layout is misaligned on certain viewports; dark mode has inconsistent styling across inputs, labels, and selects.
 **Solution:** Redesign the `SonOfMervan.jsx` input section with a clean single-column layout, consistent dark mode classes on all form elements, column headers for expense rows, and a single centred Calculate button.
 **Files:** `web/src/components/SonOfMervan.jsx`, `web/src/tests/SonOfMervan.test.jsx`
