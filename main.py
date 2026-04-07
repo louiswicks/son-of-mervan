@@ -78,7 +78,7 @@ _alembic_cfg = AlembicConfig("alembic.ini")
 # If the DB already has tables but no alembic_version tracking (pre-Alembic deploy),
 # stamp it at the initial revision so the migration history starts from the correct
 # baseline. Without this, `upgrade head` crashes on existing production DBs.
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 from database import engine as _engine
 with _engine.connect() as _conn:
     _inspector = inspect(_engine)
