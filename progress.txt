@@ -1,3 +1,13 @@
+## Phase 7.3 — What-If Scenario Planner [DONE] 2026-04-07
+- Created `web/src/components/ScenarioPlannerPage.jsx`: new `/scenarios` page with per-category spending sliders (−50% to +50%, step 5%), 3-card summary bar (baseline savings / monthly adjustment / scenario savings), 24-month area chart (Baseline vs Scenario using Recharts AreaChart), and per-savings-goal completion time delta
+- Data: fetches current-month planned amounts from `GET /insights/monthly-summary` (via `getMonthlySummary`) and savings goals from `GET /savings-goals`; all projection calculations are instant client-side with no additional API calls
+- Sliders drive `spendingAdjustment` memoised value; `scenarioSavings = baselineSavings - spendingAdjustment`; goal months = ceil(remaining / monthlySavings); delta badge shows "Xmo sooner / Xmo later"
+- Empty state shown when no current-month planned categories exist
+- Added `Sliders` icon from lucide-react to nav; added `["/scenarios", "What-If", Sliders]` entry to NAV_TABS in `AuthGuard.jsx`
+- Added `/scenarios` route to `router.jsx`
+- 225 backend tests pass; 25 frontend tests pass; build clean at 289.82 kB gzip (+7.99 kB)
+- Files changed: web/src/components/ScenarioPlannerPage.jsx (new), web/src/components/AuthGuard.jsx, web/src/router.jsx, PRD.md, progress.txt
+
 ## Phase 1.1 — Remove Debug/Migration HTTP Endpoints [DONE] 2026-04-07
 - Debug HTTP routes (`/run-migration`, `/cleanup-old-columns`, `/debug/check-month/{month}`) were already removed from `main.py` in earlier phases; CLI equivalents exist in `scripts/migrate.py`
 - Replaced the remaining `print()` call in `core/config.py` with `logging.basicConfig` + `logging.critical()` — no `print()` calls remain in application code

@@ -306,11 +306,12 @@ These features separate a solid budgeting app from a category leader.
 **Inspiration:** Mint, Copilot.
 **Acceptance Criteria:** User can add/edit/delete assets and liabilities. Net worth = assets − liabilities. Historical chart shows at least 3 months of data when available.
 
-### 7.3 "What If" Scenario Planner
+### 7.3 "What If" Scenario Planner [DONE 2026-04-07]
 **Problem:** Users cannot explore how small changes compound into large outcomes over time.
 **Solution:** Interactive page with category budget sliders. As sliders move, savings projection chart and goal-completion dates recalculate instantly in the browser (no API call). "If I cut Coffee by £50/month, I reach my house deposit goal 4 months earlier."
 **Inspiration:** Unique differentiator — no other mainstream budgeting app has this.
 **Acceptance Criteria:** Adjusting any slider updates the savings projection chart and all goal timelines within 100ms. State is not persisted (preview only).
+**Result:** 225 backend tests pass, 25 frontend tests pass, build clean. New `/scenarios` page with per-category sliders (−50% to +50%), 3-card summary bar, 24-month area chart (Baseline vs Scenario), and per-goal completion time delta. All calculations are instant client-side. Empty state shown when no current-month budget exists.
 
 ### 7.4 Weekly Spending Pace Indicator [DONE 2026-04-07]
 **Problem:** Users only discover overspending at the end of the month when it's too late to course-correct.
