@@ -51,8 +51,8 @@ The goal of this PRD is to transform the current working prototype into a produc
 - JWT authentication + email verification
 - Fernet encryption of sensitive database fields
 
-### Current Production Readiness: ~40%
-The core logic works but the app has critical security gaps, zero test coverage, missing fundamental features (edit/delete expenses, password reset), and no production infrastructure (Docker, CI/CD, monitoring, backups).
+### Current Production Readiness: ~85%
+All core features, security hardening, infrastructure, and testing are complete. Outstanding work is UI polish, coverage gap closure, and documentation refresh.
 
 ---
 
@@ -267,18 +267,105 @@ The core logic works but the app has critical security gaps, zero test coverage,
 
 ---
 
-## 5. Differentiating "Best App" Features (Post Phase 5)
+## Phase 6: Quality & Polish
 
-These features separate a solid budgeting app from a category leader:
+### 6.1 Budget Page UI Redesign
+**Problem:** The budget page card layout is misaligned on certain viewports; dark mode has inconsistent styling across inputs, labels, and selects.
+**Solution:** Redesign the `SonOfMervan.jsx` input section with a clean single-column layout, consistent dark mode classes on all form elements, column headers for expense rows, and a single centred Calculate button.
+**Files:** `web/src/components/SonOfMervan.jsx`, `web/src/tests/SonOfMervan.test.jsx`
+**Acceptance Criteria:** Salary field, expense rows (name/amount/category), and button align cleanly at 320px, 768px, and 1280px. All labels and inputs are legible in both light and dark mode.
 
-| Feature | Description | Inspiration |
-|---|---|---|
-| **Envelope Budgeting** | Zero-based allocation: every pound of income assigned to a named "envelope" at month start. Overspending one envelope borrows from another. | YNAB's core methodology |
-| **Net Worth Dashboard** | Assets minus liabilities, tracked monthly. The single most meaningful long-term financial metric. | Mint, Copilot |
-| **"What If" Scenario Planner** | Sliders adjusting category budgets and instantly recomputing savings goal timelines. "If I cut coffee by £50/month, I hit my deposit goal 4 months earlier." | Unique differentiator |
-| **Weekly Spending Pace Indicator** | "At this pace you'll overspend Food by £87 by month end." Linear projection updated daily. | Internal original |
-| **Financial Health Score** | 0–100 monthly score from savings rate, budget adherence, emergency fund coverage. Plain-English explanation of what's driving it. | Credit score model applied to budgeting |
-| **Smart Categorisation** | Suggest category based on expense description + user's own past categorisation history. "Tesco" → "Groceries". | Mint's bank-connected categorisation, reimplemented without bank APIs |
+### 6.2 Raise CI Coverage Threshold to 80%
+**Problem:** The PRD targets 80% backend test coverage but CI is currently set to 65%. The gap is from untested router modules: `alerts.py` (22%), `export.py` (14%), `insights.py` (13%), `recurring.py` (17%), `savings.py` (25%).
+**Solution:** Add focused test files covering the core happy paths and auth-ownership checks for each router. Update `ci.yml` `--cov-fail-under` from 65 to 80.
+**Files:** `tests/test_alerts.py` (new), `tests/test_export.py` (new), `tests/test_insights.py` (new), `tests/test_recurring.py` (new), `tests/test_savings.py` (new), `.github/workflows/ci.yml`
+**Acceptance Criteria:** `pytest --cov=. --cov-fail-under=80` passes in CI.
+
+### 6.3 Documentation Refresh
+**Problem:** All three CLAUDE.md files contain stale references — legacy hash routing description, hardcoded API_BASE_URL noted as a known issue (now fixed), old component list, and missing router modules.
+**Solution:** Rewrite all CLAUDE.md files to reflect the current codebase: modern React Router via `router.jsx`, Zustand auth store, modular `api/` clients, all 11 router modules, correct known-issues list.
+**Files:** `CLAUDE.md`, `routers/CLAUDE.md`, `web/CLAUDE.md`
+**Acceptance Criteria:** Any engineer can onboard using only the CLAUDE.md files with no stale information.
+
+---
+
+## Phase 7: Differentiating Features
+
+These features separate a solid budgeting app from a category leader.
+
+### 7.1 Envelope Budgeting
+**Problem:** Users plan a monthly budget but have no mechanism for zero-based allocation — assigning every pound of income to a specific purpose at the start of the month.
+**Solution:** `Envelope` model with `name`, `allocated_amount`, `spent_amount` per month. UI to set up envelopes at month start, with visual fill bars showing remaining vs spent. Overspending one envelope borrows from unallocated balance. Backend: new `routers/envelopes.py` + migration. Frontend: new `/envelopes` page.
+**Inspiration:** YNAB's core methodology.
+**Acceptance Criteria:** User can create envelopes summing to their salary. Spending an expense deducts from the correct envelope. UI shows remaining balance per envelope in real time.
+
+### 7.2 Net Worth Dashboard
+**Problem:** The app tracks cash flow but not overall financial position — the single most meaningful long-term metric.
+**Solution:** `Asset` and `Liability` models (manual entry: property value, savings account balance, car, mortgage, credit card, student loan). Monthly snapshot stored for trending. Dashboard widget shows total net worth + month-over-month delta. Recharts area chart for 12-month history.
+**Inspiration:** Mint, Copilot.
+**Acceptance Criteria:** User can add/edit/delete assets and liabilities. Net worth = assets − liabilities. Historical chart shows at least 3 months of data when available.
+
+### 7.3 "What If" Scenario Planner
+**Problem:** Users cannot explore how small changes compound into large outcomes over time.
+**Solution:** Interactive page with category budget sliders. As sliders move, savings projection chart and goal-completion dates recalculate instantly in the browser (no API call). "If I cut Coffee by £50/month, I reach my house deposit goal 4 months earlier."
+**Inspiration:** Unique differentiator — no other mainstream budgeting app has this.
+**Acceptance Criteria:** Adjusting any slider updates the savings projection chart and all goal timelines within 100ms. State is not persisted (preview only).
+
+### 7.4 Weekly Spending Pace Indicator
+**Problem:** Users only discover overspending at the end of the month when it's too late to course-correct.
+**Solution:** Backend endpoint `GET /insights/pace?month=YYYY-MM` computes linear projection: `(actual_spend_so_far / days_elapsed) × days_in_month`. Returns projected month-end spend per category and overall. Frontend: warning banner on MonthlyTracker when any category is projected to overspend by >10%.
+**Acceptance Criteria:** "At this pace you'll overspend Food by £87 by month end" appears correctly based on actual data. Projection updates each time tracker data is refreshed.
+
+### 7.5 Financial Health Score
+**Problem:** Users have raw data but no single signal telling them whether their finances are healthy.
+**Solution:** Monthly 0–100 score computed from: savings rate (40% weight), budget adherence per category (30% weight), emergency fund coverage — months of expenses in savings goals (30% weight). Plain-English explanation: "Your score dropped 8 points because Housing exceeded budget by 12%." Backend: `GET /insights/health-score?month=YYYY-MM`. Frontend: score card with colour-coded band (red/amber/green) and explanation list.
+**Inspiration:** Credit score model applied to personal budgeting.
+**Acceptance Criteria:** Score is deterministic given the same inputs. All three component scores are shown with their contribution. Score is 0 with no data (not an error).
+
+### 7.6 Smart Categorisation
+**Problem:** Users must manually select a category for every expense. Repetitive entries (e.g. "Tesco", "Netflix") are re-categorised from scratch every time.
+**Solution:** On expense name input, `GET /insights/suggest-category?name=<text>` returns the most frequently used category for that name from the user's own history. Frontend: subtle suggestion chip below the category dropdown ("Suggested: Food"). User can accept or ignore.
+**Inspiration:** Mint's bank-connected categorisation, reimplemented using the user's own history without requiring bank API access.
+**Acceptance Criteria:** Suggestion appears after 2+ characters are typed with <200ms latency. Suggestion is based only on the authenticated user's own history (no cross-user data). Accepted suggestions are tracked to improve future suggestions.
+
+---
+
+## Phase 8: Expanded Scope
+
+Previously out of scope items now included as future roadmap.
+
+### 8.1 AI/LLM-Powered Financial Advice
+**Problem:** Data is displayed but not interpreted with nuance — rule-based insights can only go so far.
+**Solution:** Integrate Claude API (claude-sonnet-4-6) to generate plain-English monthly financial summaries and personalised coaching tips. User triggers "Get AI Review" on the insights page; their anonymised monthly summary (no raw names/amounts) is sent to Claude with a structured prompt. Response streamed to the UI.
+**Constraints:** Opt-in only. No PII sent to the API. Rate-limited to 3 requests/day per user.
+**Acceptance Criteria:** User receives a coherent 3–5 sentence financial summary with at least one actionable recommendation. Response streams progressively to the UI.
+
+### 8.2 Multi-User Household Accounts
+**Problem:** Couples and households need a shared budget view, but currently each user is fully isolated.
+**Solution:** `Household` model with invite-based membership. Role: `owner` (full access) or `member` (read + own expenses). Shared `MonthlyData` with per-member expense attribution. Split expense view showing each member's contribution.
+**Acceptance Criteria:** Owner can invite a member by email. Member can view shared budget but not edit owner's individual expenses. Household budget totals across both members' expenses.
+
+### 8.3 Investment Portfolio Tracking
+**Problem:** Net Worth (7.2) covers bank accounts and liabilities but not investment holdings.
+**Solution:** Manual entry of holdings (stock ticker, fund name, units held, purchase price). Daily price sync from a free API (Yahoo Finance fallback). Portfolio value shown on Net Worth dashboard as a distinct asset class. Unrealised gain/loss per holding.
+**Acceptance Criteria:** User can add a holding by ticker. Current value updates daily. Net worth dashboard reflects portfolio value. No auto-trading or recommendations.
+
+### 8.4 Tax Filing Integration
+**Problem:** Users cannot use their expense data for self-assessment tax returns without manual re-entry.
+**Solution:** `GET /export/tax-summary?tax_year=YYYY` returns income and deductible expenses in a format aligned with HMRC self-assessment categories. PDF download formatted as a SA302-style summary. Expense category mapping to HMRC allowable expense types (configurable per user).
+**Acceptance Criteria:** Export covers the correct UK tax year (April–April). Categories map correctly to HMRC allowable expense types. PDF is human-readable and print-ready.
+
+### 8.5 Open Banking Integration (Plaid / TrueLayer)
+**Problem:** Manual expense entry is the biggest friction point in the app. Users who connect their bank accounts in competitors (Monzo, Emma) see instant categorised transactions with no manual input.
+**Solution:** Integrate TrueLayer (UK-first, FCA-regulated) for open banking connectivity. OAuth-based bank account linking — user authorises read-only access. Transaction sync via `POST /banking/sync` fetches new transactions since last sync and creates draft `MonthlyExpense` rows with AI-suggested categories (using Smart Categorisation from 7.6). User reviews and confirms drafts before they become permanent. Webhook support for real-time transaction push where the provider supports it.
+**Constraints:** TrueLayer sandbox available for development; production requires FCA registration or operating under TrueLayer's agent model. No write access to bank accounts ever. All bank tokens stored encrypted (Fernet). User can disconnect at any time and all bank-linked data is deleted.
+**Files:** new `routers/banking.py`, new `database.py` models (BankConnection, BankTransaction), new `web/src/components/BankConnectionPage.jsx`, new `alembic/versions/` migration, `requirements.txt` (truelayer-signing or plaid SDK)
+**Acceptance Criteria:** User can link a UK bank account via OAuth. Transactions sync within 60 seconds of connection. Draft expenses are pre-categorised using the user's own history. User can review, edit, and confirm or reject each draft. Disconnecting removes all stored bank tokens and unconfirmed drafts.
+
+---
+
+## 5. Differentiating "Best App" Features
+*Promoted to Phase 7 above. See Phase 7 for full specifications.*
 
 ---
 
@@ -298,34 +385,34 @@ These features separate a solid budgeting app from a category leader:
 
 ---
 
-## 7. Out of Scope
+## 9. Permanently Out of Scope
 
-- Bank/open banking API integration (Plaid, TrueLayer) — manual entry only for v1
-- Investment portfolio tracking
-- Tax filing integration
-- Multi-user household accounts
-- Mobile native app (iOS/Android) — web-first
-- AI/LLM-powered financial advice
+- Mobile native app (iOS/Android) — web-first; PWA enhancements may be considered later
 
 ---
 
-## 8. Implementation Sequence
+## 10. Implementation Sequence
 
 ```
-Phase 1 (Week 1–2):   Security fixes — must complete before any public users
-  1.1 → 1.2 → 1.3 → 1.4
+Phase 1 (DONE):  Security fixes
+Phase 2 (DONE):  Core features
+Phase 3 (DONE):  Frontend UX overhaul
+Phase 4 (DONE):  Advanced features
+Phase 5 (DONE):  Production infrastructure
 
-Phase 2 (Week 3–6):   Core features — 2.1 (Alembic) must go first
-  2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 → 2.7 (tests written alongside)
+Phase 6 (Next):  Quality & polish — complete before starting Phase 7
+  6.1 (Budget UI) → 6.2 (coverage to 80%) → 6.3 (docs refresh)
 
-Phase 3 (Week 7–10):  Frontend — 3.1 (API client) unblocks all others
-  3.1 → 3.2 → 3.3 → 3.7 → 3.4 → 3.5 → 3.6 → 3.8
+Phase 7:         Differentiating features — mostly independent, suggested order:
+  7.4 (Pace indicator — lowest effort, highest immediate value)
+  → 7.6 (Smart categorisation)
+  → 7.5 (Health score)
+  → 7.3 (What-If planner)
+  → 7.1 (Envelope budgeting)
+  → 7.2 (Net worth dashboard)
 
-Phase 4 (Week 11–18): Advanced features — mostly independent
-  4.1 → 4.2 → 4.3 → 4.4 → 4.5 → 4.6 → 4.7
-
-Phase 5 (Ongoing):    Infrastructure — 5.1 can start immediately
-  5.1 → 5.2 (once tests exist) → 5.3 → 5.4 → 5.5
+Phase 8:         Expanded scope — after Phase 7 is stable
+  8.1 (AI advice) → 8.3 (Investments) → 8.2 (Households) → 8.4 (Tax export) → 8.5 (Open banking)
 ```
 
 ---
