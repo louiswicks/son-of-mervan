@@ -373,3 +373,14 @@
 - React Query `staleTime` was already set correctly in prior phases: `useAnnualSummary` = 5 min, `useMonthlyTracker` = 30s — no frontend changes needed
 - Test result: 94 backend tests pass, 7 pre-existing deprecation warnings; ruff 0 errors
 - Files changed: core/cache.py (new), core/config.py, .env.example, requirements.txt, database.py, alembic/versions/i9j0k1l2m3n4_add_performance_indexes.py (new), routers/overview.py, routers/insights.py, main.py
+
+## Phase 6.2 — Raise CI Coverage Threshold to 80% [DONE] 2026-04-07
+- Added 5 new test files covering the previously untested router modules (alerts, export, insights, recurring, savings):
+  - `tests/test_alerts.py`: 27 tests covering budget alert CRUD, ownership isolation, notification list/mark-read/mark-all-read/delete
+  - `tests/test_export.py`: 9 tests covering CSV export (with and without data, wrong-user isolation, invalid month format) and PDF export (200/503 depending on fpdf2 availability, 404 for missing month, invalid format)
+  - `tests/test_insights.py`: 15 tests covering monthly-summary, trends (with custom `months` param and validation), and heatmap endpoints
+  - `tests/test_recurring.py`: 21 tests covering recurring expense CRUD, frequency validation, ownership (403 for wrong user), and the `/generate` endpoint
+  - `tests/test_savings.py`: 32 tests covering savings goal CRUD, contributions (add/delete, current_amount aggregation), and ownership isolation (404 for wrong user)
+- Updated `.github/workflows/ci.yml`: `--cov-fail-under` raised from 65 to 80
+- Test result: 198 tests pass (was 94), 85.84% total line coverage (was 67%), all 7 pre-existing deprecation warnings unchanged
+- Files changed: tests/test_alerts.py (new), tests/test_export.py (new), tests/test_insights.py (new), tests/test_recurring.py (new), tests/test_savings.py (new), .github/workflows/ci.yml

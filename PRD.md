@@ -275,11 +275,12 @@ All core features, security hardening, infrastructure, and testing are complete.
 **Files:** `web/src/components/SonOfMervan.jsx`, `web/src/tests/SonOfMervan.test.jsx`
 **Acceptance Criteria:** Salary field, expense rows (name/amount/category), and button align cleanly at 320px, 768px, and 1280px. All labels and inputs are legible in both light and dark mode.
 
-### 6.2 Raise CI Coverage Threshold to 80%
+### 6.2 Raise CI Coverage Threshold to 80% [DONE 2026-04-07]
 **Problem:** The PRD targets 80% backend test coverage but CI is currently set to 65%. The gap is from untested router modules: `alerts.py` (22%), `export.py` (14%), `insights.py` (13%), `recurring.py` (17%), `savings.py` (25%).
 **Solution:** Add focused test files covering the core happy paths and auth-ownership checks for each router. Update `ci.yml` `--cov-fail-under` from 65 to 80.
 **Files:** `tests/test_alerts.py` (new), `tests/test_export.py` (new), `tests/test_insights.py` (new), `tests/test_recurring.py` (new), `tests/test_savings.py` (new), `.github/workflows/ci.yml`
 **Acceptance Criteria:** `pytest --cov=. --cov-fail-under=80` passes in CI.
+**Result:** 198 tests pass, 85.84% total coverage.
 
 ### 6.3 Documentation Refresh
 **Problem:** All three CLAUDE.md files contain stale references — legacy hash routing description, hardcoded API_BASE_URL noted as a known issue (now fixed), old component list, and missing router modules.
