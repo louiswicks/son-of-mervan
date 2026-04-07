@@ -1,3 +1,17 @@
+## Phase 8.3 — Investment Portfolio Tracking [DONE] 2026-04-08
+- `Investment` model with Fernet-encrypted fields: name, units, purchase_price, notes; plaintext: ticker, asset_type, currency — ticker stays unencrypted for daily yfinance price sync
+- `InvestmentPrice` model stores plaintext daily price snapshots (investment_id, price, fetched_at)
+- Alembic migration `k1l2m3n4o5p6_add_investments.py` adds both tables with composite indexes
+- `routers/investments.py` — full CRUD: list (with P&L), create (immediate price fetch if ticker provided), update, soft-delete; portfolio summary endpoint; manual `/sync-prices` endpoint
+- APScheduler job `sync_all_investment_prices` runs daily at 16:30 UTC (after market close) via yfinance; added `yfinance>=0.2.40` to requirements.txt
+- All yfinance calls wrapped in try/except — price sync failure never breaks the app
+- `InvestmentsPage.jsx` — summary cards (holdings count, total cost, portfolio value, unrealised gain/loss with colour-coded band), responsive holdings table (name/ticker/type/units/buy price/current price/value/gain%), add/edit modal, delete confirmation, "Sync Prices" button with spinner
+- `web/src/api/investments.js`, `web/src/hooks/useInvestments.js` — full React Query integration
+- `["/investments", "Portfolio", LineChart]` added to `NAV_TABS` in `AuthGuard.jsx`; `/investments` route added to `router.jsx`
+- 21 new tests in `tests/test_investments.py` covering: list empty/owned/soft-deleted, create with/without ticker, price fetch success/failure, invalid asset_type, zero units, update, delete, ownership enforcement, summary empty/no-prices/with-prices, sync prices, unauthenticated access
+- 265 backend tests pass, 86.95% coverage (above 80% threshold); ruff clean
+- Files: database.py, models.py, routers/investments.py (new), alembic/versions/k1l2m3n4o5p6_add_investments.py (new), main.py, requirements.txt, web/src/api/investments.js (new), web/src/hooks/useInvestments.js (new), web/src/components/InvestmentsPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, tests/test_investments.py (new), PRD.md, progress.txt
+
 ## Phase 8.1 — AI/LLM-Powered Financial Advice [DONE] 2026-04-08
 - `POST /insights/ai-review?month=YYYY-MM` streams Claude's analysis as Server-Sent Events (SSE) using `anthropic` SDK (claude-haiku-4-5-20251001)
 - Sends only anonymised category-level data to Claude: income totals, spending totals per category, savings rate, over-budget flags — no raw expense names

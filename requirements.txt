@@ -22,6 +22,7 @@ structlog>=24.1.0
 boto3>=1.34.0
 redis>=5.0.0
 anthropic>=0.52.0
+yfinance>=0.2.40
 
 # Testing
 pytest>=7.4.0

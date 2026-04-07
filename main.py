@@ -33,7 +33,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router, investments as investments_router
 import email_utils
 from collections import defaultdict
 
@@ -681,6 +681,7 @@ app.include_router(insights_router.router)
 app.include_router(export_router.router)
 app.include_router(audit_router.router)
 app.include_router(currency_router.router)
+app.include_router(investments_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)
@@ -771,6 +772,39 @@ def send_monthly_digests(session_factory):
         db.close()
 
 
+def sync_all_investment_prices(session_factory):
+    """Daily job: sync latest prices for all active investment holdings with a ticker."""
+    db = session_factory()
+    try:
+        from database import Investment, InvestmentPrice, User
+        from routers.investments import fetch_price_for_ticker
+
+        users = db.query(User).filter(User.deleted_at == None).all()
+        total = 0
+        for user in users:
+            holdings = (
+                db.query(Investment)
+                .filter(Investment.user_id == user.id, Investment.deleted_at == None)
+                .all()
+            )
+            for holding in holdings:
+                if not holding.ticker:
+                    continue
+                price = fetch_price_for_ticker(holding.ticker)
+                if price is None:
+                    continue
+                snap = InvestmentPrice(investment_id=holding.id, price=price)
+                db.add(snap)
+                total += 1
+        if total:
+            db.commit()
+        logger.info("Investment price sync complete — %d price(s) updated", total)
+    except Exception:
+        logger.exception("Investment price sync job failed")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def _start_scheduler():
     from routers.recurring import generate_all_recurring
@@ -813,11 +847,21 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    _scheduler.add_job(
+        sync_all_investment_prices,
+        "cron",
+        hour=16,
+        minute=30,
+        id="sync_investment_prices",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
         "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC, "
-        "monthly digest on 1st of month at 08:00 UTC"
+        "monthly digest on 1st of month at 08:00 UTC, "
+        "investment price sync at 16:30 UTC"
     )
 
 

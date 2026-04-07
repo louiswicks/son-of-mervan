@@ -171,3 +171,54 @@ class AuditLogResponse(BaseModel):
     # {"before": null|{...}, "after": null|{...}}
     changed_fields: Optional[Dict] = None
     timestamp: datetime
+
+
+# ---------- Investments ----------
+
+VALID_ASSET_TYPES = {"stock", "etf", "fund", "crypto", "other"}
+
+
+class InvestmentCreate(BaseModel):
+    name: str
+    ticker: Optional[str] = None
+    asset_type: str = "stock"   # stock | etf | fund | crypto | other
+    units: float
+    purchase_price: float        # price per unit at time of purchase
+    currency: str = "GBP"
+    notes: Optional[str] = None
+
+
+class InvestmentUpdate(BaseModel):
+    name: Optional[str] = None
+    ticker: Optional[str] = None
+    asset_type: Optional[str] = None
+    units: Optional[float] = None
+    purchase_price: Optional[float] = None
+    currency: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class InvestmentResponse(BaseModel):
+    id: int
+    name: str
+    ticker: Optional[str]
+    asset_type: str
+    units: float
+    purchase_price: float
+    currency: str
+    notes: Optional[str]
+    current_price: Optional[float]   # latest synced price (None if never synced)
+    current_value: Optional[float]   # units × current_price
+    cost_basis: float                # units × purchase_price
+    gain_loss: Optional[float]       # current_value − cost_basis
+    gain_loss_pct: Optional[float]   # (gain_loss / cost_basis) × 100
+    last_price_at: Optional[datetime]
+    created_at: datetime
+
+
+class InvestmentPortfolioSummary(BaseModel):
+    total_cost: float
+    total_value: Optional[float]
+    total_gain_loss: Optional[float]
+    total_gain_loss_pct: Optional[float]
+    holdings_count: int

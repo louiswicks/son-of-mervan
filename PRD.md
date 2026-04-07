@@ -354,10 +354,11 @@ Previously out of scope items now included as future roadmap.
 **Solution:** `Household` model with invite-based membership. Role: `owner` (full access) or `member` (read + own expenses). Shared `MonthlyData` with per-member expense attribution. Split expense view showing each member's contribution.
 **Acceptance Criteria:** Owner can invite a member by email. Member can view shared budget but not edit owner's individual expenses. Household budget totals across both members' expenses.
 
-### 8.3 Investment Portfolio Tracking
+### 8.3 Investment Portfolio Tracking [DONE 2026-04-08]
 **Problem:** Net Worth (7.2) covers bank accounts and liabilities but not investment holdings.
 **Solution:** Manual entry of holdings (stock ticker, fund name, units held, purchase price). Daily price sync from a free API (Yahoo Finance fallback). Portfolio value shown on Net Worth dashboard as a distinct asset class. Unrealised gain/loss per holding.
 **Acceptance Criteria:** User can add a holding by ticker. Current value updates daily. Net worth dashboard reflects portfolio value. No auto-trading or recommendations.
+**Result:** `Investment` + `InvestmentPrice` models with Fernet encryption on financial fields. `routers/investments.py` — full CRUD + manual sync endpoint. APScheduler job at 16:30 UTC syncs prices via yfinance. `/investments` page with summary cards (holdings count, total cost, portfolio value, unrealised gain/loss), holdings table with buy price/current price/value/gain%, add/edit/delete modals. 21 new tests. 265 backend tests total, 86.95% coverage.
 
 ### 8.4 Tax Filing Integration
 **Problem:** Users cannot use their expense data for self-assessment tax returns without manual re-entry.

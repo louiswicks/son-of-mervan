@@ -564,6 +564,90 @@ class ExchangeRate(Base):
     )
 
 
+class Investment(Base):
+    """
+    A single investment holding (stock, ETF, fund, crypto, etc.).
+    Ticker is stored unencrypted for price-sync lookups.
+    All financial fields (units, purchase price) are encrypted at rest.
+    """
+    __tablename__ = "investments"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Public ticker symbol — not encrypted (required for Yahoo Finance price sync)
+    ticker = Column(String(20), nullable=True)  # nullable for funds/assets without a ticker
+
+    # Asset type: stock | etf | fund | crypto | other
+    asset_type = Column(String(16), nullable=False, default="stock")
+
+    # Currency of the investment (ISO 4217)
+    currency = Column(String(3), nullable=False, default="GBP")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
+    # ENCRYPTED fields
+    _name_encrypted = Column("name_encrypted", String(512), nullable=False)
+    _units_encrypted = Column("units_encrypted", String(512), nullable=False)
+    _purchase_price_encrypted = Column("purchase_price_encrypted", String(512), nullable=False)
+    _notes_encrypted = Column("notes_encrypted", String(512), nullable=True)
+
+    user = relationship("User")
+    prices = relationship("InvestmentPrice", back_populates="investment", cascade="all, delete-orphan")
+
+    @hybrid_property
+    def name(self):
+        return decrypt_value(self._name_encrypted) if self._name_encrypted else None
+
+    @name.setter
+    def name(self, value):
+        self._name_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def units(self):
+        val = decrypt_value(self._units_encrypted) if self._units_encrypted else "0.0"
+        return float(val)
+
+    @units.setter
+    def units(self, value):
+        self._units_encrypted = encrypt_value(str(value))
+
+    @hybrid_property
+    def purchase_price(self):
+        val = decrypt_value(self._purchase_price_encrypted) if self._purchase_price_encrypted else "0.0"
+        return float(val)
+
+    @purchase_price.setter
+    def purchase_price(self, value):
+        self._purchase_price_encrypted = encrypt_value(str(value))
+
+    @hybrid_property
+    def notes(self):
+        return decrypt_value(self._notes_encrypted) if self._notes_encrypted else None
+
+    @notes.setter
+    def notes(self, value):
+        self._notes_encrypted = encrypt_value(value) if value else None
+
+
+class InvestmentPrice(Base):
+    """
+    Daily price snapshot for an investment holding.
+    Stored as plaintext float — price data alone is not personally identifying.
+    """
+    __tablename__ = "investment_prices"
+    id = Column(Integer, primary_key=True, index=True)
+    investment_id = Column(Integer, ForeignKey("investments.id"), nullable=False)
+
+    # Price per unit in the investment's currency
+    price = Column(Float, nullable=False)
+
+    # When this price was fetched
+    fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    investment = relationship("Investment", back_populates="prices")
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)
