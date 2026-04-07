@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react';
 import './index.css';
 import App from './App.jsx';
 import reportWebVitals from './reportWebVitals';
+import { register as registerSW } from './serviceWorkerRegistration';
 
 // Sentry is only active when REACT_APP_SENTRY_DSN is set at build time.
 // Leave the variable unset in local development to keep the console clean.
@@ -30,3 +31,4 @@ root.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+registerSW();

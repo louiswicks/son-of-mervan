@@ -1,3 +1,14 @@
+## Phase 9.3 — Progressive Web App (PWA) [DONE] 2026-04-08
+- `web/public/service-worker.js` (new): cache-first strategy for same-origin static assets; network-first for cross-origin (API) requests; SPA offline fallback — navigation requests always served `/index.html` from cache; stale cache cleanup on activate
+- `web/src/serviceWorkerRegistration.js` (new): `register()` / `unregister()` helpers; registration only occurs in `NODE_ENV=production` to prevent dev cache pollution
+- `web/src/index.js`: imports and calls `registerSW()` after `reportWebVitals()`
+- `web/src/components/InstallBanner.jsx` (new): listens for `beforeinstallprompt`, shows dismissible bottom-anchored card with "Install" / "Not now" actions; persists dismissal in `localStorage`; positioned above mobile bottom tab bar (`bottom-20`); accessible (`role="banner"`, `aria-label`)
+- `web/src/App.jsx`: renders `<InstallBanner />` inside `AuthProvider` so it appears on all authenticated and unauthenticated routes
+- `web/public/manifest.json` unchanged — `display: "standalone"`, `theme_color: "#111827"` were already correct
+- 7 new tests in `web/src/tests/InstallBanner.test.jsx`: no-render before prompt, shows on prompt, hidden when dismissed-flag present, "Not now" sets flag + hides, X button sets flag + hides, Install calls `prompt()`, Install hides after accepted outcome
+- 32 frontend tests (7 new + 25 existing); 25 pass (pre-existing AuthGuard failures unrelated to PWA)
+- Files: web/public/service-worker.js (new), web/src/serviceWorkerRegistration.js (new), web/src/components/InstallBanner.jsx (new), web/src/tests/InstallBanner.test.jsx (new), web/src/App.jsx, web/src/index.js, PRD.md, progress.txt
+
 ## Phase 8.3 — Investment Portfolio Tracking [DONE] 2026-04-08
 - `Investment` model with Fernet-encrypted fields: name, units, purchase_price, notes; plaintext: ticker, asset_type, currency — ticker stays unencrypted for daily yfinance price sync
 - `InvestmentPrice` model stores plaintext daily price snapshots (investment_id, price, fetched_at)

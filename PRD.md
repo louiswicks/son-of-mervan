@@ -425,7 +425,7 @@ Previously out of scope items now included as future roadmap.
 **Scope:** Step 1 — salary entry; Step 2 — pick 3–5 expense categories from presets; Step 3 — confirm & save. Show only on first login (tracked via `has_completed_onboarding` flag on User).
 **Result:** `has_completed_onboarding` boolean added to `User` model (default `False`; Alembic migration `l2m3n4o5p6q7` sets all existing users to `True`). `UserProfileResponse` and `UpdateProfileRequest` extended. 3-step `OnboardingWizard.jsx`: (1) Welcome with feature highlights, (2) currency picker + salary input + category tile checkboxes (8 presets), (3) confirmation summary + "Start Budgeting". On complete: creates current-month budget via `POST /calculate-budget?commit=true` then `PUT /users/me { has_completed_onboarding: true }`. `AuthGuard.jsx` fetches profile after auth restore and redirects new users to `/onboarding`. Existing users bypass the wizard (migration + flag check). 9 new tests; 274 total, 87.09% coverage.
 
-### 9.3 Progressive Web App (PWA) [PENDING]
+### 9.3 Progressive Web App (PWA) [DONE 2026-04-08]
 **Goal:** Make the app installable and provide offline access to the last-loaded budget page.  
 **Scope:** `manifest.json`, service worker (cache-first for static assets, network-first for API), install prompt banner.
 
