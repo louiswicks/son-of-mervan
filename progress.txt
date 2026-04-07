@@ -516,3 +516,25 @@
 - 12 new tests in `TestDigestEnabledField`, `TestSendMonthlyDigests`, `TestSendMonthlyDigestEmailDevMode` covering: default true, disable/re-enable persistence, skip no-data, skip opted-out, skip deleted, over-budget detection, multi-user send, dev-mode logging
 - 244 backend tests pass, 86.68% coverage; ruff clean on all changed files
 - Files: `database.py`, `alembic/versions/j0k1l2m3n4o5_*.py`, `email_utils.py`, `main.py`, `routers/users.py`, `web/src/components/AccountSettings.jsx`, `tests/test_digest.py`, `PRD.md`, `progress.txt`
+
+## Phase 9.2 — Onboarding Wizard [DONE] 2026-04-08
+- Added `has_completed_onboarding` (bool, default False) to `User` model in `database.py`
+- Alembic migration `l2m3n4o5p6q7_add_onboarding_flag.py`:
+  - Adds column with `server_default='0'` for new users
+  - Data migration sets all *existing* users to `1` so they are not redirected to the wizard after deploy
+- `UserProfileResponse` extended with `has_completed_onboarding: bool`
+- `UpdateProfileRequest` extended with `has_completed_onboarding: bool | None = None`
+- `GET /users/me` and `PUT /users/me` both handle the new field; `bool()` cast for SQLite compatibility
+- `useProfile(options = {})` in `hooks/useProfile.js` now accepts React Query option overrides (used by AuthGuard to set `enabled`)
+- `OnboardingWizard.jsx` — 3-step wizard at `/onboarding`:
+  - Step 1: Welcome screen with 4 app feature highlights and "Get started" CTA + "Skip" link
+  - Step 2: Currency selector (from `/currency/list`), monthly income input (validated ≥ 0), category tile checkboxes (8 presets: Housing, Transportation, Food, Utilities, Insurance, Healthcare, Entertainment, Other)
+  - Step 3: Confirmation summary (currency, income, selected categories) + "Start Budgeting" button
+  - On complete: `POST /calculate-budget?commit=true` (current month, all categories at £0) then `PUT /users/me { base_currency, has_completed_onboarding: true }`; React Query profile cache updated via `setQueryData`; navigate to `/budget` with success toast
+  - Auth guard built-in: redirects to `/login` if unauthenticated, to `/budget` if already completed
+- `router.jsx` — `/onboarding` added as a top-level route (outside AuthGuard, has its own auth/state logic)
+- `AuthGuard.jsx` — imports `useProfile`; fetches profile after session restore with `enabled: isAuthenticated && !loading`; redirects to `/onboarding` when `has_completed_onboarding === false`; shows spinner while profile loads for first time (cached for 5 min after)
+- 9 new tests in `tests/test_onboarding.py` (class `TestOnboardingFlag`):
+  - Response includes field; default false for new users; PUT persists true; GET reflects persisted value; can reset to false; preserves other fields; omitting field leaves it unchanged; unauthenticated GET/PUT → 401/403
+- Test result: 274 tests pass (was 244), 87.09% coverage (was 86.68%)
+- Files changed: database.py, alembic/versions/l2m3n4o5p6q7_add_onboarding_flag.py, routers/users.py, web/src/hooks/useProfile.js, web/src/components/OnboardingWizard.jsx, web/src/router.jsx, web/src/components/AuthGuard.jsx, tests/test_onboarding.py, PRD.md, progress.txt

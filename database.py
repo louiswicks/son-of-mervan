@@ -89,6 +89,9 @@ class User(Base):
     # Monthly email digest opt-in (default True — new users receive the digest)
     digest_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
 
+    # Onboarding wizard completion flag (default False — new users see the wizard)
+    has_completed_onboarding = Column(Boolean, nullable=False, default=False, server_default="0")
+
     months = relationship("MonthlyData", back_populates="owner", cascade="all, delete-orphan")
     
     # Hybrid property for transparent encryption/decryption

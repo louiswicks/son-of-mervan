@@ -18,6 +18,7 @@ import InsightsPage from "./components/InsightsPage";
 import ScenarioPlannerPage from "./components/ScenarioPlannerPage";
 import InvestmentsPage from "./components/InvestmentsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
+import OnboardingWizard from "./components/OnboardingWizard";
 
 function withPageBoundary(element) {
   return <ErrorBoundary key={element.type?.name}>{element}</ErrorBoundary>;
@@ -29,6 +30,7 @@ export const router = createHashRouter([
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/verify-email", element: <VerifyEmailPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/onboarding", element: <OnboardingWizard /> },
   {
     path: "/",
     element: <AuthGuard />,

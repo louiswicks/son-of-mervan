@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
+import { useProfile } from "../hooks/useProfile";
 import {
   useNotifications,
   useMarkRead,
@@ -327,7 +328,13 @@ export default function AuthGuard() {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Fetch profile only after auth is confirmed so we can check onboarding status.
+  // staleTime keeps this instant on subsequent navigations.
+  const { data: profile, isLoading: profileLoading } = useProfile({
+    enabled: isAuthenticated && !loading,
+  });
+
+  if (loading || (isAuthenticated && profileLoading && !profile)) {
     return (
       <div className="min-h-dvh bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white" />
@@ -337,6 +344,11 @@ export default function AuthGuard() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // First-time users must complete onboarding before accessing the app.
+  if (profile && profile.has_completed_onboarding === false) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return (

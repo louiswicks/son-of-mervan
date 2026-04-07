@@ -23,11 +23,13 @@ class UserProfileResponse(BaseModel):
     username: str | None
     base_currency: str
     digest_enabled: bool
+    has_completed_onboarding: bool
 
 class UpdateProfileRequest(BaseModel):
     username: str | None = None
     base_currency: str | None = None
     digest_enabled: bool | None = None
+    has_completed_onboarding: bool | None = None
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
@@ -64,6 +66,7 @@ def get_profile(user: User = Depends(_get_current_user)):
         "username": user.username,
         "base_currency": user.base_currency or "GBP",
         "digest_enabled": user.digest_enabled if user.digest_enabled is not None else True,
+        "has_completed_onboarding": bool(user.has_completed_onboarding),
     }
 
 
@@ -84,6 +87,8 @@ def update_profile(
         user.base_currency = code
     if payload.digest_enabled is not None:
         user.digest_enabled = payload.digest_enabled
+    if payload.has_completed_onboarding is not None:
+        user.has_completed_onboarding = payload.has_completed_onboarding
     db.commit()
     db.refresh(user)
     return {
@@ -91,6 +96,7 @@ def update_profile(
         "username": user.username,
         "base_currency": user.base_currency or "GBP",
         "digest_enabled": user.digest_enabled if user.digest_enabled is not None else True,
+        "has_completed_onboarding": bool(user.has_completed_onboarding),
     }
 
 

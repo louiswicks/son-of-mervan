@@ -2,11 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProfile, updateProfile, changePassword, deleteAccount } from '../api/users';
 import toast from 'react-hot-toast';
 
-export function useProfile() {
+export function useProfile(options = {}) {
   return useQuery({
     queryKey: ['profile'],
     queryFn: getProfile,
     staleTime: 5 * 60 * 1000,
+    ...options,
   });
 }
 
