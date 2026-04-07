@@ -197,3 +197,70 @@ class TestSpendingPace:
         # Authenticated user has no data, so no Housing warning from second_user
         warning_cats = [w["category"] for w in body["warnings"]]
         assert "Housing" not in warning_cats
+
+
+class TestSuggestCategory:
+    def test_missing_name_returns_422(self, auth_client):
+        r = auth_client.get("/insights/suggest-category")
+        assert r.status_code == 422
+
+    def test_name_too_short_returns_422(self, auth_client):
+        r = auth_client.get("/insights/suggest-category?name=a")
+        assert r.status_code == 422
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/suggest-category?name=tesco")
+        assert r.status_code in (401, 403)
+
+    def test_no_history_returns_null_suggestion(self, auth_client):
+        r = auth_client.get("/insights/suggest-category?name=tesco")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["suggestion"] is None
+        assert body["count"] == 0
+
+    def test_returns_most_common_category(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-01")
+        make_expense(db, month, name="Tesco", category="Food", planned=50.0, actual=50.0)
+        make_expense(db, month, name="Tesco Express", category="Food", planned=30.0, actual=30.0)
+        make_expense(db, month, name="Tesco Metro", category="Housing", planned=10.0, actual=10.0)
+
+        r = auth_client.get("/insights/suggest-category?name=Tesco")
+        assert r.status_code == 200
+        body = r.json()
+        # "Tesco" substring matches all 3 expenses; Food appears twice, Housing once
+        assert body["suggestion"] == "Food"
+        assert body["count"] == 2
+        assert body["total_matches"] == 3
+
+    def test_case_insensitive_matching(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-02")
+        make_expense(db, month, name="Netflix", category="Entertainment", planned=15.0, actual=15.0)
+
+        r = auth_client.get("/insights/suggest-category?name=netflix")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["suggestion"] == "Entertainment"
+
+    def test_only_own_history(self, auth_client, db, second_user):
+        month = make_month(db, second_user, month="2026-03")
+        make_expense(db, month, name="Gym", category="Healthcare", planned=40.0, actual=40.0)
+
+        # auth_client user has no "Gym" expense in their own history
+        r = auth_client.get("/insights/suggest-category?name=Gym")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["suggestion"] is None
+
+    def test_deleted_expenses_not_counted(self, auth_client, db, verified_user):
+        from datetime import datetime
+        month = make_month(db, verified_user, month="2026-04")
+        exp = make_expense(db, month, name="Spotify", category="Entertainment", planned=10.0, actual=10.0)
+        # Soft-delete the expense
+        exp.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.get("/insights/suggest-category?name=Spotify")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["suggestion"] is None

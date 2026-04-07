@@ -1,5 +1,5 @@
 // src/components/RecurringExpensesPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, RefreshCw, X, Check } from "lucide-react";
 import {
   useRecurring,
@@ -10,6 +10,7 @@ import {
 } from "../hooks/useRecurring";
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
+import { useCategorySuggestion } from "../hooks/useInsights";
 
 const CATEGORIES = [
   "Housing", "Transportation", "Food", "Utilities",
@@ -40,6 +41,13 @@ function toISOInput(dt) {
 }
 
 function FormRow({ value, onChange, onSubmit, onCancel, submitLabel, isPending }) {
+  const [debouncedName, setDebouncedName] = useState(value.name);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedName(value.name), 300);
+    return () => clearTimeout(timer);
+  }, [value.name]);
+  const { data: categorySuggestion } = useCategorySuggestion(debouncedName);
+
   return (
     <div className="bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded-xl p-4 mb-4 shadow-sm">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -61,6 +69,17 @@ function FormRow({ value, onChange, onSubmit, onCancel, submitLabel, isPending }
           >
             {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
           </select>
+          {categorySuggestion?.suggestion && (
+            <button
+              type="button"
+              onClick={() => onChange("category", categorySuggestion.suggestion)}
+              className="mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 whitespace-nowrap"
+              title={`Based on ${categorySuggestion.count} past expense${categorySuggestion.count !== 1 ? 's' : ''}`}
+              aria-label={`Suggest category: ${categorySuggestion.suggestion}`}
+            >
+              Suggested: {categorySuggestion.suggestion}
+            </button>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Amount (£)</label>

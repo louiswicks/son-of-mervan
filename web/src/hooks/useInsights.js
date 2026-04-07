@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace } from "../api/insights";
+import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace, suggestCategory } from "../api/insights";
 
 export function useMonthlySummary(month) {
   return useQuery({
@@ -32,5 +32,16 @@ export function useSpendingPace(month) {
     queryFn: () => getSpendingPace(month),
     enabled: !!month,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useCategorySuggestion(name) {
+  const trimmed = (name || "").trim();
+  return useQuery({
+    queryKey: ["insights-suggest-category", trimmed],
+    queryFn: () => suggestCategory(trimmed),
+    enabled: trimmed.length >= 2,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

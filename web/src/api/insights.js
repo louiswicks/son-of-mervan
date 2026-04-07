@@ -11,3 +11,6 @@ export const getSpendingHeatmap = (year) =>
 
 export const getSpendingPace = (month) =>
   client.get("/insights/pace", { params: { month } }).then((r) => r.data);
+
+export const suggestCategory = (name) =>
+  client.get("/insights/suggest-category", { params: { name } }).then((r) => r.data);

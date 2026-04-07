@@ -339,6 +339,55 @@ def spending_heatmap(
     }
 
 
+@router.get("/suggest-category")
+def suggest_category(
+    name: str = Query(..., min_length=2, description="Expense name (min 2 chars)"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Return the most frequently used category for the given expense name,
+    based solely on the authenticated user's own history.
+
+    Matching is case-insensitive substring: "tesco" matches "Tesco Express".
+    Returns null suggestion when there are fewer than 2 history matches.
+    """
+    user = _require_user(db, current_user)
+
+    all_monthly = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    if not all_monthly:
+        return {"suggestion": None, "count": 0, "total_matches": 0}
+
+    monthly_ids = [m.id for m in all_monthly]
+    expenses = (
+        db.query(MonthlyExpense)
+        .filter(
+            MonthlyExpense.monthly_data_id.in_(monthly_ids),
+            MonthlyExpense.deleted_at == None,  # noqa: E711
+        )
+        .all()
+    )
+
+    name_lower = name.strip().lower()
+    category_counts: Dict[str, int] = {}
+    for expense in expenses:
+        exp_name = (expense.name or "").lower()
+        if name_lower in exp_name:
+            cat = expense.category or "Other"
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    if not category_counts:
+        return {"suggestion": None, "count": 0, "total_matches": 0}
+
+    best_category = max(category_counts, key=lambda c: category_counts[c])
+    total = sum(category_counts.values())
+    return {
+        "suggestion": best_category,
+        "count": category_counts[best_category],
+        "total_matches": total,
+    }
+
+
 @router.get("/pace")
 def spending_pace(
     month: str = Query(..., description="Month in YYYY-MM format"),

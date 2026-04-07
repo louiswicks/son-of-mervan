@@ -14,7 +14,7 @@ import { exportCSV, exportPDF } from "../api/export";
 import { useExpenseAudit } from "../hooks/useAudit";
 import { useProfile } from "../hooks/useProfile";
 import { currencySymbol, useCurrencies } from "../hooks/useCurrency";
-import { useSpendingPace } from "../hooks/useInsights";
+import { useSpendingPace, useCategorySuggestion } from "../hooks/useInsights";
 
 const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
@@ -164,6 +164,27 @@ const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
         </div>
       </div>
     </div>
+  );
+};
+
+const CategorySuggestionChip = ({ name, onAccept }) => {
+  const [debouncedName, setDebouncedName] = useState(name);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedName(name), 300);
+    return () => clearTimeout(timer);
+  }, [name]);
+  const { data } = useCategorySuggestion(debouncedName);
+  if (!data?.suggestion) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => onAccept(data.suggestion)}
+      className="mt-1 block text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 whitespace-nowrap"
+      title={`Based on ${data.count} past expense${data.count !== 1 ? 's' : ''}`}
+      aria-label={`Suggest category: ${data.suggestion}`}
+    >
+      Suggested: {data.suggestion}
+    </button>
   );
 };
 
@@ -463,23 +484,35 @@ const MonthlyTracker = () => {
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       {isEditing ? (
-                        <select
-                          value={editDraft.category}
-                          onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
-                          className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
-                        >
-                          {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <>
+                          <select
+                            value={editDraft.category}
+                            onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                            className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                          >
+                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <CategorySuggestionChip
+                            name={editDraft.name}
+                            onAccept={(cat) => setEditDraft(d => ({ ...d, category: cat }))}
+                          />
+                        </>
                       ) : row.builtin ? (
                         <span className="font-semibold text-gray-800 dark:text-gray-200">{row.category}</span>
                       ) : (
-                        <select
-                          value={row.category}
-                          onChange={(e) => handleUpdate(i, 'category', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
-                        >
-                          {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <>
+                          <select
+                            value={row.category}
+                            onChange={(e) => handleUpdate(i, 'category', e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                          >
+                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <CategorySuggestionChip
+                            name={row.name}
+                            onAccept={(cat) => handleUpdate(i, 'category', cat)}
+                          />
+                        </>
                       )}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -674,23 +707,35 @@ const MonthlyTracker = () => {
                     <tr key={`${row.id ?? 'new'}-${row.category}-${i}`} className="border-t dark:border-gray-700 dark:text-gray-200">
                       <td className="p-3 font-medium whitespace-nowrap">
                         {isEditing ? (
-                          <select
-                            value={editDraft.category}
-                            onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
-                            className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                          >
-                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                          <>
+                            <select
+                              value={editDraft.category}
+                              onChange={(e) => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                              className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            >
+                              {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <CategorySuggestionChip
+                              name={editDraft.name}
+                              onAccept={(cat) => setEditDraft(d => ({ ...d, category: cat }))}
+                            />
+                          </>
                         ) : row.builtin && !isEditing ? (
                           row.category
                         ) : (
-                          <select
-                            value={row.category}
-                            onChange={(e) => handleUpdate(i, 'category', e.target.value)}
-                            className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                          >
-                            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                          <>
+                            <select
+                              value={row.category}
+                              onChange={(e) => handleUpdate(i, 'category', e.target.value)}
+                              className="px-2 py-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                            >
+                              {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <CategorySuggestionChip
+                              name={row.name}
+                              onAccept={(cat) => handleUpdate(i, 'category', cat)}
+                            />
+                          </>
                         )}
                       </td>
 
