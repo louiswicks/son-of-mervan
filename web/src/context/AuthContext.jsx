@@ -1,7 +1,7 @@
 // src/context/AuthContext.jsx
 // AuthProvider runs the session-restore side effect on mount.
 // All auth state lives in authStore (Zustand) — no React Context needed.
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { refreshSession, logout as apiLogout } from '../api/auth';
 
