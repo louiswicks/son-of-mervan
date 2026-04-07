@@ -294,17 +294,19 @@ All core features, security hardening, infrastructure, and testing are complete.
 
 These features separate a solid budgeting app from a category leader.
 
-### 7.1 Envelope Budgeting
+### 7.1 Envelope Budgeting [DONE 2026-04-06]
 **Problem:** Users plan a monthly budget but have no mechanism for zero-based allocation — assigning every pound of income to a specific purpose at the start of the month.
 **Solution:** `Envelope` model with `name`, `allocated_amount`, `spent_amount` per month. UI to set up envelopes at month start, with visual fill bars showing remaining vs spent. Overspending one envelope borrows from unallocated balance. Backend: new `routers/envelopes.py` + migration. Frontend: new `/envelopes` page.
 **Inspiration:** YNAB's core methodology.
 **Acceptance Criteria:** User can create envelopes summing to their salary. Spending an expense deducts from the correct envelope. UI shows remaining balance per envelope in real time.
+**Result:** Envelope model, CRUD router, and `/envelopes` frontend page complete. 204 tests pass, 87% coverage.
 
-### 7.2 Net Worth Dashboard
+### 7.2 Net Worth Dashboard [DONE 2026-04-06]
 **Problem:** The app tracks cash flow but not overall financial position — the single most meaningful long-term metric.
 **Solution:** `Asset` and `Liability` models (manual entry: property value, savings account balance, car, mortgage, credit card, student loan). Monthly snapshot stored for trending. Dashboard widget shows total net worth + month-over-month delta. Recharts area chart for 12-month history.
 **Inspiration:** Mint, Copilot.
 **Acceptance Criteria:** User can add/edit/delete assets and liabilities. Net worth = assets − liabilities. Historical chart shows at least 3 months of data when available.
+**Result:** Asset/Liability models, monthly snapshots, net worth dashboard widget, and 12-month area chart complete. 204 tests pass, 87% coverage.
 
 ### 7.3 "What If" Scenario Planner [DONE 2026-04-07]
 **Problem:** Users cannot explore how small changes compound into large outcomes over time.
@@ -340,11 +342,12 @@ These features separate a solid budgeting app from a category leader.
 
 Previously out of scope items now included as future roadmap.
 
-### 8.1 AI/LLM-Powered Financial Advice
+### 8.1 AI/LLM-Powered Financial Advice [DONE 2026-04-08]
 **Problem:** Data is displayed but not interpreted with nuance — rule-based insights can only go so far.
 **Solution:** Integrate Claude API (claude-sonnet-4-6) to generate plain-English monthly financial summaries and personalised coaching tips. User triggers "Get AI Review" on the insights page; their anonymised monthly summary (no raw names/amounts) is sent to Claude with a structured prompt. Response streamed to the UI.
 **Constraints:** Opt-in only. No PII sent to the API. Rate-limited to 3 requests/day per user.
 **Acceptance Criteria:** User receives a coherent 3–5 sentence financial summary with at least one actionable recommendation. Response streams progressively to the UI.
+**Result:** `POST /insights/ai-review` streams SSE via `anthropic` SDK (claude-haiku-4-5). Rate-limited 3/day/user via Redis (in-memory fallback). Anonymised category+amount data only — no expense names. `AIReviewSection` on InsightsPage with streaming cursor, error handling, and daily-use counter. 232 backend tests pass, 86.37% coverage.
 
 ### 8.2 Multi-User Household Accounts
 **Problem:** Couples and households need a shared budget view, but currently each user is fully isolated.

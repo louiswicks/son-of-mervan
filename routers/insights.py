@@ -1,10 +1,12 @@
 # routers/insights.py
 import calendar
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 
 from database import get_db, User, MonthlyData, MonthlyExpense, SavingsGoal, SavingsContribution
@@ -13,6 +15,10 @@ from security import verify_token
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/insights", tags=["insights"])
+
+MAX_AI_REVIEWS_PER_DAY = 3
+# In-memory fallback for rate limiting when Redis is unavailable (resets on restart)
+_ai_review_counts: Dict[str, int] = {}
 
 
 # -------------------- helpers --------------------
@@ -636,3 +642,174 @@ def spending_pace(
         "overall": overall,
         "warnings": warnings,
     }
+
+
+# -------------------- AI review helpers --------------------
+
+def _check_and_increment_ai_rate_limit(user_id: int) -> tuple[bool, int]:
+    """
+    Check and increment the AI review rate limit for today.
+    Returns (allowed, remaining_after_this_call).
+    Uses Redis if available, falls back to in-memory dict.
+    """
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    key = f"ai_review:{user_id}:{today}"
+
+    # Try Redis atomic increment first
+    try:
+        from core.cache import _get_client  # noqa: PLC0415
+        redis_client = _get_client()
+        if redis_client is not None:
+            count = redis_client.incr(key)
+            if count == 1:
+                redis_client.expire(key, 86400)
+            remaining = max(0, MAX_AI_REVIEWS_PER_DAY - count)
+            return count <= MAX_AI_REVIEWS_PER_DAY, remaining
+    except Exception:
+        logger.warning("Redis rate limit check failed, falling back to in-memory")
+
+    # In-memory fallback
+    current = _ai_review_counts.get(key, 0) + 1
+    _ai_review_counts[key] = current
+    remaining = max(0, MAX_AI_REVIEWS_PER_DAY - current)
+    return current <= MAX_AI_REVIEWS_PER_DAY, remaining
+
+
+def _build_ai_prompt(context: Dict[str, Any]) -> str:
+    """Build the anonymised prompt sent to Claude. No raw expense names are included."""
+    month = context["month"]
+    currency = context["currency"]
+    salary_planned = context["salary_planned"]
+    salary_actual = context["salary_actual"]
+    total_planned = context["total_planned"]
+    total_actual = context["total_actual"]
+    savings_rate = context["savings_rate"]
+    categories = context["categories"]
+    health_score = context.get("health_score")
+
+    lines = [
+        f"You are a friendly, encouraging personal finance coach reviewing a user's budget for {month}.",
+        "Provide a concise financial summary (3–5 sentences) followed by 2–3 specific, actionable recommendations.",
+        "Be warm but honest. Do not mention any merchant names or specific transaction details.",
+        "Keep your entire response under 220 words.",
+        "",
+        f"Monthly Overview ({currency}):",
+        f"  Income:   planned {salary_planned:.2f}, actual {salary_actual:.2f}",
+        f"  Spending: planned {total_planned:.2f}, actual {total_actual:.2f}",
+        f"  Savings rate this month: {savings_rate:.1f}%",
+    ]
+
+    if health_score is not None:
+        lines.append(f"  Financial health score: {health_score}/100")
+
+    lines.append("")
+    lines.append("Category Breakdown:")
+    for cat, data in categories.items():
+        variance_pct = data.get("variance_pct")
+        pct_str = f" ({variance_pct:+.1f}% vs plan)" if variance_pct is not None else ""
+        over = " [OVER BUDGET]" if data.get("over_budget") else ""
+        lines.append(
+            f"  {cat}: planned {data['planned']:.2f}, actual {data['actual']:.2f}{pct_str}{over}"
+        )
+
+    return "\n".join(lines)
+
+
+async def _stream_ai_review(context: Dict[str, Any]):
+    """Async generator that yields SSE-formatted chunks from Claude."""
+    from core.config import settings  # noqa: PLC0415
+
+    if not settings.ANTHROPIC_API_KEY:
+        yield f"data: {json.dumps({'error': 'AI review is not configured on this server.'})}\n\n"
+        return
+
+    prompt = _build_ai_prompt(context)
+
+    try:
+        import anthropic  # noqa: PLC0415
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        async with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=350,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield f"data: {json.dumps({'chunk': text})}\n\n"
+        yield f"data: {json.dumps({'done': True})}\n\n"
+    except Exception as exc:
+        logger.error("AI review streaming failed: %s", exc)
+        yield f"data: {json.dumps({'error': 'AI review failed. Please try again later.'})}\n\n"
+
+
+# -------------------- AI review endpoint --------------------
+
+@router.post("/ai-review")
+async def ai_financial_review(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Generate an AI-powered monthly financial review using Claude.
+
+    Opt-in endpoint — rate-limited to 3 requests per user per day.
+    Anonymised category-level data is sent to Claude; no raw expense names are included.
+    Response streams as Server-Sent Events (SSE).
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    allowed, remaining = _check_and_increment_ai_rate_limit(user.id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"AI review limit reached. You have {MAX_AI_REVIEWS_PER_DAY} reviews per day.",
+            headers={"X-RateLimit-Remaining": "0", "Retry-After": "86400"},
+        )
+
+    # Gather anonymised context — no raw expense names
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+    cat_data = _category_totals(db, month_row)
+
+    salary_planned = float(month_row.salary_planned or 0.0) if month_row else 0.0
+    salary_actual = float(month_row.salary_actual or 0.0) if month_row else 0.0
+    total_planned = float(month_row.total_planned or 0.0) if month_row else 0.0
+    total_actual = float(month_row.total_actual or 0.0) if month_row else 0.0
+    savings_rate = (
+        max(0.0, (salary_actual - total_actual) / salary_actual * 100.0)
+        if salary_actual > 0 else 0.0
+    )
+
+    categories: Dict[str, Any] = {}
+    for cat, v in cat_data.items():
+        planned = v["planned"]
+        actual = v["actual"]
+        variance_pct = ((actual - planned) / planned * 100.0) if planned > 0 else None
+        categories[cat] = {
+            "planned": round(planned, 2),
+            "actual": round(actual, 2),
+            "variance_pct": round(variance_pct, 1) if variance_pct is not None else None,
+            "over_budget": actual > planned and planned > 0,
+        }
+
+    context: Dict[str, Any] = {
+        "month": month_norm,
+        "currency": user.base_currency or "GBP",
+        "salary_planned": round(salary_planned, 2),
+        "salary_actual": round(salary_actual, 2),
+        "total_planned": round(total_planned, 2),
+        "total_actual": round(total_actual, 2),
+        "savings_rate": round(savings_rate, 1),
+        "categories": categories,
+    }
+
+    return StreamingResponse(
+        _stream_ai_review(context),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "X-RateLimit-Remaining": str(remaining),
+        },
+    )

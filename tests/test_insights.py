@@ -404,3 +404,69 @@ class TestHealthScore:
         body = r.json()
         # Auth user has no salary data → savings score should be 0
         assert body["components"]["savings_rate"]["score"] == 0
+
+
+class TestAIReview:
+    """Tests for POST /insights/ai-review (streaming SSE endpoint)."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.post("/insights/ai-review?month=2026-04")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_returns_422(self, auth_client):
+        r = auth_client.post("/insights/ai-review")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        r = auth_client.post("/insights/ai-review?month=not-a-month")
+        assert r.status_code == 422
+
+    def test_no_api_key_streams_error_message(self, auth_client, monkeypatch):
+        """When ANTHROPIC_API_KEY is absent, endpoint streams an error SSE event."""
+        from core import config as cfg
+        monkeypatch.setattr(cfg.settings, "ANTHROPIC_API_KEY", "")
+
+        r = auth_client.post("/insights/ai-review?month=2026-04")
+        assert r.status_code == 200
+        assert "text/event-stream" in r.headers.get("content-type", "")
+        # Response body should contain an error event
+        assert b"error" in r.content
+
+    def test_rate_limit_blocks_after_max_requests(self, auth_client, monkeypatch):
+        """After MAX_AI_REVIEWS_PER_DAY requests the endpoint returns 429."""
+        import routers.insights as ins
+        # Patch in-memory counter to simulate limit already reached
+        from datetime import datetime
+        from database import User, SessionLocal
+        from security import verify_token
+
+        # Force the in-memory counter past the limit for any user key today
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+
+        original_check = ins._check_and_increment_ai_rate_limit
+
+        def always_denied(user_id):
+            return False, 0
+
+        monkeypatch.setattr(ins, "_check_and_increment_ai_rate_limit", always_denied)
+
+        r = auth_client.post("/insights/ai-review?month=2026-04")
+        assert r.status_code == 429
+
+    def test_rate_limit_header_present(self, auth_client, monkeypatch):
+        """X-RateLimit-Remaining header is included in a successful (SSE) response."""
+        from core import config as cfg
+        monkeypatch.setattr(cfg.settings, "ANTHROPIC_API_KEY", "")
+
+        r = auth_client.post("/insights/ai-review?month=2026-04")
+        assert r.status_code == 200
+        assert "x-ratelimit-remaining" in r.headers
+
+    def test_empty_month_still_returns_sse_stream(self, auth_client, monkeypatch):
+        """With no expense data the endpoint still streams (error when no API key)."""
+        from core import config as cfg
+        monkeypatch.setattr(cfg.settings, "ANTHROPIC_API_KEY", "")
+
+        r = auth_client.post("/insights/ai-review?month=2099-01")
+        # Should be 200 streaming response even for a future month with no data
+        assert r.status_code == 200

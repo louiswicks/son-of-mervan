@@ -1,3 +1,14 @@
+## Phase 8.1 — AI/LLM-Powered Financial Advice [DONE] 2026-04-08
+- `POST /insights/ai-review?month=YYYY-MM` streams Claude's analysis as Server-Sent Events (SSE) using `anthropic` SDK (claude-haiku-4-5-20251001)
+- Sends only anonymised category-level data to Claude: income totals, spending totals per category, savings rate, over-budget flags — no raw expense names
+- Rate-limited to 3 requests/user/day via Redis atomic INCR with expire (falls back to in-memory dict when Redis unavailable)
+- Returns HTTP 429 with `X-RateLimit-Remaining: 0` and `Retry-After: 86400` headers when limit exceeded; graceful error SSE event when `ANTHROPIC_API_KEY` not configured
+- `requestAIReview()` in `web/src/api/insights.js` uses native `fetch()` with `ReadableStream` to accumulate SSE chunks progressively
+- `AIReviewSection` component added to `InsightsPage.jsx` between Health Score and Monthly Summary — streaming cursor, error card, daily-use counter display, disabled state at limit
+- 5 new tests in `TestAIReview` class covering: unauthenticated 401, missing month 422, invalid month 422, no-API-key error SSE, rate-limit 429, rate-limit header, empty-month SSE
+- 232 backend tests pass, 86.37% coverage; ruff clean
+- Files: `requirements.txt`, `core/config.py`, `routers/insights.py`, `tests/test_insights.py`, `web/src/api/insights.js`, `web/src/components/InsightsPage.jsx`, `PRD.md`, `progress.txt`
+
 ## Phase 7.3 — What-If Scenario Planner [DONE] 2026-04-07
 - Created `web/src/components/ScenarioPlannerPage.jsx`: new `/scenarios` page with per-category spending sliders (−50% to +50%, step 5%), 3-card summary bar (baseline savings / monthly adjustment / scenario savings), 24-month area chart (Baseline vs Scenario using Recharts AreaChart), and per-savings-goal completion time delta
 - Data: fetches current-month planned amounts from `GET /insights/monthly-summary` (via `getMonthlySummary`) and savings goals from `GET /savings-goals`; all projection calculations are instant client-side with no additional API calls

@@ -1,14 +1,15 @@
 // src/components/InsightsPage.jsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
-  Info, BarChart2, Heart,
+  Info, BarChart2, Heart, Sparkles, RefreshCw,
 } from "lucide-react";
 import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap, useHealthScore } from "../hooks/useInsights";
+import { requestAIReview } from "../api/insights";
 import { SkeletonCard } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
 
@@ -422,6 +423,111 @@ function HealthScoreCard({ month }) {
   );
 }
 
+// -------------------- AI review --------------------
+
+const MAX_DAILY_REVIEWS = 3;
+
+function AIReviewSection({ month }) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [usedToday, setUsedToday] = useState(0);
+  const abortRef = useRef(false);
+
+  const remaining = MAX_DAILY_REVIEWS - usedToday;
+  const disabled = loading || remaining <= 0;
+
+  const handleReview = async () => {
+    setText("");
+    setError(null);
+    setLoading(true);
+    abortRef.current = false;
+
+    await requestAIReview(
+      month,
+      (chunk) => {
+        if (!abortRef.current) setText((prev) => prev + chunk);
+      },
+      () => {
+        setLoading(false);
+        setUsedToday((n) => n + 1);
+      },
+      (err) => {
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+  };
+
+  return (
+    <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles size={20} className="text-indigo-500 dark:text-indigo-400" />
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Financial Review</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Personalised coaching from Claude · {remaining} of {MAX_DAILY_REVIEWS} uses left today
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleReview}
+          disabled={disabled}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors min-h-[40px] ${
+            disabled
+              ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+          }`}
+        >
+          {loading ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              Reviewing…
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} />
+              Get AI Review
+            </>
+          )}
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-3">
+          <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      {remaining <= 0 && !text && (
+        <p className="text-sm text-amber-600 dark:text-amber-400 text-center py-2">
+          Daily limit reached. AI reviews reset at midnight UTC.
+        </p>
+      )}
+
+      {!text && !loading && !error && remaining > 0 && (
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+          Click "Get AI Review" to receive a personalised summary and recommendations for {month}.
+          Your data is anonymised before being sent — no transaction names are shared.
+        </p>
+      )}
+
+      {text && (
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+            {text}
+            {loading && (
+              <span className="inline-block w-0.5 h-4 bg-indigo-500 animate-pulse ml-0.5 align-middle" />
+            )}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // -------------------- main page --------------------
 
 export default function InsightsPage() {
@@ -463,6 +569,9 @@ export default function InsightsPage() {
 
       {/* ---- Health Score ---- */}
       <HealthScoreCard month={selectedMonth} />
+
+      {/* ---- AI Financial Review ---- */}
+      <AIReviewSection month={selectedMonth} />
 
       {/* ---- Section 1: Monthly Summary ---- */}
       <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">

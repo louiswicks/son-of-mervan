@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     # Redis URL for caching — leave empty to run without cache (safe for local dev)
     REDIS_URL: str = ""
+    # Anthropic API key for AI financial review — leave empty to disable (safe for local dev)
+    ANTHROPIC_API_KEY: str = ""
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
