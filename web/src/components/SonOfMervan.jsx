@@ -88,139 +88,115 @@ export default function SonOfMervan() {
   };
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-900 p-3 sm:p-4">
-      <div className="mx-auto w-full max-w-6xl space-y-4 sm:space-y-6">
-        {/* Header */}
-        <header className="text-center py-3 sm:py-6">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100">Son Of Mervan</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">There are two sides to every dollar</p>
-        </header>
+    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 p-3 sm:p-6">
+      <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
 
         {/* Inputs Card */}
-        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-4 sm:p-6 md:p-8">
-          <div className="flex items-center mb-4 sm:mb-6">
-            <DollarSign className="text-blue-500 mr-2 sm:mr-3" size={22} />
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
-              Financial Information
+        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-7">
+          <div className="flex items-center gap-2 mb-5">
+            <DollarSign className="text-blue-500 shrink-0" size={20} />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Son Of Mervan
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {/* Salary */}
-            <div className="space-y-2 sm:space-y-3">
-              <label className="block text-sm font-semibold text-gray-700">
-                Monthly Salary (£)
-              </label>
+          {/* Salary */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              Monthly take-home salary (£)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-medium select-none">£</span>
               <input
                 inputMode="decimal"
                 pattern="[0-9]*[.]?[0-9]*"
                 value={salary}
-                onChange={(e) =>
-                  setSalary(e.target.value.replace(/[^\d.]/g, ""))
-                }
-                className="w-full px-3 py-3 sm:py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                placeholder="e.g. 2500"
+                onChange={(e) => setSalary(e.target.value.replace(/[^\d.]/g, ""))}
+                className="w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400"
+                placeholder="0.00"
               />
             </div>
+          </div>
 
-            {/* Expenses */}
-            <div className="space-y-2 sm:space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Monthly Expenses
-                </label>
-                <button
-                  type="button"
-                  onClick={addExpense}
-                  className="inline-flex items-center text-blue-600 hover:text-blue-800 font-semibold px-3 py-2 rounded-lg hover:bg-blue-50 transition"
-                >
-                  <PlusCircle size={18} className="mr-2" />
-                  Add
-                </button>
-              </div>
+          {/* Expenses */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Monthly expenses
+              </label>
+              <button
+                type="button"
+                onClick={addExpense}
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
+              >
+                <PlusCircle size={15} />
+                Add row
+              </button>
+            </div>
 
-              <div className="max-h-72 sm:max-h-64 overflow-y-auto space-y-2.5">
-                {expenses.map((exp, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-gray-50 dark:bg-gray-700 px-3 py-3 rounded-xl items-center"
-                  >
-                    <input
-                      className="sm:col-span-5 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-                      placeholder="Expense name"
-                      value={exp.name}
-                      onChange={(e) => updateExpense(i, "name", e.target.value)}
-                    />
+            {/* Column headers */}
+            <div className="hidden sm:grid grid-cols-12 gap-2 px-1 mb-1">
+              <span className="col-span-5 text-xs text-gray-400 dark:text-gray-500 font-medium">Name</span>
+              <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Amount</span>
+              <span className="col-span-4 text-xs text-gray-400 dark:text-gray-500 font-medium">Category</span>
+            </div>
+
+            <div className="space-y-2">
+              {expenses.map((exp, i) => (
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <input
+                    className="sm:col-span-5 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 text-sm"
+                    placeholder="e.g. Rent"
+                    value={exp.name}
+                    onChange={(e) => updateExpense(i, "name", e.target.value)}
+                  />
+                  <div className="sm:col-span-3 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none">£</span>
                     <input
                       inputMode="decimal"
                       pattern="[0-9]*[.]?[0-9]*"
-                      className="sm:col-span-2 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-                      placeholder="£"
+                      className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 text-sm"
+                      placeholder="0.00"
                       value={exp.amount}
-                      onChange={(e) =>
-                        updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))
-                      }
+                      onChange={(e) => updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))}
                     />
-                    <select
-                      className="sm:col-span-3 px-3 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-                      value={exp.category}
-                      onChange={(e) => updateExpense(i, "category", e.target.value)}
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="sm:col-span-2 flex justify-end">
-                      {expenses.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeExpense(i)}
-                          className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
-                          aria-label="Remove expense row"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
                   </div>
-                ))}
-              </div>
+                  <select
+                    className="sm:col-span-3 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                    value={exp.category}
+                    onChange={(e) => updateExpense(i, "category", e.target.value)}
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <div className="sm:col-span-1 flex justify-end sm:justify-center">
+                    {expenses.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeExpense(i)}
+                        className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                        aria-label="Remove row"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    ) : <div className="w-8" />}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Calculate button */}
-          <div className="mt-5 sm:mt-8">
-            <div className="md:hidden sticky bottom-20 sm:bottom-3 z-20">
-              <button
-                onClick={doCalculate}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-3 rounded-xl shadow-lg active:scale-[.99] transition disabled:opacity-60"
-              >
-                {loading ? "Calculating…" : (
-                  <span className="inline-flex items-center justify-center">
-                    <Calculator className="mr-2" size={18} />
-                    Calculate Budget
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="hidden md:flex justify-center">
-              <button
-                onClick={doCalculate}
-                disabled={loading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition disabled:opacity-60"
-              >
-                {loading ? "Calculating…" : (
-                  <span className="inline-flex items-center">
-                    <Calculator className="mr-2" size={18} />
-                    Calculate Budget
-                  </span>
-                )}
-              </button>
-            </div>
+          <div className="mt-6">
+            <button
+              onClick={doCalculate}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <Calculator size={17} />
+              {loading ? "Calculating…" : "Calculate Budget"}
+            </button>
           </div>
         </section>
 

@@ -67,9 +67,8 @@ describe('SonOfMervan', () => {
 
   test('renders salary input and at least one expense row', () => {
     renderSonOfMervan();
-    expect(screen.getByPlaceholderText(/e\.g\. 2500/i)).toBeInTheDocument();
-    // The expense name input placeholder
-    expect(screen.getByPlaceholderText(/expense name/i)).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText(/0\.00/i).length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText(/e\.g\. rent/i)).toBeInTheDocument();
   });
 
   test('no results shown initially (no "Monthly Salary" result card)', () => {
@@ -77,33 +76,27 @@ describe('SonOfMervan', () => {
     expect(screen.queryByText('Monthly Salary')).not.toBeInTheDocument();
   });
 
-  test('"Add" button adds a new expense row', () => {
+  test('"Add row" button adds a new expense row', () => {
     renderSonOfMervan();
-    const nameInputsBefore = screen.getAllByPlaceholderText(/expense name/i);
-    fireEvent.click(screen.getByRole('button', { name: /add/i }));
-    const nameInputsAfter = screen.getAllByPlaceholderText(/expense name/i);
+    const nameInputsBefore = screen.getAllByPlaceholderText(/e\.g\. rent/i);
+    fireEvent.click(screen.getByRole('button', { name: /add row/i }));
+    const nameInputsAfter = screen.getAllByPlaceholderText(/e\.g\. rent/i);
     expect(nameInputsAfter.length).toBe(nameInputsBefore.length + 1);
   });
 
   test('Calculate button calls mutateAsync with correct payload', async () => {
     renderSonOfMervan();
 
-    // Fill in salary
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. 2500/i), {
-      target: { value: '3000' },
-    });
+    // Fill in salary — first 0.00 placeholder is the salary field
+    const allInputs = screen.getAllByPlaceholderText(/0\.00/i);
+    fireEvent.change(allInputs[0], { target: { value: '3000' } });
 
     // Fill in one expense
-    const nameInput = screen.getByPlaceholderText(/expense name/i);
+    const nameInput = screen.getByPlaceholderText(/e\.g\. rent/i);
     fireEvent.change(nameInput, { target: { value: 'Rent' } });
+    fireEvent.change(allInputs[1], { target: { value: '1000' } });
 
-    // Amount input is the £ placeholder input
-    const amountInputs = screen.getAllByPlaceholderText(/^£$/);
-    fireEvent.change(amountInputs[0], { target: { value: '1000' } });
-
-    // Click "Calculate Budget" — there may be two buttons (mobile + desktop)
-    const calcButtons = screen.getAllByRole('button', { name: /calculate budget/i });
-    fireEvent.click(calcButtons[0]);
+    fireEvent.click(screen.getByRole('button', { name: /calculate budget/i }));
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
@@ -122,19 +115,14 @@ describe('SonOfMervan', () => {
   test('after mutateAsync resolves with results, shows result cards', async () => {
     renderSonOfMervan();
 
-    // Fill salary so the payload is valid
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. 2500/i), {
-      target: { value: '3000' },
-    });
+    const allInputs = screen.getAllByPlaceholderText(/0\.00/i);
+    fireEvent.change(allInputs[0], { target: { value: '3000' } });
 
-    // Fill expense
-    const nameInput = screen.getByPlaceholderText(/expense name/i);
+    const nameInput = screen.getByPlaceholderText(/e\.g\. rent/i);
     fireEvent.change(nameInput, { target: { value: 'Rent' } });
-    const amountInputs = screen.getAllByPlaceholderText(/^£$/);
-    fireEvent.change(amountInputs[0], { target: { value: '1000' } });
+    fireEvent.change(allInputs[1], { target: { value: '1000' } });
 
-    const calcButtons = screen.getAllByRole('button', { name: /calculate budget/i });
-    fireEvent.click(calcButtons[0]);
+    fireEvent.click(screen.getByRole('button', { name: /calculate budget/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Monthly Salary')).toBeInTheDocument();
