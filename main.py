@@ -177,10 +177,8 @@ async def root():
     return {"message": "Son of Mervan Budget API is running", "status": "healthy"}
 
 @app.get("/health")
-async def health(db: Session = Depends(get_db)):
+async def health():
     """Health check endpoint used by Docker and Railway."""
-    # Verify DB connectivity with a lightweight query
-    db.execute(text("SELECT 1"))
     return {"status": "ok", "version": "1.0.0"}
 
 @app.post("/login", response_model=LoginResponse)
