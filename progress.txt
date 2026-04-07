@@ -1,3 +1,10 @@
+## Phase 1.1 — Remove Debug/Migration HTTP Endpoints [DONE] 2026-04-07
+- Debug HTTP routes (`/run-migration`, `/cleanup-old-columns`, `/debug/check-month/{month}`) were already removed from `main.py` in earlier phases; CLI equivalents exist in `scripts/migrate.py`
+- Replaced the remaining `print()` call in `core/config.py` with `logging.basicConfig` + `logging.critical()` — no `print()` calls remain in application code
+- `core/logging_config.py` and `scripts/migrate.py` already existed with correct implementations
+- 206 tests pass; ruff clean (only pre-existing alembic import warnings unrelated to this change)
+- Files changed: `core/config.py`, `PRD.md`
+
 ## Phase 6.1 — Budget Page UI Redesign [DONE] 2026-04-07
 - Fixed column header misalignment in `SonOfMervan.jsx`: Category header was `col-span-4` but the select was `col-span-3`; corrected to `col-span-3` with an explicit `col-span-1` spacer for the delete button column so headers now align exactly with inputs on desktop
 - Added explicit `sm:hidden` labels (Name, Amount, Category) inside each expense row — visible on mobile, hidden on desktop where the shared column header row provides context

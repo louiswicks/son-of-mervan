@@ -63,7 +63,7 @@ All core features, security hardening, infrastructure, and testing are complete.
 ## Phase 1: Critical Security Fixes
 **Priority: Blocker — must complete before any public users**
 
-### 1.1 Remove Debug/Migration HTTP Endpoints
+### 1.1 Remove Debug/Migration HTTP Endpoints [DONE 2026-04-07]
 **Problem:** Routes like `/run-migration`, `/cleanup-old-columns`, `/debug/check-month/{month}` are exposed as live HTTP endpoints. Any caller can trigger destructive database operations.  
 **Solution:** Extract to CLI scripts (`scripts/migrate.py`), never mounted as HTTP routes. Remove all `print()` statements; replace with Python `logging` module.  
 **Files:** `main.py`, new `scripts/migrate.py`, new `core/logging_config.py`  

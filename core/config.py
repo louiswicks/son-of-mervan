@@ -50,10 +50,11 @@ def get_settings() -> Settings:
     try:
         return Settings()
     except Exception as e:
-        print(
-            f"\n[FATAL] Configuration error — application cannot start:\n  {e}\n"
-            f"  Set the missing environment variables and restart.\n",
-            file=sys.stderr,
+        logging.basicConfig(level=logging.CRITICAL)
+        logging.critical(
+            "[FATAL] Configuration error — application cannot start: %s  "
+            "Set the missing environment variables and restart.",
+            e,
         )
         sys.exit(1)
 
