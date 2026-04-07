@@ -429,9 +429,10 @@ Previously out of scope items now included as future roadmap.
 **Goal:** Make the app installable and provide offline access to the last-loaded budget page.  
 **Scope:** `manifest.json`, service worker (cache-first for static assets, network-first for API), install prompt banner.
 
-### 9.4 Budget Templates [PENDING]
+### 9.4 Budget Templates [DONE 2026-04-08]
 **Goal:** Let users bootstrap their budget from popular frameworks (50/30/20, Zero-Based, etc.) rather than starting blank.  
 **Scope:** Template selector on the Budget page pre-fills category rows; user adjusts amounts before saving.
+**Result:** Added `BUDGET_TEMPLATES` constant (4 templates: 50/30/20 Rule, Zero-Based, Minimalist, Student Budget) to `SonOfMervan.jsx`. "Use Template" button opens a modal with template cards showing name, description, savings percentage, and per-category allocations. Selecting a template replaces expense rows with template rows; amounts are auto-calculated if salary is already entered (percentage of salary), else left blank. Modal closes on selection or close button or backdrop click. 7 new frontend tests added in `SonOfMervan.test.jsx` (13 total in that suite, all passing). No backend changes required.
 
 ### 9.5 Annual Financial Calendar [PENDING]
 **Goal:** Visualise upcoming recurring expenses and savings goal deadlines on a calendar so users can anticipate cash-flow pressure.  

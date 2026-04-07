@@ -129,4 +129,76 @@ describe('SonOfMervan', () => {
       expect(screen.getByText('Total Expenses')).toBeInTheDocument();
     });
   });
+
+  describe('Budget Templates', () => {
+    test('"Use Template" button is visible', () => {
+      renderSonOfMervan();
+      expect(screen.getByRole('button', { name: /use template/i })).toBeInTheDocument();
+    });
+
+    test('clicking "Use Template" opens the template modal', () => {
+      renderSonOfMervan();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Choose a Budget Template')).toBeInTheDocument();
+    });
+
+    test('modal shows all four templates', () => {
+      renderSonOfMervan();
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      expect(screen.getByText('50/30/20 Rule')).toBeInTheDocument();
+      expect(screen.getByText('Zero-Based')).toBeInTheDocument();
+      expect(screen.getByText('Minimalist')).toBeInTheDocument();
+      expect(screen.getByText('Student Budget')).toBeInTheDocument();
+    });
+
+    test('close button dismisses the modal', () => {
+      renderSonOfMervan();
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /close template selector/i }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    test('selecting the 50/30/20 template populates expense rows', () => {
+      renderSonOfMervan();
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      const useButtons = screen.getAllByRole('button', { name: /use this template/i });
+      fireEvent.click(useButtons[0]); // 50/30/20
+      // Modal should close
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      // Expense rows should now contain template names
+      expect(screen.getByDisplayValue('Rent / Mortgage')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Groceries')).toBeInTheDocument();
+    });
+
+    test('applying template with salary pre-filled calculates amounts', () => {
+      renderSonOfMervan();
+      // Enter salary first
+      const allInputs = screen.getAllByPlaceholderText(/0\.00/i);
+      fireEvent.change(allInputs[0], { target: { value: '2000' } });
+
+      // Apply minimalist template (Housing 35% of 2000 = 700)
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      const useButtons = screen.getAllByRole('button', { name: /use this template/i });
+      fireEvent.click(useButtons[2]); // Minimalist
+
+      // Housing row: 35% of 2000 = 700
+      expect(screen.getByDisplayValue('700')).toBeInTheDocument();
+    });
+
+    test('applying template with no salary leaves amounts blank', () => {
+      renderSonOfMervan();
+      fireEvent.click(screen.getByRole('button', { name: /use template/i }));
+      const useButtons = screen.getAllByRole('button', { name: /use this template/i });
+      fireEvent.click(useButtons[2]); // Minimalist
+      // All amount fields should be empty
+      const amountInputs = screen.getAllByPlaceholderText(/0\.00/i);
+      // First is salary (still empty), rest are expense amounts (also empty)
+      amountInputs.forEach((input) => {
+        expect(input.value).toBe('');
+      });
+    });
+  });
 });

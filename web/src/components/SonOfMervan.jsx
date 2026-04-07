@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from "react";
 import {
   PlusCircle, Calculator, Trash2, TrendingUp,
-  DollarSign, PieChart
+  DollarSign, PieChart, LayoutTemplate, X
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid,
@@ -16,12 +16,76 @@ const CATEGORIES = [
   "Healthcare","Entertainment","Other"
 ];
 
+const BUDGET_TEMPLATES = [
+  {
+    id: "50-30-20",
+    name: "50/30/20 Rule",
+    description: "50% needs · 30% wants · 20% savings — a classic balanced approach.",
+    savings_pct: 20,
+    expenses: [
+      { name: "Rent / Mortgage", category: "Housing",        pct: 25 },
+      { name: "Groceries",       category: "Food",           pct: 10 },
+      { name: "Transport",       category: "Transportation",  pct: 8  },
+      { name: "Utilities",       category: "Utilities",      pct: 4  },
+      { name: "Insurance",       category: "Insurance",      pct: 3  },
+      { name: "Entertainment",   category: "Entertainment",  pct: 15 },
+      { name: "Healthcare",      category: "Healthcare",     pct: 5  },
+      { name: "Other",           category: "Other",          pct: 10 },
+    ],
+  },
+  {
+    id: "zero-based",
+    name: "Zero-Based",
+    description: "Every pound is allocated — income minus expenses equals zero.",
+    savings_pct: 15,
+    expenses: [
+      { name: "Rent / Mortgage", category: "Housing",        pct: 30 },
+      { name: "Groceries",       category: "Food",           pct: 12 },
+      { name: "Transport",       category: "Transportation",  pct: 10 },
+      { name: "Utilities",       category: "Utilities",      pct: 6  },
+      { name: "Insurance",       category: "Insurance",      pct: 5  },
+      { name: "Healthcare",      category: "Healthcare",     pct: 7  },
+      { name: "Entertainment",   category: "Entertainment",  pct: 10 },
+      { name: "Savings",         category: "Other",          pct: 15 },
+      { name: "Other",           category: "Other",          pct: 5  },
+    ],
+  },
+  {
+    id: "minimalist",
+    name: "Minimalist",
+    description: "Essentials only — maximise savings by cutting discretionary spend.",
+    savings_pct: 30,
+    expenses: [
+      { name: "Rent / Mortgage", category: "Housing",        pct: 35 },
+      { name: "Groceries",       category: "Food",           pct: 15 },
+      { name: "Transport",       category: "Transportation",  pct: 10 },
+      { name: "Utilities",       category: "Utilities",      pct: 5  },
+      { name: "Other",           category: "Other",          pct: 5  },
+    ],
+  },
+  {
+    id: "student",
+    name: "Student Budget",
+    description: "For those on tight budgets — essentials first with a little fun.",
+    savings_pct: 10,
+    expenses: [
+      { name: "Rent",            category: "Housing",        pct: 40 },
+      { name: "Groceries",       category: "Food",           pct: 20 },
+      { name: "Transport",       category: "Transportation",  pct: 10 },
+      { name: "Entertainment",   category: "Entertainment",  pct: 8  },
+      { name: "Healthcare",      category: "Healthcare",     pct: 5  },
+      { name: "Other",           category: "Other",          pct: 7  },
+    ],
+  },
+];
+
 export default function SonOfMervan() {
   const [salary, setSalary] = useState("");
   const [expenses, setExpenses] = useState([
     { name: "", amount: "", category: "Housing" },
   ]);
   const [results, setResults] = useState(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const calculateMutation = useCalculateBudget();
 
@@ -33,6 +97,18 @@ export default function SonOfMervan() {
 
   const updateExpense = (i, field, value) =>
     setExpenses((xs) => xs.map((x, j) => (j === i ? { ...x, [field]: value } : x)));
+
+  const applyTemplate = (template) => {
+    const salaryNum = parseFloat(salary) || 0;
+    setExpenses(
+      template.expenses.map((e) => ({
+        name: e.name,
+        category: e.category,
+        amount: salaryNum > 0 ? String(Math.round((salaryNum * e.pct) / 100)) : "",
+      }))
+    );
+    setShowTemplateModal(false);
+  };
 
   const doCalculate = async () => {
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -124,14 +200,24 @@ export default function SonOfMervan() {
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
                 Monthly expenses
               </label>
-              <button
-                type="button"
-                onClick={addExpense}
-                className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
-              >
-                <PlusCircle size={15} />
-                Add row
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(true)}
+                  className="inline-flex items-center gap-1.5 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 transition"
+                >
+                  <LayoutTemplate size={15} />
+                  Use Template
+                </button>
+                <button
+                  type="button"
+                  onClick={addExpense}
+                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
+                >
+                  <PlusCircle size={15} />
+                  Add row
+                </button>
+              </div>
             </div>
 
             {/* Column headers — desktop only */}
@@ -219,6 +305,78 @@ export default function SonOfMervan() {
             </button>
           </div>
         </section>
+
+        {/* Template Modal */}
+        {showTemplateModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Budget template selector"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowTemplateModal(false); }}
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                  <LayoutTemplate className="text-purple-500" size={20} />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Choose a Budget Template
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  aria-label="Close template selector"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {BUDGET_TEMPLATES.map((template) => (
+                  <div
+                    key={template.id}
+                    className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-purple-400 dark:hover:border-purple-500 transition"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                          {template.name}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                          {template.description}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-1 rounded-full">
+                        {template.savings_pct}% savings
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {template.expenses.map((e) => (
+                        <span
+                          key={e.name}
+                          className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full"
+                        >
+                          {e.name} · {e.pct}%
+                        </span>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => applyTemplate(template)}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 rounded-lg transition"
+                    >
+                      Use this template
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results */}
         {results && (

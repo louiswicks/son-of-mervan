@@ -549,3 +549,18 @@
   - Response includes field; default false for new users; PUT persists true; GET reflects persisted value; can reset to false; preserves other fields; omitting field leaves it unchanged; unauthenticated GET/PUT → 401/403
 - Test result: 274 tests pass (was 244), 87.09% coverage (was 86.68%)
 - Files changed: database.py, alembic/versions/l2m3n4o5p6q7_add_onboarding_flag.py, routers/users.py, web/src/hooks/useProfile.js, web/src/components/OnboardingWizard.jsx, web/src/router.jsx, web/src/components/AuthGuard.jsx, tests/test_onboarding.py, PRD.md, progress.txt
+
+## Phase 9.4 — Budget Templates [DONE] 2026-04-08
+- Added `BUDGET_TEMPLATES` constant to `web/src/components/SonOfMervan.jsx` with 4 templates:
+  - **50/30/20 Rule**: Housing 25%, Groceries 10%, Transport 8%, Utilities 4%, Insurance 3%, Entertainment 15%, Healthcare 5%, Other 10% → 20% savings
+  - **Zero-Based**: Housing 30%, Groceries 12%, Transport 10%, Utilities 6%, Insurance 5%, Healthcare 7%, Entertainment 10%, Savings 15%, Other 5% → 0% unallocated
+  - **Minimalist**: Housing 35%, Groceries 15%, Transport 10%, Utilities 5%, Other 5% → 30% savings
+  - **Student Budget**: Rent 40%, Groceries 20%, Transport 10%, Entertainment 8%, Healthcare 5%, Other 7% → 10% savings
+- "Use Template" button (purple, LayoutTemplate icon) added next to "Add row" button in the expense section header
+- Clicking opens a modal (`role="dialog"`) with template cards: name, description, savings-% badge, category pill tags with percentages, and a "Use this template" CTA
+- `applyTemplate(template)` replaces expense rows with template rows; if salary is already entered, amounts are pre-calculated as `Math.round(salary × pct / 100)`; otherwise amounts are left blank for the user to fill
+- Modal dismisses on template selection, close button click, or backdrop click
+- 7 new frontend tests in `web/src/tests/SonOfMervan.test.jsx` (13 total, all passing):
+  - Button visible; modal opens on click; all four templates shown; close button works; 50/30/20 populates rows; salary-based amounts calculated correctly; no salary → blank amounts
+- No backend changes required (templates are hardcoded frontend constants)
+- Files changed: web/src/components/SonOfMervan.jsx, web/src/tests/SonOfMervan.test.jsx, PRD.md, progress.txt
