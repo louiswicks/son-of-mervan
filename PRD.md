@@ -784,7 +784,7 @@ Builds on Smart Categorisation (7.6, DONE) to eliminate the biggest user frictio
 | `TRUELAYER_CLIENT_SECRET` | TrueLayer app client secret |
 | `TRUELAYER_REDIRECT_URI` | OAuth callback URL (e.g. `https://son-of-mervan-production.up.railway.app/banking/callback`) |
 
-### 15.1 Backend — Database Models and Migration
+### 15.1 Backend — Database Models and Migration ✅ DONE
 **Problem:** No DB schema exists to store bank connections or imported transaction drafts.
 **Solution:** Add two new encrypted models to `database.py`:
 - `BankConnection`: `id`, `user_id` (FK), `_provider_encrypted` (e.g. "truelayer"), `_access_token_encrypted`, `_refresh_token_encrypted`, `_account_id_encrypted`, `last_synced_at`, `created_at`, `disconnected_at` (soft-delete)

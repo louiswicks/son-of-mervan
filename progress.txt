@@ -872,3 +872,15 @@
 - `ScenarioPlannerPage.jsx`: Fixed mismatched `</div>` → `</Card>` closing tag introduced during the update.
 
 **Tests:** 51 frontend tests pass; build succeeds (no ESLint errors); commit: `af91eab`
+
+## Phase 15.1 — Backend: BankConnection & BankTransaction DB Models [DONE] 2026-04-08
+
+**Problem solved:** No database schema existed for storing OAuth bank connections or imported transaction drafts needed for open banking integration.
+
+**What was built:**
+- `database.py`: Added `BankConnection` model — stores TrueLayer OAuth tokens (access, refresh), provider name, account ID, last_synced_at, soft-delete via `disconnected_at`. All PII/token fields Fernet-encrypted via hybrid properties.
+- `database.py`: Added `BankTransaction` model — stores imported transactions with `draft/confirmed/rejected` status lifecycle, dedup via `external_id_encrypted`, links to `MonthlyExpense` on confirm. All financial/PII fields encrypted.
+- `alembic/versions/u1v2w3x4y5z6_add_banking_tables.py`: Migration creates both tables with indexes; downgrade drops them cleanly.
+- `.env.example`: Added `TRUELAYER_CLIENT_ID`, `TRUELAYER_CLIENT_SECRET`, `TRUELAYER_REDIRECT_URI` variables.
+
+**Tests:** 481 backend tests pass (all existing tests unaffected); alembic upgrade/downgrade verified; ruff lint clean; commit: `f3ac819`
