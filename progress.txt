@@ -933,4 +933,4 @@
 - `models.py`: Added `BankDisconnectResponse` (id, drafts_deleted, confirmed_preserved).
 - `tests/test_banking.py`: 11 new tests covering: disconnected_at set, correct counts returned, draft hard-delete, confirmed FK nulled, connection excluded from list, 404 on missing/other-user/already-disconnected, revocation POST called with correct URL, graceful proceed on revocation network failure, unauthenticated 4xx.
 
-**Tests:** 541 backend tests pass (91% coverage); ruff lint clean; commit: TBD
+**Tests:** 541 backend tests pass (91% coverage); ruff lint clean; commit: `cd51a0c`
