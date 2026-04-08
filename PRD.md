@@ -528,17 +528,17 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 - [x] SonOfMervan, MonthlyTracker, BudgetAlertsPage dropdowns use dynamic categories
 - [x] 19 backend tests; 348 total; 87.51% coverage
 
-### 11.2 Bank Statement CSV Import
+### 11.2 Bank Statement CSV Import ✅ DONE
 **Goal:** Reduce manual data-entry by letting users import transactions from a bank's exported CSV.  
 **Scope:** `POST /import/csv` multipart endpoint: parse rows, auto-categorise via existing suggest-category logic, return preview payload. `POST /import/csv/confirm` persists confirmed rows. Frontend: ImportPage with file-upload, review table (editable category/amount per row), confirm button. Duplicate detection by name+date+amount within the same month.
 
 **Acceptance Criteria:**
-- [ ] Accepts common bank CSV formats (date, description, amount columns)
-- [ ] Returns preview with suggested category per row (not yet saved)
-- [ ] User can edit category before confirming
-- [ ] Duplicates (same name+amount+month) flagged as warnings, not auto-imported
-- [ ] Persists confirmed rows to monthly_expenses via existing upsert logic
-- [ ] 6+ backend tests; frontend renders review table
+- [x] Accepts common bank CSV formats (date, description, amount columns)
+- [x] Returns preview with suggested category per row (not yet saved)
+- [x] User can edit category before confirming
+- [x] Duplicates (same name+amount+month) flagged as warnings, not auto-imported
+- [x] Persists confirmed rows to monthly_expenses via existing upsert logic
+- [x] 22 backend tests; 370 total; 87.95% coverage; frontend renders review table
 
 ### 11.3 Cashflow Forecasting
 **Goal:** Show users their projected account balance over the next 3–6 months based on income and recurring expenses.  

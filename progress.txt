@@ -1,3 +1,15 @@
+## Phase 11.2 — Bank Statement CSV Import [DONE] 2026-04-08
+- `routers/import_csv.py` (new): `POST /import/csv` multipart endpoint — decodes CSV (UTF-8 with BOM / latin-1 fallback), auto-detects date/description/amount columns from a list of common bank header names, parses dates in 10 formats, converts negative amounts to positive via abs(), keyword-categorises each row against 8-category keyword map, checks duplicates against existing user expenses (name_lower + rounded_amount + month set lookup); returns `CSVPreviewResponse` with rows, total, duplicates_count, parse_errors. `POST /import/csv/confirm` takes confirmed rows, gets-or-creates MonthlyData, upserts expenses by name+category (updates actual_amount if matched, inserts new otherwise), writes AuditLog per row; returns `{ imported, skipped }`. Both endpoints rate-limited (20/min preview, 10/min confirm) and auth-protected.
+- `models.py`: Added `CSVPreviewRow`, `CSVPreviewResponse`, `CSVConfirmRow`, `CSVConfirmRequest`, `CSVImportResult` Pydantic schemas
+- `main.py`: Imported and registered `import_csv_router`
+- `web/src/api/import.js`: `previewCSVImport(file, month)` (multipart) and `confirmCSVImport(rows)` Axios wrappers
+- `web/src/hooks/useImport.js`: `useCSVPreview` and `useCSVConfirm` React Query mutation hooks
+- `web/src/components/ImportPage.jsx`: 3-step flow (upload → preview → done); drag-and-drop or file browser; optional month override; review table with per-row category dropdown (populated from `useCategories`), include checkboxes, select-all, duplicate warning badges; summary stats bar; confirm/start-over buttons
+- `web/src/router.jsx`: Added `/import` route → `ImportPage` with `withPageBoundary`
+- `web/src/components/AuthGuard.jsx`: Added `Upload` lucide icon; added `["/import", "Import", Upload]` to `NAV_TABS`
+- `tests/test_import.py`: 22 tests — unauthenticated 4xx, single-row parse, auto-categorisation (entertainment/food/other), month inferred from date, multi-row, blank lines, zero/negative amounts, empty file 422, missing columns 422, invalid month 422, duplicate detection, non-duplicate not flagged, cross-user isolation, confirm creates expense, confirm skips excluded, confirm updates existing actual, confirm creates MonthlyData when missing, empty rows, invalid month skipped
+- 370 backend tests pass; 87.95% coverage; ruff clean
+
 ## Phase 11.1 — Custom Expense Categories [DONE] 2026-04-08
 - `database.py`: Added `UserCategory` model (id, user_id, name, color, is_default, created_at); names stored unencrypted (labels aren't sensitive, and Fernet non-determinism would break the per-user UNIQUE constraint); `DEFAULT_CATEGORIES` constant defines the 8 built-in entries with hex colours
 - `models.py`: Added `UserCategoryCreate`, `UserCategoryUpdate`, `UserCategoryResponse` Pydantic schemas; imported `Field` from pydantic

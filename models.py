@@ -321,3 +321,40 @@ class UserCategoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- CSV Import ----------
+
+class CSVPreviewRow(BaseModel):
+    row_id: str
+    date: str
+    description: str
+    amount: float
+    month: str  # YYYY-MM
+    suggested_category: str
+    is_duplicate: bool
+
+
+class CSVPreviewResponse(BaseModel):
+    rows: List[CSVPreviewRow]
+    total: int
+    duplicates_count: int
+    parse_errors: int
+
+
+class CSVConfirmRow(BaseModel):
+    row_id: str
+    description: str
+    amount: float
+    month: str  # YYYY-MM
+    category: str
+    include: bool = True
+
+
+class CSVConfirmRequest(BaseModel):
+    rows: List[CSVConfirmRow]
+
+
+class CSVImportResult(BaseModel):
+    imported: int
+    skipped: int
