@@ -1,3 +1,11 @@
+## Phase 15.2 — Open Banking OAuth Flow [DONE] 2026-04-08
+- `core/config.py`: Added `TRUELAYER_CLIENT_ID`, `TRUELAYER_CLIENT_SECRET`, `TRUELAYER_REDIRECT_URI`, `TRUELAYER_SANDBOX` (default True) optional settings
+- `models.py`: Added `BankConnectResponse` (auth_url), `BankConnectionResponse` (id, provider, account_id, last_synced_at, created_at, is_sandbox), `BankConnectionListResponse` Pydantic schemas
+- `routers/banking.py` (new): HMAC-signed CSRF state helpers; `GET /banking/connect` returns TrueLayer auth URL; `GET /banking/callback` validates state, exchanges code for tokens via httpx, fetches first account_id, upserts encrypted `BankConnection`, redirects to frontend `/banking?connected=true`; `POST /banking/refresh/{id}` refreshes stored tokens; `GET /banking/connections` lists active connections (excludes disconnected_at rows, never exposes raw tokens)
+- `main.py`: Imported and registered `banking_router`
+- `tests/test_banking.py` (new): 22 tests across 4 classes — TestConnect (4 tests: 503 when unconfigured, auth_url returned, scopes present, unauthenticated 401), TestCallback (7 tests: creates BankConnection, invalid state 400, missing params 422×2, httpx error 502, 503 unconfigured, upsert on second call), TestRefreshConnection (5 tests: refreshes tokens, 404 not found, 404 wrong user, 503 unconfigured, unauthenticated 401), TestListConnections (6 tests: empty list, returns active, excludes disconnected, no tokens in response, unauthenticated 401, isolates by user)
+- 503 backend tests pass; 91% coverage; ruff clean
+
 ## Phase 13.5 — Active Session Manager [DONE] 2026-04-08
 - `database.py`: Added `user_agent` (Text, nullable) and `last_used_at` (DateTime, nullable) columns to `RefreshToken` model
 - `alembic/versions/t0u1v2w3x4y5_add_session_metadata_to_refresh_tokens.py`: Migration adding both columns to `refresh_tokens` table; down_revision = s9t0u1v2w3x4

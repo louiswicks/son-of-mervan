@@ -795,7 +795,7 @@ All financial and PII fields use Fernet hybrid properties (same pattern as `Mont
 **Files:** `database.py`, new `alembic/versions/*_add_banking_tables.py`
 **Acceptance Criteria:** `alembic upgrade head` creates both tables. `alembic downgrade -1` drops them cleanly. No plaintext tokens visible in a `SELECT *` from either table.
 
-### 15.2 Backend — OAuth Flow (Connect & Callback)
+### 15.2 Backend — OAuth Flow (Connect & Callback) ✅ DONE
 **Problem:** Users need a way to authorise read-only access to their bank account via TrueLayer's OAuth flow.
 **Solution:**
 - `GET /banking/connect` — generates a TrueLayer authorisation URL with scopes `accounts transactions balance` and a CSRF state token; returns `{ auth_url }` for the frontend to redirect to
