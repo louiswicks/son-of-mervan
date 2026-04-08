@@ -919,6 +919,154 @@ class MilestoneNotificationSent(Base):
     user = relationship("User")
 
 
+class BankConnection(Base):
+    """
+    Stores an OAuth-linked bank connection (TrueLayer).
+    All PII and token fields are Fernet-encrypted at rest.
+    """
+    __tablename__ = "bank_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    _provider_encrypted = Column("provider_encrypted", String(512), nullable=True)
+    _access_token_encrypted = Column("access_token_encrypted", Text, nullable=True)
+    _refresh_token_encrypted = Column("refresh_token_encrypted", Text, nullable=True)
+    _account_id_encrypted = Column("account_id_encrypted", String(512), nullable=True)
+
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    disconnected_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    transactions = relationship("BankTransaction", back_populates="bank_connection", cascade="all, delete-orphan")
+
+    @hybrid_property
+    def provider(self):
+        return decrypt_value(self._provider_encrypted) if self._provider_encrypted else None
+
+    @provider.setter
+    def provider(self, value):
+        self._provider_encrypted = encrypt_value(value) if value else None
+
+    @provider.expression
+    def provider(cls):
+        return cls._provider_encrypted
+
+    @hybrid_property
+    def access_token(self):
+        return decrypt_value(self._access_token_encrypted) if self._access_token_encrypted else None
+
+    @access_token.setter
+    def access_token(self, value):
+        self._access_token_encrypted = encrypt_value(value) if value else None
+
+    @access_token.expression
+    def access_token(cls):
+        return cls._access_token_encrypted
+
+    @hybrid_property
+    def refresh_token(self):
+        return decrypt_value(self._refresh_token_encrypted) if self._refresh_token_encrypted else None
+
+    @refresh_token.setter
+    def refresh_token(self, value):
+        self._refresh_token_encrypted = encrypt_value(value) if value else None
+
+    @refresh_token.expression
+    def refresh_token(cls):
+        return cls._refresh_token_encrypted
+
+    @hybrid_property
+    def account_id(self):
+        return decrypt_value(self._account_id_encrypted) if self._account_id_encrypted else None
+
+    @account_id.setter
+    def account_id(self, value):
+        self._account_id_encrypted = encrypt_value(value) if value else None
+
+    @account_id.expression
+    def account_id(cls):
+        return cls._account_id_encrypted
+
+
+class BankTransaction(Base):
+    """
+    A transaction imported from a linked bank account.
+    Status lifecycle: draft → confirmed (linked to MonthlyExpense) or rejected.
+    All PII/financial fields are Fernet-encrypted at rest.
+    """
+    __tablename__ = "bank_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    bank_connection_id = Column(Integer, ForeignKey("bank_connections.id"), nullable=False, index=True)
+    monthly_expense_id = Column(Integer, ForeignKey("monthly_expenses.id"), nullable=True)
+
+    _external_id_encrypted = Column("external_id_encrypted", String(512), nullable=False)
+    _description_encrypted = Column("description_encrypted", String(512), nullable=True)
+    _amount_encrypted = Column("amount_encrypted", String(64), nullable=True)
+    _currency_encrypted = Column("currency_encrypted", String(64), nullable=True)
+
+    transaction_date = Column(Date, nullable=False)
+    suggested_category = Column(String(128), nullable=True)
+    # draft / confirmed / rejected
+    status = Column(String(16), nullable=False, default="draft", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+    bank_connection = relationship("BankConnection", back_populates="transactions")
+
+    @hybrid_property
+    def external_id(self):
+        return decrypt_value(self._external_id_encrypted) if self._external_id_encrypted else None
+
+    @external_id.setter
+    def external_id(self, value):
+        self._external_id_encrypted = encrypt_value(value) if value else None
+
+    @external_id.expression
+    def external_id(cls):
+        return cls._external_id_encrypted
+
+    @hybrid_property
+    def description(self):
+        return decrypt_value(self._description_encrypted) if self._description_encrypted else None
+
+    @description.setter
+    def description(self, value):
+        self._description_encrypted = encrypt_value(value) if value else None
+
+    @description.expression
+    def description(cls):
+        return cls._description_encrypted
+
+    @hybrid_property
+    def amount(self):
+        raw = decrypt_value(self._amount_encrypted) if self._amount_encrypted else None
+        return float(raw) if raw is not None else None
+
+    @amount.setter
+    def amount(self, value):
+        self._amount_encrypted = encrypt_value(str(value)) if value is not None else None
+
+    @amount.expression
+    def amount(cls):
+        return cls._amount_encrypted
+
+    @hybrid_property
+    def currency(self):
+        return decrypt_value(self._currency_encrypted) if self._currency_encrypted else None
+
+    @currency.setter
+    def currency(self, value):
+        self._currency_encrypted = encrypt_value(value) if value else None
+
+    @currency.expression
+    def currency(cls):
+        return cls._currency_encrypted
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),
