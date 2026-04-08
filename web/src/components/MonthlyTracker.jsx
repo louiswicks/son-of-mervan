@@ -199,6 +199,8 @@ const buildRowsFromExpenses = (items, defaultCurrency = 'GBP', categories = FALL
     builtin: categories.includes(e.category),
     name: e.name || '',
     currency: e.currency || defaultCurrency,
+    note: e.note || '',
+    tags: e.tags || [],
   }));
 
   const presentCategories = new Set(serverRows.map(r => r.category));
@@ -295,6 +297,8 @@ const MonthlyTracker = () => {
           builtin: BASE_CATEGORIES.includes(e.category),
           name: e.name || '',
           currency: e.currency || serverCurrency,
+          note: e.note || '',
+          tags: e.tags || [],
         }));
 
     setRows(allRows);
@@ -328,7 +332,7 @@ const MonthlyTracker = () => {
 
   const addRow = () => setRows(prev => [
     ...prev,
-    { id: null, category: 'Other', projected: '', actual: '', builtin: false, name: '', currency: baseCurrency },
+    { id: null, category: 'Other', projected: '', actual: '', builtin: false, name: '', currency: baseCurrency, note: '', tags: [] },
   ]);
 
   const removeRow = (index) => setRows(prev => prev.filter((_, i) => i !== index));
@@ -343,6 +347,8 @@ const MonthlyTracker = () => {
       projected: row.projected || '',
       actual: row.actual || '',
       currency: row.currency || baseCurrency,
+      note: row.note || '',
+      tags: row.tags || [],
     });
   };
 
@@ -364,6 +370,8 @@ const MonthlyTracker = () => {
       projected: draft.projected,
       actual: draft.actual,
       currency: draft.currency || baseCurrency,
+      note: draft.note || '',
+      tags: draft.tags || [],
     };
     setRows(newRows);
     setEditingIndex(null);
@@ -379,6 +387,8 @@ const MonthlyTracker = () => {
             planned_amount: draft.projected !== '' ? Number(draft.projected) : null,
             actual_amount: draft.actual !== '' ? Number(draft.actual) : null,
             currency: draft.currency || baseCurrency,
+            note: draft.note || null,
+            tags: draft.tags && draft.tags.length > 0 ? draft.tags : null,
           },
         });
       } catch {
@@ -792,6 +802,48 @@ const MonthlyTracker = () => {
                     <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">{row.currency}</div>
                   )}
 
+                  {/* Note (mobile) */}
+                  {isEditing && (
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Note (optional)</label>
+                      <textarea
+                        value={editDraft.note || ''}
+                        onChange={(e) => setEditDraft(d => ({ ...d, note: e.target.value }))}
+                        maxLength={500}
+                        rows={2}
+                        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 resize-none"
+                        placeholder="Add a note…"
+                      />
+                    </div>
+                  )}
+                  {!isEditing && row.note && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic truncate">{row.note}</div>
+                  )}
+
+                  {/* Tags (mobile) */}
+                  {isEditing && (
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Tags (up to 5, comma-separated)</label>
+                      <input
+                        type="text"
+                        value={(editDraft.tags || []).join(', ')}
+                        onChange={(e) => {
+                          const parts = e.target.value.split(',').map(t => t.trimStart()).filter(Boolean);
+                          setEditDraft(d => ({ ...d, tags: parts.slice(0, 5) }));
+                        }}
+                        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 min-h-[44px]"
+                        placeholder="e.g. work, reimbursable"
+                      />
+                    </div>
+                  )}
+                  {!isEditing && row.tags && row.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {row.tags.map((t, ti) => (
+                        <span key={ti} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">{t}</span>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Difference + Status */}
                   {hasValues && (
                     <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100 dark:border-gray-700">
@@ -841,6 +893,7 @@ const MonthlyTracker = () => {
                   <th className="p-3 dark:text-gray-200">Projected</th>
                   <th className="p-3 dark:text-gray-200">Actual</th>
                   <th className="p-3 dark:text-gray-200">Currency</th>
+                  <th className="p-3 dark:text-gray-200">Note / Tags</th>
                   <th className="p-3 dark:text-gray-200">Difference</th>
                   <th className="p-3 dark:text-gray-200">Status</th>
                   <th className="p-3"></th>
@@ -979,6 +1032,43 @@ const MonthlyTracker = () => {
                           <span className={`text-xs font-medium ${(row.currency || baseCurrency) !== baseCurrency ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
                             {row.currency || baseCurrency}
                           </span>
+                        )}
+                      </td>
+
+                      {/* Note / Tags column (desktop) */}
+                      <td className="p-3 max-w-[200px]">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-1">
+                            <textarea
+                              value={editDraft.note || ''}
+                              onChange={(e) => setEditDraft(d => ({ ...d, note: e.target.value }))}
+                              maxLength={500}
+                              rows={2}
+                              className="w-full px-2 py-1 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 resize-none"
+                              placeholder="Note…"
+                            />
+                            <input
+                              type="text"
+                              value={(editDraft.tags || []).join(', ')}
+                              onChange={(e) => {
+                                const parts = e.target.value.split(',').map(t => t.trimStart()).filter(Boolean);
+                                setEditDraft(d => ({ ...d, tags: parts.slice(0, 5) }));
+                              }}
+                              className="w-full px-2 py-1 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                              placeholder="Tags (comma-separated)"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {row.note && <span className="text-xs text-gray-500 dark:text-gray-400 italic truncate" title={row.note}>{row.note}</span>}
+                            {row.tags && row.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {row.tags.map((t, ti) => (
+                                  <span key={ti} className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full">{t}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </td>
 

@@ -520,6 +520,8 @@ async def get_monthly_tracker(
             "planned_amount": float(e.planned_amount or 0.0),
             "actual_amount": float(e.actual_amount or 0.0),
             "currency": e.currency or user.base_currency or "GBP",
+            "note": e.note,
+            "tags": e.tags,
         }
         for e in all_expenses
     ]
@@ -563,6 +565,7 @@ async def get_monthly_tracker(
 async def search_expenses(
     q: Optional[str] = Query(None, max_length=200, description="Partial match on expense name (case-insensitive)"),
     category: Optional[str] = Query(None, max_length=100, description="Exact category filter"),
+    tag: Optional[str] = Query(None, max_length=30, description="Exact tag filter"),
     from_month: Optional[str] = Query(None, alias="from", description="Start month YYYY-MM (inclusive)"),
     to_month: Optional[str] = Query(None, alias="to", description="End month YYYY-MM (inclusive)"),
     page: int = Query(1, ge=1, description="Page number (1-based)"),
@@ -611,9 +614,12 @@ async def search_expenses(
         for e in expenses:
             name_dec = e.name or ""
             cat_dec = e.category or ""
+            tags_dec = e.tags  # decrypted list
             if q_lower and q_lower not in name_dec.lower():
                 continue
             if category and cat_dec != category:
+                continue
+            if tag and tag not in tags_dec:
                 continue
             results.append({
                 "id": e.id,
@@ -623,6 +629,8 @@ async def search_expenses(
                 "actual_amount": float(e.actual_amount or 0.0),
                 "currency": e.currency or user.base_currency or "GBP",
                 "month": month_str,
+                "note": e.note,
+                "tags": tags_dec,
             })
 
     # Sort most-recent month first, then by name
@@ -720,6 +728,12 @@ async def update_expense(
         if code not in VALID_CURRENCY_CODES:
             raise HTTPException(status_code=400, detail=f"Unsupported currency code: {code}")
         expense.currency = code
+    if data.note is not None:
+        expense.note = data.note
+    if data.tags is not None:
+        # Enforce per-tag max length of 30 chars
+        cleaned = [t.strip()[:30] for t in data.tags if t.strip()][:5]
+        expense.tags = cleaned
 
     after = _expense_snapshot(expense)
     _write_audit(db, user.id, expense.id, "update", before, after)
@@ -734,6 +748,8 @@ async def update_expense(
         "planned_amount": float(expense.planned_amount or 0.0),
         "actual_amount": float(expense.actual_amount or 0.0),
         "currency": expense.currency or "GBP",
+        "note": expense.note,
+        "tags": expense.tags,
     }
 
 

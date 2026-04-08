@@ -347,3 +347,71 @@ class TestMonthlyTrackerPost:
             "expenses": [{"name": "Rent", "amount": 1000, "category": "Housing"}],
         })
         assert r.json()["remaining_actual"] == 2000.0
+
+
+class TestExpenseNotesTags:
+    """Phase 13.3 — Expense Notes & Tags."""
+
+    def test_update_note_persists(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user)
+        expense = make_expense(db, month)
+
+        r = auth_client.put(f"/expenses/{expense.id}", json={"note": "reimbursable"})
+        assert r.status_code == 200
+        assert r.json()["note"] == "reimbursable"
+
+    def test_update_tags_persists(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user)
+        expense = make_expense(db, month)
+
+        r = auth_client.put(f"/expenses/{expense.id}", json={"tags": ["work", "travel"]})
+        assert r.status_code == 200
+        assert r.json()["tags"] == ["work", "travel"]
+
+    def test_tags_capped_at_five(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user)
+        expense = make_expense(db, month)
+
+        r = auth_client.put(
+            f"/expenses/{expense.id}",
+            json={"tags": ["a", "b", "c", "d", "e", "f"]},
+        )
+        assert r.status_code == 200
+        assert len(r.json()["tags"]) == 5
+
+    def test_tracker_response_includes_note_and_tags(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2027-01")
+        expense = make_expense(db, month, "Rent", "Housing", planned=800.0, actual=0.0)
+        expense.note = "monthly rent"
+        expense.tags = ["housing", "fixed"]
+        db.commit()
+
+        r = auth_client.get("/monthly-tracker/2027-01")
+        assert r.status_code == 200
+        items = r.json()["expenses"]["items"]
+        assert any(
+            e.get("note") == "monthly rent" and "housing" in (e.get("tags") or [])
+            for e in items
+        )
+
+    def test_search_filters_by_tag(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2027-02")
+        expense = make_expense(db, month, "Gym", "Health", planned=50.0, actual=0.0)
+        expense.tags = ["fitness"]
+        db.commit()
+
+        r = auth_client.get("/expenses/search?tag=fitness")
+        assert r.status_code == 200
+        items = r.json()["items"]
+        assert any(e["name"] == "Gym" for e in items)
+
+    def test_search_tag_no_match_returns_empty(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2027-03")
+        expense = make_expense(db, month, "Dinner", "Food", planned=40.0, actual=0.0)
+        expense.tags = ["personal"]
+        db.commit()
+
+        r = auth_client.get("/expenses/search?tag=nonexistent_tag_xyz")
+        assert r.status_code == 200
+        items = r.json()["items"]
+        assert not any(e["name"] == "Dinner" for e in items)

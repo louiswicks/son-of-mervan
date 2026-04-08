@@ -1,4 +1,5 @@
 # database.py
+import json
 import os
 from datetime import datetime
 from cryptography.fernet import Fernet
@@ -254,6 +255,8 @@ class MonthlyExpense(Base):
     _category_encrypted = Column("category_encrypted", String(512), nullable=False)
     _planned_amount_encrypted = Column("planned_amount_encrypted", String(512), default=None)
     _actual_amount_encrypted = Column("actual_amount_encrypted", String(512), default=None)
+    _note_encrypted = Column("note_encrypted", String(1024), nullable=True)
+    _tags_encrypted = Column("tags_encrypted", String(512), nullable=True)
 
     # Currency of this expense (ISO 4217 code); defaults to user's base_currency at save time
     currency = Column(String(3), nullable=False, default="GBP", server_default="GBP")
@@ -297,6 +300,31 @@ class MonthlyExpense(Base):
     @actual_amount.setter
     def actual_amount(self, value):
         self._actual_amount_encrypted = encrypt_value(str(value))
+
+    @hybrid_property
+    def note(self):
+        return decrypt_value(self._note_encrypted) if self._note_encrypted else None
+
+    @note.setter
+    def note(self, value):
+        self._note_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def tags(self):
+        if not self._tags_encrypted:
+            return []
+        raw = decrypt_value(self._tags_encrypted)
+        try:
+            return json.loads(raw)
+        except Exception:
+            return []
+
+    @tags.setter
+    def tags(self, value):
+        if not value:
+            self._tags_encrypted = None
+        else:
+            self._tags_encrypted = encrypt_value(json.dumps(value))
 
 
 class PasswordResetToken(Base):

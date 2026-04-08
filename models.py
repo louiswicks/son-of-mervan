@@ -20,6 +20,8 @@ class ExpenseUpdateRequest(BaseModel):
     planned_amount: Optional[float] = None
     actual_amount: Optional[float] = None
     currency: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = None
 
 class ExpenseResponse(BaseModel):
     id: int
@@ -28,6 +30,8 @@ class ExpenseResponse(BaseModel):
     planned_amount: float
     actual_amount: float
     currency: str = "GBP"
+    note: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
 
 class MonthlyTrackerRequest(BaseModel):
     month: str   # e.g. "2025-08"
