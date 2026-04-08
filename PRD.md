@@ -637,12 +637,12 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 **Scope:** APScheduler job runs monthly to check for streak milestones (3/6/12 months), completed savings goals, and paid-off debts since last run. Sends congratulatory emails via SendGrid. New `milestone_notifications_sent` table to prevent duplicate sends.
 
 **Acceptance Criteria:**
-- [ ] Streak milestone emails sent at 3, 6, 12-month thresholds (one-time per threshold)
-- [ ] Savings goal completion email sent when `current_amount >= target_amount`
-- [ ] Debt payoff email sent when all debts reach zero balance
-- [ ] Duplicate-send prevention: each milestone type + user fires at most once
-- [ ] All emails are no-ops when `SENDGRID_API_KEY` is not set
-- [ ] 4+ backend tests
+- [x] Streak milestone emails sent at 3, 6, 12-month thresholds (one-time per threshold)
+- [x] Savings goal completion email sent when `current_amount >= target_amount`
+- [x] Debt payoff email sent when all debts reach zero balance
+- [x] Duplicate-send prevention: each milestone type + user fires at most once
+- [x] All emails are no-ops when `SENDGRID_API_KEY` is not set
+- [x] 4+ backend tests (18 written)
 
 ---
 
