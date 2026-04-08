@@ -33,7 +33,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password
 from models import ExpenseUpdateRequest
-from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router, investments as investments_router
+from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router, investments as investments_router, household as household_router
 import email_utils
 from collections import defaultdict
 
@@ -682,6 +682,7 @@ app.include_router(export_router.router)
 app.include_router(audit_router.router)
 app.include_router(currency_router.router)
 app.include_router(investments_router.router)
+app.include_router(household_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

@@ -245,3 +245,57 @@ class TaxSummaryResponse(BaseModel):
     savings_rate: float          # percentage
     category_breakdown: List[TaxCategoryBreakdown]
     potentially_deductible_total: float
+
+
+# ---------- Household ----------
+
+class HouseholdCreate(BaseModel):
+    name: str
+
+
+class HouseholdInviteRequest(BaseModel):
+    email: str
+
+
+class HouseholdJoinRequest(BaseModel):
+    token: str
+
+
+class MemberResponse(BaseModel):
+    user_id: int
+    email: str
+    username: Optional[str]
+    role: str
+    joined_at: datetime
+
+
+class HouseholdResponse(BaseModel):
+    id: int
+    name: str
+    owner_id: int
+    members: List[MemberResponse]
+    pending_invites: List[str]   # list of invitee emails awaiting acceptance
+    created_at: datetime
+
+
+class HouseholdBudgetMemberSummary(BaseModel):
+    user_id: int
+    email: str
+    username: Optional[str]
+    salary_planned: float
+    salary_actual: float
+    total_expenses_planned: float
+    total_expenses_actual: float
+    remaining_planned: float
+    remaining_actual: float
+
+
+class HouseholdBudgetResponse(BaseModel):
+    month: str
+    members: List[HouseholdBudgetMemberSummary]
+    combined_salary_planned: float
+    combined_salary_actual: float
+    combined_expenses_planned: float
+    combined_expenses_actual: float
+    combined_remaining_planned: float
+    combined_remaining_actual: float

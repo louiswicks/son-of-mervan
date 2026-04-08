@@ -349,10 +349,11 @@ Previously out of scope items now included as future roadmap.
 **Acceptance Criteria:** User receives a coherent 3–5 sentence financial summary with at least one actionable recommendation. Response streams progressively to the UI.
 **Result:** `POST /insights/ai-review` streams SSE via `anthropic` SDK (claude-haiku-4-5). Rate-limited 3/day/user via Redis (in-memory fallback). Anonymised category+amount data only — no expense names. `AIReviewSection` on InsightsPage with streaming cursor, error handling, and daily-use counter. 232 backend tests pass, 86.37% coverage.
 
-### 8.2 Multi-User Household Accounts
+### 8.2 Multi-User Household Accounts [DONE 2026-04-08]
 **Problem:** Couples and households need a shared budget view, but currently each user is fully isolated.
 **Solution:** `Household` model with invite-based membership. Role: `owner` (full access) or `member` (read + own expenses). Shared `MonthlyData` with per-member expense attribution. Split expense view showing each member's contribution.
 **Acceptance Criteria:** Owner can invite a member by email. Member can view shared budget but not edit owner's individual expenses. Household budget totals across both members' expenses.
+**Result:** `Household` + `HouseholdMembership` + `HouseholdInvite` models added to `database.py`. Alembic migration `137017825f82`. `routers/household.py` — `POST /households` (create), `GET /households/me`, `POST /households/invite` (7-day token, SendGrid email), `POST /households/join` (token accept), `DELETE /households/members/{id}` (owner removes member), `DELETE /households` (owner dissolves), `GET /households/budget?month=YYYY-MM` (combined view aggregating all members' MonthlyData). Pydantic schemas: `HouseholdCreate`, `HouseholdInviteRequest`, `HouseholdJoinRequest`, `HouseholdResponse`, `MemberResponse`, `HouseholdBudgetResponse`, `HouseholdBudgetMemberSummary`. `HouseholdPage.jsx` with create flow, member list with role badges, invite panel with pending invites, collapsible combined budget view, dissolve danger zone. Nav tab "Household" with Users icon. `web/src/api/household.js` + `web/src/hooks/useHousehold.js`. 19 new tests; 303 total, 86.66% coverage. Build 305.12 kB gzip.
 
 ### 8.3 Investment Portfolio Tracking [DONE 2026-04-08]
 **Problem:** Net Worth (7.2) covers bank accounts and liabilities but not investment holdings.

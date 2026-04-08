@@ -583,3 +583,53 @@
   - Button visible; modal opens on click; all four templates shown; close button works; 50/30/20 populates rows; salary-based amounts calculated correctly; no salary → blank amounts
 - No backend changes required (templates are hardcoded frontend constants)
 - Files changed: web/src/components/SonOfMervan.jsx, web/src/tests/SonOfMervan.test.jsx, PRD.md, progress.txt
+
+---
+
+## Phase 8.2: Multi-User Household Accounts [2026-04-08]
+
+**Goal:** Allow couples and housemates to share a budget view, with an owner/member role model and invite-based membership.
+
+**Backend:**
+- `Household`, `HouseholdMembership`, `HouseholdInvite` models added to `database.py`
+  - `Household`: id, owner_id (FK → users), name, created_at, deleted_at
+  - `HouseholdMembership`: id, household_id, user_id, role (owner|member), joined_at; UniqueConstraint(household_id, user_id)
+  - `HouseholdInvite`: id, household_id, invitee_email, token_hash (SHA-256), expires_at, accepted_at
+- Alembic migration `137017825f82_add_household_tables.py` — creates all three tables with appropriate indexes
+- `routers/household.py` — 7 endpoints under `/households` prefix:
+  - `POST /households` — create household; caller becomes owner; one household per user
+  - `GET /households/me` — return household with members + pending invites
+  - `POST /households/invite` — owner sends 7-day invite by email (SendGrid in prod, log in dev); old pending invites for same email are expired
+  - `POST /households/join` — accept invite via raw token; validates email match, expiry, not already a member
+  - `DELETE /households/members/{user_id}` — owner removes a member (cannot remove self)
+  - `DELETE /households` — owner soft-deletes household (all members lose access)
+  - `GET /households/budget?month=YYYY-MM` — combined budget view: per-member MonthlyData aggregated into combined totals
+- Pydantic schemas added to `models.py`: `HouseholdCreate`, `HouseholdInviteRequest`, `HouseholdJoinRequest`, `MemberResponse`, `HouseholdResponse`, `HouseholdBudgetMemberSummary`, `HouseholdBudgetResponse`
+- `_send_household_invite_email()` in router (same SendGrid pattern as other email utils)
+- Security model: owner-only actions enforced server-side; invite token is opaque (only hash stored); email-address binding on join
+
+**Frontend:**
+- `web/src/api/household.js` — 7 API functions (getMyHousehold, createHousehold, inviteMember, joinHousehold, removeMember, dissolveHousehold, getHouseholdBudget)
+- `web/src/hooks/useHousehold.js` — React Query hooks for all operations; 404 on `useMyHousehold` does not retry (expected when no household)
+- `web/src/components/HouseholdPage.jsx`:
+  - Empty state: create-household form (name input + submit)
+  - Member list with role badges (Owner=indigo, Member=gray), avatar initials, remove button for non-owner members (owner only)
+  - Invite panel (owner only): email input, send invite, pending invites list with amber dot
+  - Collapsible combined budget view: month picker, combined KPI cards (income/expenses/remaining actual vs planned), per-member breakdown cards
+  - Danger zone (owner only): dissolve household with ConfirmModal confirmation
+  - Remove-member flow also uses ConfirmModal
+- Route `/household` added to `router.jsx`
+- "Household" nav tab (Users icon) added to desktop sidebar and mobile bottom bar in `AuthGuard.jsx`
+
+**Tests:**
+- `tests/test_household.py` — 19 new tests:
+  - Create household, empty name → 422, duplicate → 409
+  - Get household not member → 404, owner → 200
+  - Invite member, invite self → 422, non-owner invite → 403
+  - Join: success, expired → 410, wrong email → 403, already member → 409
+  - Remove member, remove self → 422, member cannot remove → 403
+  - Dissolve: owner success, member cannot → 403
+  - Budget view: combined totals aggregated correctly, missing month → zeros
+- All 303 tests pass, 86.66% coverage (exceeds 80% target)
+- Build: 305.12 kB gzip (clean, no warnings)
+- Files changed: database.py, models.py, main.py, routers/household.py (new), alembic/versions/137017825f82_add_household_tables.py (new), tests/test_household.py (new), web/src/api/household.js (new), web/src/hooks/useHousehold.js (new), web/src/components/HouseholdPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, PRD.md, progress.txt

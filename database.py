@@ -651,6 +651,69 @@ class InvestmentPrice(Base):
     investment = relationship("Investment", back_populates="prices")
 
 
+class Household(Base):
+    """
+    A shared budget household. One owner, one or more members.
+    All members' expenses roll up into the household budget view.
+    """
+    __tablename__ = "households"
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Human-readable name (e.g. "Smith Family Budget")
+    name = Column(String(128), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
+    owner = relationship("User", foreign_keys=[owner_id])
+    memberships = relationship("HouseholdMembership", back_populates="household", cascade="all, delete-orphan")
+    invites = relationship("HouseholdInvite", back_populates="household", cascade="all, delete-orphan")
+
+
+class HouseholdMembership(Base):
+    """
+    Links a user to a household. role: 'owner' or 'member'.
+    Owner row is created automatically when the household is created.
+    """
+    __tablename__ = "household_memberships"
+    id = Column(Integer, primary_key=True, index=True)
+    household_id = Column(Integer, ForeignKey("households.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # role: owner | member
+    role = Column(String(16), nullable=False, default="member")
+    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("household_id", "user_id", name="uq_household_member"),
+    )
+
+    household = relationship("Household", back_populates="memberships")
+    user = relationship("User")
+
+
+class HouseholdInvite(Base):
+    """
+    A pending invitation to join a household. Token sent by email; hashed at rest.
+    Expires after 7 days. Single-use.
+    """
+    __tablename__ = "household_invites"
+    id = Column(Integer, primary_key=True, index=True)
+    household_id = Column(Integer, ForeignKey("households.id"), nullable=False)
+
+    # Invitee's email — unencrypted so we can match on accept
+    invitee_email = Column(String(320), nullable=False, index=True)
+
+    # SHA-256 hash of the raw token sent in the email link
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True, default=None)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    household = relationship("Household", back_populates="invites")
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)
