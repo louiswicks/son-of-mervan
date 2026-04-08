@@ -404,3 +404,76 @@ class TestAccountManagement:
 
         updated = db.query(RefreshToken).filter(RefreshToken.id == rt_id).first()
         assert updated.revoked_at is not None
+
+
+# ── Resend verification ────────────────────────────────────────────────────────
+
+class TestResendVerification:
+    def test_resend_success_sends_link_for_unverified_user(self, client, db):
+        """Unverified user with old enough verification_sent_at gets a new link."""
+        user = User(
+            email="unver_resend@example.com",
+            password_hash=get_password_hash(TEST_PASSWORD),
+            email_verified=False,
+            verification_sent_at=datetime.utcnow() - timedelta(minutes=5),
+        )
+        db.add(user)
+        db.commit()
+
+        r = client.post("/auth/resend-verification", json={"email": "unver_resend@example.com"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "message" in data
+        # Dev link returned (no SMTP_HOST set in tests)
+        assert "dev_verify_url" in data
+        assert data["dev_verify_url"] is not None
+
+    def test_resend_returns_generic_message_for_unknown_email(self, client):
+        """Non-existent email still returns 200 (no enumeration)."""
+        r = client.post("/auth/resend-verification", json={"email": "nobody@example.com"})
+        assert r.status_code == 200
+        assert "message" in r.json()
+
+    def test_resend_returns_generic_message_for_already_verified_user(self, client, verified_user):
+        """Already-verified user gets generic 200, no email sent."""
+        r = client.post("/auth/resend-verification", json={"email": TEST_EMAIL})
+        assert r.status_code == 200
+        data = r.json()
+        assert "message" in data
+        # dev_verify_url absent or None — no email generated
+        assert not data.get("dev_verify_url")
+
+    def test_resend_cooldown_suppresses_second_send(self, client, db):
+        """A user who just got a link (<2 min ago) doesn't get another."""
+        user = User(
+            email="cooldown_resend@example.com",
+            password_hash=get_password_hash(TEST_PASSWORD),
+            email_verified=False,
+            verification_sent_at=datetime.utcnow() - timedelta(seconds=30),
+        )
+        db.add(user)
+        db.commit()
+
+        r = client.post("/auth/resend-verification", json={"email": "cooldown_resend@example.com"})
+        assert r.status_code == 200
+        # Generic message returned but no dev link (cooldown suppressed the send)
+        assert not r.json().get("dev_verify_url")
+
+    def test_resend_updates_verification_sent_at(self, client, db):
+        """A successful resend updates the verification_sent_at timestamp."""
+        sent_before = datetime.utcnow() - timedelta(minutes=10)
+        user = User(
+            email="ts_resend@example.com",
+            password_hash=get_password_hash(TEST_PASSWORD),
+            email_verified=False,
+            verification_sent_at=sent_before,
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+
+        client.post("/auth/resend-verification", json={"email": "ts_resend@example.com"})
+
+        db.expire_all()
+        updated = db.query(User).filter(User.id == user_id).first()
+        assert updated.verification_sent_at > sent_before

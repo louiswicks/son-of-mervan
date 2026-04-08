@@ -703,17 +703,17 @@ Phase 13 targets measurable performance improvements, stronger account security,
 - [x] Advanced search endpoint (`GET /expenses/search`) filters by tag
 - [x] 4+ backend tests (6 new tests added)
 
-### 13.4 Email Notification Preference Center
+### 13.4 Email Notification Preference Center [DONE 2026-04-09]
 **Goal:** Give users granular control over which emails they receive to reduce notification fatigue and improve retention.  
 **Scope:** Replace the single `digest_opt_in` flag with a `notification_preferences` JSON column (or individual boolean columns) on User covering: monthly digest, milestone emails, budget alert emails. Expose via `GET/PUT /users/me/notification-preferences`. Show toggles in Account Settings.
 
 **Acceptance Criteria:**
-- [ ] `notification_preferences` stored per-user (digest, milestones, budget_alerts — all default `true`)
-- [ ] `GET /users/me/notification-preferences` returns current preferences
-- [ ] `PUT /users/me/notification-preferences` updates preferences
-- [ ] Monthly digest job, milestone job, and budget alert job all respect the per-user preference
-- [ ] Account Settings: "Email Preferences" section with three labelled toggles
-- [ ] 3+ backend tests
+- [x] `notification_preferences` stored per-user (digest, milestones, budget_alerts — all default `true`)
+- [x] `GET /users/me/notification-preferences` returns current preferences
+- [x] `PUT /users/me/notification-preferences` updates preferences
+- [x] Monthly digest job, milestone job, and budget alert job all respect the per-user preference
+- [x] Account Settings: "Email Preferences" section with three labelled toggles
+- [x] 3+ backend tests
 
 ### 13.5 Active Session Manager
 **Goal:** Give users visibility and control over where their account is logged in, improving security transparency.  
@@ -838,6 +838,88 @@ All financial and PII fields use Fernet hybrid properties (same pattern as `Mont
 
 ---
 
+---
+
+## Phase 16: Reliability, Developer Experience & User Onboarding
+
+Phase 16 addresses user-facing reliability gaps and production hygiene that become important once real users are onboarded.
+
+### 16.1 Email Verification Resend
+**Goal:** Allow users who missed or lost their verification email to request a new one — currently they are permanently stuck with no self-service recovery.
+**Scope:**
+- `POST /auth/resend-verification` — accepts `{ email }`. If the user exists, is not yet verified, and the last verification email was sent >2 minutes ago, generates a new JWT verification token and sends the email. Returns a generic success message regardless of whether the email exists (prevents user enumeration). Rate-limited 3/minute per IP.
+- `User.verification_sent_at` column already exists — no new migration needed.
+- Frontend: "Didn't receive the email?" link on the login page that opens a small inline form. When a user tries to log in and gets a 403 "Email not verified" error, show a "Resend verification email" button automatically in the error state.
+
+**Acceptance Criteria:**
+- [x] `POST /auth/resend-verification` returns 200 with generic message for valid and invalid emails alike (no enumeration)
+- [x] New verification email sent only if: user exists + not verified + last sent >2 minutes ago
+- [x] Rate-limited 3/minute per IP; 6th request within 60s → 429
+- [x] If `SENDGRID_API_KEY` is unset, logs the link (same behaviour as signup)
+- [x] Login page: "Resend verification email" inline form accessible from "Didn't receive your email?" link
+- [x] Login error for unverified account includes a "Resend" button that pre-fills the email
+- [x] 5+ backend tests: success path, cooldown enforcement, unverified-only, already-verified no-op, rate limit
+
+### 16.2 Scheduled Expired Token Cleanup
+**Goal:** Purge stale DB rows (expired refresh tokens, used password reset tokens) to keep the DB lean and reduce security surface area over time.
+**Scope:**
+- APScheduler job `cleanup_expired_tokens` runs daily at 03:30 UTC.
+- Deletes `RefreshToken` rows where `expires_at < now` OR (`revoked_at IS NOT NULL AND revoked_at < now - 7 days`).
+- Deletes `PasswordResetToken` rows where `expires_at < now` OR `used_at IS NOT NULL`.
+- Logs counts of rows deleted per table.
+- No HTTP endpoint exposed.
+
+**Acceptance Criteria:**
+- [ ] Job deletes expired and revoked RefreshTokens (7-day grace after revocation)
+- [ ] Job deletes expired and used PasswordResetTokens
+- [ ] Active tokens are not touched
+- [ ] Job registered in APScheduler startup block in `main.py`
+- [ ] 4+ backend tests (mock datetime.utcnow to simulate stale rows)
+
+### 16.3 iCal Export of Recurring Expenses
+**Goal:** Let users export their recurring expense schedule as a `.ics` file importable into Google Calendar / Apple Calendar — bringing financial awareness into the tools users already check daily.
+**Scope:**
+- `GET /export/calendar.ics` — generates RFC 5545-compliant iCalendar file. Each active, non-deleted recurring expense becomes one VEVENT (or RRULE) with: SUMMARY = expense name + amount, DTSTART = next occurrence from today, RRULE matching the frequency (FREQ=MONTHLY / WEEKLY / DAILY / YEARLY). DESCRIPTION includes category and currency.
+- No external library required — generate RFC 5545 text directly (it is simple enough).
+- Frontend: "Export to Calendar" button on RecurringExpensesPage; triggers download.
+
+**Acceptance Criteria:**
+- [ ] Response has `Content-Type: text/calendar` and `Content-Disposition: attachment; filename="recurring-expenses.ics"`
+- [ ] Output passes RFC 5545 basic structure (VCALENDAR > VEVENT per expense)
+- [ ] RRULE correctly maps: monthly → `FREQ=MONTHLY`, weekly → `FREQ=WEEKLY`, daily → `FREQ=DAILY`, yearly → `FREQ=YEARLY`
+- [ ] Empty response (no expenses) returns a valid empty calendar
+- [ ] Unauthenticated request → 401/403
+- [ ] 4+ backend tests; "Export to Calendar" button on RecurringExpensesPage
+
+### 16.4 Spending Budget Carry-Forward Card
+**Goal:** Surface unspent budget at month-end so users are prompted to move the surplus to savings — turning passive awareness into active saving behaviour.
+**Scope:**
+- `GET /insights/month-close-summary?month=YYYY-MM` — returns per-category unspent amounts (`planned - actual` where positive) and `total_unspent`. Requires auth.
+- Frontend: Dashboard renders a "Month Close" card during days 22–28 of the current month (detected client-side). Card shows total unspent and a "Move to savings" CTA that pre-fills the contributions form with the surplus amount.
+
+**Acceptance Criteria:**
+- [ ] Endpoint returns `{ month, total_unspent, categories: [{category, planned, actual, unspent}] }` sorted by unspent descending
+- [ ] Categories where actual > planned (overspend) have `unspent = 0` (not negative)
+- [ ] Returns empty categories list with `total_unspent = 0` when no data for month
+- [ ] Dashboard renders card from day 22 of the current month onwards
+- [ ] 4+ backend tests; frontend card renders correctly with mock data
+
+### 16.5 API Changelog Endpoint
+**Goal:** Provide a machine-readable version history so future client integrations can detect breaking changes without reading git logs.
+**Scope:**
+- `GET /version` — returns `{ version: "1.16.0", changelog: [{version, date, summary}] }`. Version is driven by a `VERSION` constant in `core/config.py`. Changelog is a static list maintained in code.
+- No auth required (public endpoint).
+- Version bumped on each Phase completion going forward.
+
+**Acceptance Criteria:**
+- [ ] `GET /version` returns 200 with `version` and `changelog` array
+- [ ] No authentication required
+- [ ] `version` matches `VERSION` constant in `core/config.py`
+- [ ] At least current version entry in changelog
+- [ ] 2+ backend tests
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -867,9 +949,13 @@ Phase 13 (DONE): Performance, security hardening & developer experience
 Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
   14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) [DONE] → 14.3 (Global visual polish) [DONE]
 
-Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
+Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
   15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
   → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
+
+Phase 16: Reliability, developer experience & user onboarding
+  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) → 16.3 (iCal export)
+  → 16.4 (Month-close card) → 16.5 (API changelog endpoint)
 ```
 
 ---

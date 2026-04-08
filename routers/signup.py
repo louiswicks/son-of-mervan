@@ -172,6 +172,55 @@ async def password_reset_confirm(
     return {"message": "Password updated successfully. You can now log in."}
 
 
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+_RESEND_COOLDOWN_SECONDS = 120  # 2-minute cooldown between resends
+
+@router.post("/resend-verification", response_model=SignupResponse)
+@limiter.limit("3/minute")
+async def resend_verification(
+    request: Request,
+    payload: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Resend the email verification link.
+
+    Always returns a generic success message to prevent user enumeration.
+    Only sends an email when: user exists + not verified + cooldown (>2 min) passed.
+    """
+    _GENERIC_MSG = "If that email is registered and unverified, a new link has been sent."
+
+    user = db.query(User).filter(User.email == payload.email).first()
+
+    # Early-out: no user or already verified — return generic message
+    if not user or user.email_verified:
+        return {"message": _GENERIC_MSG}
+
+    # Cooldown: don't resend if last sent <2 minutes ago
+    if user.verification_sent_at:
+        elapsed = (datetime.utcnow() - user.verification_sent_at).total_seconds()
+        if elapsed < _RESEND_COOLDOWN_SECONDS:
+            return {"message": _GENERIC_MSG}
+
+    # Generate new token and update sent timestamp
+    token = create_email_verify_token(user.id, user.email)
+    verify_url = f"{FRONTEND_BASE_URL}#/verify-email?token={token}"
+    user.verification_sent_at = datetime.utcnow()
+    db.commit()
+
+    smtp_ready = all(os.getenv(k) for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS"))
+    if smtp_ready:
+        background_tasks.add_task(send_verification_email, user.email, verify_url)
+        dev_link = None
+    else:
+        logger.info("[DEV] Resend verification link for %s: %s", user.email, verify_url)
+        dev_link = verify_url
+
+    return {"message": _GENERIC_MSG, "dev_verify_url": dev_link}
+
+
 class VerifyResponse(BaseModel):
     message: str
 

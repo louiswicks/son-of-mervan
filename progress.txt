@@ -1,3 +1,11 @@
+## Phase 16.1 — Email Verification Resend [DONE] 2026-04-09
+- `routers/signup.py`: Added `POST /auth/resend-verification` endpoint — accepts `{ email }`, returns generic 200 regardless of whether email exists (prevents enumeration). Sends a new JWT verify token only when: user exists + not yet verified + `verification_sent_at` > 2 minutes ago. Rate-limited 3/min per IP via slowapi. Updates `User.verification_sent_at` on send. Dev link returned when SMTP not configured (same pattern as signup).
+- `web/src/api/auth.js`: Added `resendVerification(email)` Axios wrapper for `POST /auth/resend-verification`.
+- `web/src/components/LoginPage.jsx`: (1) On 403 "verify" login error, `showResend` state surfaces a "Resend verification email" button inline in the error banner that calls `doResend()` with the current `identifier` value pre-filled. (2) "Didn't receive your verification email?" text button at the bottom of the login form toggles the resend UI when no error message is shown (covers fresh-page use case). Both flows update resend state and show success/error feedback.
+- `tests/test_auth.py`: Added `TestResendVerification` class — 5 tests: success path (dev link returned for eligible unverified user), generic 200 for unknown email, generic 200 for already-verified user, cooldown suppresses resend within 2 minutes, `verification_sent_at` timestamp updated on successful resend.
+- Also updated PRD.md: Phase 13.4 checkboxes corrected to `[x]` (was already implemented), Phase 16 tasks added.
+- 546 backend tests pass; 91.41% coverage; ruff clean.
+
 ## Phase 15.2 — Open Banking OAuth Flow [DONE] 2026-04-08
 - `core/config.py`: Added `TRUELAYER_CLIENT_ID`, `TRUELAYER_CLIENT_SECRET`, `TRUELAYER_REDIRECT_URI`, `TRUELAYER_SANDBOX` (default True) optional settings
 - `models.py`: Added `BankConnectResponse` (auth_url), `BankConnectionResponse` (id, provider, account_id, last_synced_at, created_at, is_sandbox), `BankConnectionListResponse` Pydantic schemas

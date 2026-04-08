@@ -17,6 +17,9 @@ export const confirmPasswordReset = (token, newPassword) =>
     .post('/auth/password-reset-confirm', { token, new_password: newPassword })
     .then((r) => r.data);
 
+export const resendVerification = (email) =>
+  client.post('/auth/resend-verification', { email }).then((r) => r.data);
+
 export const refreshSession = () =>
   client.post('/auth/refresh').then((r) => r.data);
 
