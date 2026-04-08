@@ -222,3 +222,26 @@ class InvestmentPortfolioSummary(BaseModel):
     total_gain_loss: Optional[float]
     total_gain_loss_pct: Optional[float]
     holdings_count: int
+
+
+# ---------- Tax Filing ----------
+
+class TaxCategoryBreakdown(BaseModel):
+    category: str
+    hmrc_category: str           # mapped HMRC expense heading
+    total_actual: float          # total actual spend across tax year
+    months_with_data: int        # how many months had expenses in this category
+    potentially_deductible: bool # advisory flag (user should verify with accountant)
+
+
+class TaxSummaryResponse(BaseModel):
+    tax_year: int                # e.g. 2024 means April 2024 – April 2025
+    period_start: str            # "2024-04-06"
+    period_end: str              # "2025-04-05"
+    months_with_data: int
+    total_income: float
+    total_expenses: float
+    net_savings: float
+    savings_rate: float          # percentage
+    category_breakdown: List[TaxCategoryBreakdown]
+    potentially_deductible_total: float

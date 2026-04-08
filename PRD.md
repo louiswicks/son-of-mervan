@@ -360,10 +360,11 @@ Previously out of scope items now included as future roadmap.
 **Acceptance Criteria:** User can add a holding by ticker. Current value updates daily. Net worth dashboard reflects portfolio value. No auto-trading or recommendations.
 **Result:** `Investment` + `InvestmentPrice` models with Fernet encryption on financial fields. `routers/investments.py` — full CRUD + manual sync endpoint. APScheduler job at 16:30 UTC syncs prices via yfinance. `/investments` page with summary cards (holdings count, total cost, portfolio value, unrealised gain/loss), holdings table with buy price/current price/value/gain%, add/edit/delete modals. 21 new tests. 265 backend tests total, 86.95% coverage.
 
-### 8.4 Tax Filing Integration
+### 8.4 Tax Filing Integration [DONE 2026-04-08]
 **Problem:** Users cannot use their expense data for self-assessment tax returns without manual re-entry.
 **Solution:** `GET /export/tax-summary?tax_year=YYYY` returns income and deductible expenses in a format aligned with HMRC self-assessment categories. PDF download formatted as a SA302-style summary. Expense category mapping to HMRC allowable expense types (configurable per user).
 **Acceptance Criteria:** Export covers the correct UK tax year (April–April). Categories map correctly to HMRC allowable expense types. PDF is human-readable and print-ready.
+**Result:** `GET /export/tax-summary?tax_year=YYYY` returns JSON summary (total income, total expenses, net savings, savings rate, per-category breakdown with HMRC headings and deductibility flags, potentially-deductible total). `GET /export/tax-pdf?tax_year=YYYY` generates SA302-style PDF with income summary, category table, HMRC headings, deductible total, and professional advice disclaimer. HMRC category mapping for all 8 expense categories. `/tax` page with year selector (current + 4 prior years), 4 KPI cards, responsive category table with deductibility badges, PDF download button. "Tax" nav tab added (desktop + mobile). 9 new tests; 284 total, 85.79% coverage. Build 302.67 kB gzip.
 
 ### 8.5 Open Banking Integration (Plaid / TrueLayer)
 **Problem:** Manual expense entry is the biggest friction point in the app. Users who connect their bank accounts in competitors (Monzo, Emma) see instant categorised transactions with no manual input.

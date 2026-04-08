@@ -40,3 +40,27 @@ export async function exportPDF(month) {
   });
   downloadBlob(res.data, `budget_report_${month}.pdf`);
 }
+
+/**
+ * Fetch the tax-year spending summary as JSON.
+ * @param {number} taxYear  e.g. 2024 for April 2024 – April 2025
+ * @returns {Promise<object>} TaxSummaryResponse
+ */
+export async function getTaxSummary(taxYear) {
+  const res = await client.get('/export/tax-summary', {
+    params: { tax_year: taxYear },
+  });
+  return res.data;
+}
+
+/**
+ * Download an SA302-style PDF for the given UK tax year.
+ * @param {number} taxYear  e.g. 2024 for April 2024 – April 2025
+ */
+export async function exportTaxPDF(taxYear) {
+  const res = await client.get('/export/tax-pdf', {
+    params: { tax_year: taxYear },
+    responseType: 'blob',
+  });
+  downloadBlob(res.data, `tax_summary_${taxYear}_${taxYear + 1}.pdf`);
+}

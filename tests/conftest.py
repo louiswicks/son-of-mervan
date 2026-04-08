@@ -62,13 +62,20 @@ TEST_EMAIL_2 = "other@example.com"
 
 # ── DB helpers (importable by test modules) ───────────────────────────────────
 
-def make_month(db, user, month="2026-01", salary_planned=3000.0, total_planned=1000.0):
+def make_month(
+    db, user, month="2026-01",
+    salary_planned=3000.0, total_planned=1000.0,
+    salary_actual=0.0, total_actual=0.0,
+):
     """Create a MonthlyData row owned by *user*."""
     m = MonthlyData(user_id=user.id)
     m.month = month
     m.salary_planned = salary_planned
     m.total_planned = total_planned
     m.remaining_planned = salary_planned - total_planned
+    m.salary_actual = salary_actual
+    m.total_actual = total_actual
+    m.remaining_actual = salary_actual - total_actual
     db.add(m)
     db.commit()
     db.refresh(m)
