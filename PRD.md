@@ -443,6 +443,74 @@ Previously out of scope items now included as future roadmap.
 
 ---
 
+## Phase 10: Operational Excellence & Advanced Insights
+
+Phase 10 tasks address the next tier of user value: proactive intelligence, power-user workflows, and deeper financial analysis. All tasks are independent and can be shipped in any order.
+
+### 10.1 Spending Anomaly Detection [IN PROGRESS]
+**Goal:** Proactively surface unusual spending spikes so users don't miss overspends buried in monthly data.  
+**User story:** As a user, I want to be notified when a category's spending is unusually high compared to recent months, so I can take action before the month ends.  
+**Scope:**
+- New endpoint `GET /insights/anomalies?month=YYYY-MM&lookback=3` in `routers/insights.py`
+- For each category in the target month, compute mean and standard deviation of actual spend over the prior `lookback` months (2–12, default 3)
+- Classify severity: **high** (z-score ≥ 2.0 or >100% above mean), **medium** (z-score ≥ 1.5 or >50% above mean with zero std dev), **low** (z-score ≥ 1.0 and >30% above mean)
+- Categories with no prior history are excluded (cannot determine a baseline)
+- Response: `{ month, anomalies: [{ category, current_amount, historical_avg, pct_change, z_score, severity, message }], lookback_months, categories_analysed }`
+- Frontend: `getAnomalyDetection(month, lookback)` in `api/insights.js`; `useAnomalyDetection(month, lookback)` hook; **AnomalyAlerts** card section in `InsightsPage.jsx` (colour-coded by severity: red=high, amber=medium, yellow=low)
+
+**Acceptance Criteria:**
+- [ ] Endpoint returns 200 with empty anomaly list when month has no data or no historical baseline
+- [ ] Correctly identifies high/medium/low anomalies using z-score thresholds
+- [ ] Correctly ignores categories with normal spend (z-score < 1.0)
+- [ ] `lookback` param range enforced (2–12); 422 on out-of-range
+- [ ] Unauthenticated request returns 401/403
+- [ ] Only returns data for the authenticated user
+- [ ] 8+ backend tests; all existing tests still pass; coverage ≥ 80%
+- [ ] InsightsPage renders AnomalyAlerts section with severity colour-coding and message text
+
+### 10.2 Advanced Expense Search & Filtering
+**Goal:** Let power users find specific expenses across months without scrolling.  
+**Scope:** `GET /expenses/search?q=&category=&from=YYYY-MM&to=YYYY-MM&page=1&per_page=20` endpoint. Frontend: search bar + category dropdown + date range filter above MonthlyTracker expense list; debounced (300ms). Returns paginated results with month context.
+
+**Acceptance Criteria:**
+- [ ] Search matches expense name (case-insensitive, partial match on decrypted values)
+- [ ] Category filter correctly narrows results
+- [ ] Date range restricts to months in range
+- [ ] Pagination headers returned (`X-Total-Count`, `X-Page`)
+- [ ] Only own expenses returned; soft-deleted excluded
+- [ ] 6+ backend tests; frontend renders filtered results
+
+### 10.3 Database Index Audit
+**Goal:** Ensure all high-traffic query patterns use index scans, not full-table scans.  
+**Scope:** Audit `EXPLAIN ANALYZE` output for the 5 most-used query patterns (monthly data by user, expenses by monthly data ID, recurring expenses by user, savings goals by user, notifications by user). Add any missing SQLAlchemy `Index(...)` declarations and a new Alembic migration.
+
+**Acceptance Criteria:**
+- [ ] `EXPLAIN ANALYZE` shows index scans on all 5 patterns
+- [ ] New migration applies cleanly
+- [ ] No regression in test suite
+
+### 10.4 Bulk Expense Operations
+**Goal:** Save power users time when re-categorising or removing multiple expenses.  
+**Scope:** Multi-select checkboxes in MonthlyTracker expense table; "Bulk Actions" toolbar appears when ≥1 row selected (bulk delete, bulk change category). New `DELETE /expenses/bulk` and `PATCH /expenses/bulk-category` endpoints.
+
+**Acceptance Criteria:**
+- [ ] Select-all checkbox toggles all rows
+- [ ] Bulk delete soft-deletes all selected; UI refreshes
+- [ ] Bulk recategorise updates all selected rows; audit log entry written per expense
+- [ ] 4+ backend tests
+
+### 10.5 Savings Goal Projections
+**Goal:** Show users exactly how long it will take to reach each savings goal based on their contribution pace.  
+**Scope:** Add `projection` field to `GET /savings-goals` response: `{ months_to_goal, suggested_monthly, on_track_pct, projected_completion_date }`. Frontend SavingsGoalsPage renders a "Projection" row under each goal card.
+
+**Acceptance Criteria:**
+- [ ] `months_to_goal` is null when no contributions made yet
+- [ ] `suggested_monthly` = (remaining / months_remaining) capped at a sensible max
+- [ ] `projected_completion_date` derived from average monthly contribution rate
+- [ ] 4+ backend tests
+
+---
+
 ## 9. Permanently Out of Scope
 
 - Mobile native app (iOS/Android) — web-first; PWA enhancements may be considered later

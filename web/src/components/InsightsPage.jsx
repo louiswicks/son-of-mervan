@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   Info, BarChart2, Heart, Sparkles, RefreshCw,
 } from "lucide-react";
-import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap, useHealthScore } from "../hooks/useInsights";
+import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap, useHealthScore, useAnomalyDetection } from "../hooks/useInsights";
 import { requestAIReview } from "../api/insights";
 import { SkeletonCard } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
@@ -423,6 +423,116 @@ function HealthScoreCard({ month }) {
   );
 }
 
+// -------------------- anomaly alerts --------------------
+
+const ANOMALY_STYLES = {
+  high: {
+    bg: "bg-red-50 dark:bg-red-900/20",
+    border: "border-red-200 dark:border-red-800",
+    badge: "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300",
+    icon: "text-red-500 dark:text-red-400",
+  },
+  medium: {
+    bg: "bg-amber-50 dark:bg-amber-900/20",
+    border: "border-amber-200 dark:border-amber-800",
+    badge: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
+    icon: "text-amber-500 dark:text-amber-400",
+  },
+  low: {
+    bg: "bg-yellow-50 dark:bg-yellow-900/20",
+    border: "border-yellow-200 dark:border-yellow-800",
+    badge: "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300",
+    icon: "text-yellow-500 dark:text-yellow-400",
+  },
+};
+
+function AnomalyAlertsSection({ month }) {
+  const [lookback, setLookback] = useState(3);
+  const { data, isLoading } = useAnomalyDetection(month, lookback);
+
+  const anomalies = data?.anomalies || [];
+
+  return (
+    <section
+      className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5"
+      data-testid="anomaly-section"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={20} className="text-amber-500 dark:text-amber-400" />
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Anomaly Detection
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Categories with unusually high spending vs recent history
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <label htmlFor="lookback-select" className="text-xs">Compare vs</label>
+          <select
+            id="lookback-select"
+            value={lookback}
+            onChange={(e) => setLookback(Number(e.target.value))}
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1 text-xs"
+          >
+            {[2, 3, 6, 12].map((n) => (
+              <option key={n} value={n}>{n} months</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <SkeletonCard />
+      ) : anomalies.length === 0 ? (
+        <div className="flex items-center gap-2 py-4 text-sm text-green-700 dark:text-green-300">
+          <CheckCircle size={16} className="flex-shrink-0" />
+          No unusual spending detected for this month.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {anomalies.map((a) => {
+            const s = ANOMALY_STYLES[a.severity] || ANOMALY_STYLES.low;
+            return (
+              <div
+                key={a.category}
+                className={`flex items-start gap-3 p-4 rounded-xl border ${s.bg} ${s.border}`}
+              >
+                <AlertTriangle size={18} className={`flex-shrink-0 mt-0.5 ${s.icon}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-white">
+                      {a.category}
+                    </span>
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full uppercase ${s.badge}`}>
+                      {a.severity}
+                    </span>
+                    {a.pct_change !== null && a.pct_change !== undefined && (
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        +{a.pct_change.toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{a.message}</p>
+                  <div className="flex gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Current: <strong className="text-gray-800 dark:text-gray-200">£{a.current_amount.toFixed(2)}</strong></span>
+                    <span>Avg: <strong className="text-gray-800 dark:text-gray-200">£{a.historical_avg.toFixed(2)}</strong></span>
+                    {a.z_score !== null && a.z_score !== undefined && (
+                      <span>Z-score: <strong className="text-gray-800 dark:text-gray-200">{a.z_score.toFixed(1)}</strong></span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // -------------------- AI review --------------------
 
 const MAX_DAILY_REVIEWS = 3;
@@ -569,6 +679,9 @@ export default function InsightsPage() {
 
       {/* ---- Health Score ---- */}
       <HealthScoreCard month={selectedMonth} />
+
+      {/* ---- Anomaly Detection ---- */}
+      <AnomalyAlertsSection month={selectedMonth} />
 
       {/* ---- AI Financial Review ---- */}
       <AIReviewSection month={selectedMonth} />

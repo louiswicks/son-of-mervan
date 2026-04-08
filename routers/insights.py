@@ -741,6 +741,136 @@ async def _stream_ai_review(context: Dict[str, Any]):
         yield f"data: {json.dumps({'error': 'AI review failed. Please try again later.'})}\n\n"
 
 
+# -------------------- anomaly detection --------------------
+
+@router.get("/anomalies")
+def spending_anomalies(
+    month: str = Query(..., description="Month to analyse, YYYY-MM"),
+    lookback: int = Query(3, ge=2, le=12, description="Prior months to use as baseline (2–12)"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Detect spending anomalies by comparing each category's actual spend in *month*
+    against the distribution of the prior *lookback* months.
+
+    Severity thresholds:
+      high   — z-score ≥ 2.0, or >100% above mean when std dev is 0
+      medium — z-score ≥ 1.5, or >50% above mean when std dev is 0
+      low    — z-score ≥ 1.0 and spend >30% above mean
+
+    Categories with no prior history are excluded (no baseline to compare against).
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    current_row = _find_month(all_rows, month_norm)
+
+    if not current_row:
+        return {
+            "month": month_norm,
+            "anomalies": [],
+            "lookback_months": lookback,
+            "categories_analysed": 0,
+        }
+
+    # Build list of prior month strings (oldest → newest, excluding current month)
+    year, mo = map(int, month_norm.split("-"))
+    prior_months: list[str] = []
+    for i in range(lookback, 0, -1):
+        pmo = mo - i
+        pyr = year
+        while pmo <= 0:
+            pmo += 12
+            pyr -= 1
+        prior_months.append(f"{pyr:04d}-{pmo:02d}")
+
+    # Collect per-category actual spend for each prior month that has data
+    history: Dict[str, List[float]] = {}
+    for pm in prior_months:
+        pm_row = _find_month(all_rows, pm)
+        if pm_row is None:
+            continue
+        for cat, vals in _category_totals(db, pm_row).items():
+            history.setdefault(cat, []).append(vals["actual"])
+
+    current_cats = _category_totals(db, current_row)
+
+    _severity_order = {"high": 0, "medium": 1, "low": 2}
+    anomalies: List[Dict[str, Any]] = []
+
+    for cat, vals in current_cats.items():
+        current_actual = vals["actual"]
+        if current_actual <= 0:
+            continue
+
+        hist_values = history.get(cat)
+        if not hist_values:
+            continue  # No historical baseline — cannot determine anomaly
+
+        n = len(hist_values)
+        mean = sum(hist_values) / n
+        if mean <= 0:
+            continue  # Historical average is zero — skip to avoid division issues
+
+        pct_change = round(((current_actual - mean) / mean) * 100, 1)
+
+        std_dev = (sum((x - mean) ** 2 for x in hist_values) / n) ** 0.5
+
+        if std_dev == 0:
+            # All prior months identical — classify by pct_change only
+            if pct_change > 100:
+                severity = "high"
+            elif pct_change > 50:
+                severity = "medium"
+            else:
+                continue
+            anomalies.append({
+                "category": cat,
+                "current_amount": round(current_actual, 2),
+                "historical_avg": round(mean, 2),
+                "pct_change": pct_change,
+                "z_score": None,
+                "severity": severity,
+                "message": f"{cat} spending is {pct_change:.0f}% above your usual amount.",
+            })
+            continue
+
+        z_score = round((current_actual - mean) / std_dev, 2)
+
+        if z_score >= 2.0:
+            severity = "high"
+        elif z_score >= 1.5:
+            severity = "medium"
+        elif z_score >= 1.0 and pct_change >= 30:
+            severity = "low"
+        else:
+            continue  # Within normal range
+
+        anomalies.append({
+            "category": cat,
+            "current_amount": round(current_actual, 2),
+            "historical_avg": round(mean, 2),
+            "pct_change": pct_change,
+            "z_score": z_score,
+            "severity": severity,
+            "message": (
+                f"{cat} spending is {pct_change:.0f}% above your "
+                f"{lookback}-month average."
+            ),
+        })
+
+    anomalies.sort(key=lambda x: _severity_order[x["severity"]])
+
+    return {
+        "month": month_norm,
+        "anomalies": anomalies,
+        "lookback_months": lookback,
+        "categories_analysed": len(current_cats),
+    }
+
+
 # -------------------- AI review endpoint --------------------
 
 @router.post("/ai-review")

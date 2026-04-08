@@ -19,6 +19,11 @@ export const suggestCategory = (name) =>
 export const getHealthScore = (month) =>
   client.get("/insights/health-score", { params: { month } }).then((r) => r.data);
 
+export const getAnomalyDetection = (month, lookback = 3) =>
+  client
+    .get("/insights/anomalies", { params: { month, lookback } })
+    .then((r) => r.data);
+
 /**
  * Stream an AI financial review for the given month.
  * Uses native fetch() so the response body can be read as a stream.

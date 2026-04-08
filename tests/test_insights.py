@@ -435,15 +435,6 @@ class TestAIReview:
     def test_rate_limit_blocks_after_max_requests(self, auth_client, monkeypatch):
         """After MAX_AI_REVIEWS_PER_DAY requests the endpoint returns 429."""
         import routers.insights as ins
-        # Patch in-memory counter to simulate limit already reached
-        from datetime import datetime
-        from database import User, SessionLocal
-        from security import verify_token
-
-        # Force the in-memory counter past the limit for any user key today
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-
-        original_check = ins._check_and_increment_ai_rate_limit
 
         def always_denied(user_id):
             return False, 0
@@ -470,3 +461,142 @@ class TestAIReview:
         r = auth_client.post("/insights/ai-review?month=2099-01")
         # Should be 200 streaming response even for a future month with no data
         assert r.status_code == 200
+
+
+class TestAnomalyDetection:
+    """Tests for GET /insights/anomalies."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/anomalies?month=2026-04")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_returns_422(self, auth_client):
+        r = auth_client.get("/insights/anomalies")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        r = auth_client.get("/insights/anomalies?month=not-a-month")
+        assert r.status_code == 422
+
+    def test_lookback_below_minimum_returns_422(self, auth_client):
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=1")
+        assert r.status_code == 422
+
+    def test_lookback_above_maximum_returns_422(self, auth_client):
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=13")
+        assert r.status_code == 422
+
+    def test_no_data_returns_empty_list(self, auth_client):
+        r = auth_client.get("/insights/anomalies?month=2099-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["anomalies"] == []
+        assert body["categories_analysed"] == 0
+
+    def test_no_historical_baseline_returns_empty_list(self, auth_client, db, verified_user):
+        """Current month data exists but no prior months — can't flag anomalies."""
+        month = make_month(db, verified_user, month="2026-04", salary_planned=3000.0)
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0, actual=900.0)
+
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["anomalies"] == []
+
+    def test_detects_high_severity_anomaly(self, auth_client, db, verified_user):
+        """Spending well above the historical mean (high z-score) is flagged as high."""
+        # Build 3 months of consistent history at £200
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Groceries", category="Food", planned=200.0, actual=200.0)
+
+        # Current month: spike to £600 (3× the mean — very high z-score)
+        current = make_month(db, verified_user, month="2026-04", salary_planned=3000.0)
+        make_expense(db, current, name="Groceries", category="Food", planned=200.0, actual=600.0)
+
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["anomalies"]) >= 1
+        anomaly = next(a for a in body["anomalies"] if a["category"] == "Food")
+        assert anomaly["severity"] == "high"
+        assert anomaly["current_amount"] == 600.0
+        assert anomaly["historical_avg"] == 200.0
+        assert anomaly["pct_change"] == 200.0
+
+    def test_ignores_normal_spending(self, auth_client, db, verified_user):
+        """Spending within normal range does not produce any anomaly."""
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        # Current month within normal bounds (same as history)
+        current = make_month(db, verified_user, month="2026-04", salary_planned=3000.0)
+        make_expense(db, current, name="Rent", category="Housing", planned=800.0, actual=810.0)
+
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        # No anomaly should be flagged for this minor variation
+        housing_anomalies = [a for a in body["anomalies"] if a["category"] == "Housing"]
+        assert len(housing_anomalies) == 0
+
+    def test_only_own_data_returned(self, auth_client, db, verified_user, second_user):
+        """Anomaly analysis is isolated to the authenticated user's data."""
+        # Give second user 3 months of history + a spike
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, second_user, month=mo, salary_planned=5000.0)
+            make_expense(db, m, name="Dining", category="Food", planned=100.0, actual=100.0)
+        m_current = make_month(db, second_user, month="2026-04", salary_planned=5000.0)
+        make_expense(db, m_current, name="Dining", category="Food", planned=100.0, actual=800.0)
+
+        # Auth user has no data — should see no anomalies
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["anomalies"] == []
+
+    def test_response_sorted_high_to_low(self, auth_client, db, verified_user):
+        """Anomalies are sorted high → medium → low severity."""
+        # Build 3 months of varied history so different categories get different z-scores
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=5000.0)
+            # Food: mean 100, std_dev ~0 (all same)
+            make_expense(db, m, name="Food", category="Food", planned=100.0, actual=100.0)
+            # Entertainment: mean 50, std_dev 0
+            make_expense(db, m, name="Fun", category="Entertainment", planned=50.0, actual=50.0)
+
+        # Current month: Food spikes to 300 (>100% above mean → high)
+        # Entertainment spikes to 80 (60% above mean → medium)
+        current = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        make_expense(db, current, name="Food", category="Food", planned=100.0, actual=300.0)
+        make_expense(db, current, name="Fun", category="Entertainment", planned=50.0, actual=80.0)
+
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        anomalies = body["anomalies"]
+        assert len(anomalies) >= 1
+        # First anomaly should be highest severity
+        severity_order = {"high": 0, "medium": 1, "low": 2}
+        for i in range(len(anomalies) - 1):
+            assert severity_order[anomalies[i]["severity"]] <= severity_order[anomalies[i + 1]["severity"]]
+
+    def test_lookback_param_respected(self, auth_client, db, verified_user):
+        """lookback=2 uses only the 2 most recent prior months."""
+        # Month 2026-01: Food £100 (old, outside lookback=2 window)
+        m_jan = make_month(db, verified_user, month="2026-01", salary_planned=3000.0)
+        make_expense(db, m_jan, name="Food", category="Food", planned=100.0, actual=1000.0)
+        # Months 2026-02 and 2026-03: Food £100 (inside lookback=2 window)
+        for mo in ["2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Food", category="Food", planned=100.0, actual=100.0)
+
+        # Current month: £200 (100% above the 2-month average of £100)
+        current = make_month(db, verified_user, month="2026-04", salary_planned=3000.0)
+        make_expense(db, current, name="Food", category="Food", planned=100.0, actual=200.0)
+
+        r = auth_client.get("/insights/anomalies?month=2026-04&lookback=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["lookback_months"] == 2
