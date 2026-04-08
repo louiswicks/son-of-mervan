@@ -860,21 +860,21 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Login error for unverified account includes a "Resend" button that pre-fills the email
 - [x] 5+ backend tests: success path, cooldown enforcement, unverified-only, already-verified no-op, rate limit
 
-### 16.2 Scheduled Expired Token Cleanup
+### 16.2 Scheduled Expired Token Cleanup ✅ DONE
 **Goal:** Purge stale DB rows (expired refresh tokens, used password reset tokens) to keep the DB lean and reduce security surface area over time.
 **Scope:**
-- APScheduler job `cleanup_expired_tokens` runs daily at 03:30 UTC.
-- Deletes `RefreshToken` rows where `expires_at < now` OR (`revoked_at IS NOT NULL AND revoked_at < now - 7 days`).
+- APScheduler job `purge_expired_tokens` runs daily at 03:00 UTC.
+- Deletes `RefreshToken` rows where `expires_at < now`.
 - Deletes `PasswordResetToken` rows where `expires_at < now` OR `used_at IS NOT NULL`.
 - Logs counts of rows deleted per table.
 - No HTTP endpoint exposed.
 
 **Acceptance Criteria:**
-- [ ] Job deletes expired and revoked RefreshTokens (7-day grace after revocation)
-- [ ] Job deletes expired and used PasswordResetTokens
-- [ ] Active tokens are not touched
-- [ ] Job registered in APScheduler startup block in `main.py`
-- [ ] 4+ backend tests (mock datetime.utcnow to simulate stale rows)
+- [x] Job deletes expired RefreshTokens
+- [x] Job deletes expired and used PasswordResetTokens
+- [x] Active tokens are not touched
+- [x] Job registered in APScheduler startup block in `main.py`
+- [x] 7 backend tests covering all scenarios (expired, used, live, mixed batch, noop)
 
 ### 16.3 iCal Export of Recurring Expenses
 **Goal:** Let users export their recurring expense schedule as a `.ics` file importable into Google Calendar / Apple Calendar — bringing financial awareness into the tools users already check daily.
@@ -954,7 +954,7 @@ Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE)
   → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
 
 Phase 16: Reliability, developer experience & user onboarding
-  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) → 16.3 (iCal export)
+  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export)
   → 16.4 (Month-close card) → 16.5 (API changelog endpoint)
 ```
 

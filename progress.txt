@@ -960,3 +960,8 @@
 
 **Tests:** 541 backend tests passing (91% coverage), 51 frontend tests passing, ruff clean.
 **Status:** DONE — committed and pushed (56bcefd).
+
+## Phase 16.2 — Scheduled Expired Token Cleanup [DONE] 2026-04-09
+- `main.py`: Added `PasswordResetToken` to the database import line. Added `purge_expired_tokens(session_factory)` job function — hard-deletes `RefreshToken` rows where `expires_at < now` and `PasswordResetToken` rows where `expires_at < now` OR `used_at IS NOT NULL`. Registered in `_start_scheduler` as a daily cron at 03:00 UTC (`id="purge_expired_tokens"`). Updated startup log message to include the new job.
+- `tests/test_token_cleanup.py` (new): 7 tests across `TestPurgeExpiredTokens` — expired refresh deleted, live refresh kept, expired reset deleted, used reset deleted, live reset kept, mixed-batch (all combinations verified in one pass), noop when no tokens exist. Uses `session_factory` fixture pattern (MagicMock wrapping `db`, `db.close` mocked) consistent with `test_digest.py`.
+- 553 backend tests pass; 91.45% coverage; ruff clean.
