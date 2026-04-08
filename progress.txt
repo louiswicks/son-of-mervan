@@ -1,3 +1,9 @@
+## Phase 16.5 — API Changelog Endpoint [DONE] 2026-04-09
+- `core/config.py`: Added `VERSION = "1.16.0"` constant and `CHANGELOG` static list (8 entries, newest-first, covering Phases 1–16). Both are module-level so they can be imported by tests directly.
+- `main.py`: Imported `VERSION` and `CHANGELOG` from `core.config`. Updated `/health` to report `VERSION` instead of the old hardcoded `"1.0.0"`. Added public `GET /version` endpoint — no auth required — returns `{ version, changelog }`.
+- `tests/test_version.py`: 7 tests covering: 200 with no auth, response shape, version matches constant, changelog contains current version entry, all entries have required fields, changelog is non-empty, endpoint matches the module-level constant.
+- 573 backend tests pass; 91.60% coverage; ruff clean.
+
 ## Phase 16.1 — Email Verification Resend [DONE] 2026-04-09
 - `routers/signup.py`: Added `POST /auth/resend-verification` endpoint — accepts `{ email }`, returns generic 200 regardless of whether email exists (prevents enumeration). Sends a new JWT verify token only when: user exists + not yet verified + `verification_sent_at` > 2 minutes ago. Rate-limited 3/min per IP via slowapi. Updates `User.verification_sent_at` on send. Dev link returned when SMTP not configured (same pattern as signup).
 - `web/src/api/auth.js`: Added `resendVerification(email)` Axios wrapper for `POST /auth/resend-verification`.

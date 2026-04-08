@@ -904,7 +904,7 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Dashboard renders card from day 22 of the current month onwards
 - [x] 4+ backend tests; frontend card renders correctly with mock data
 
-### 16.5 API Changelog Endpoint
+### 16.5 API Changelog Endpoint [DONE]
 **Goal:** Provide a machine-readable version history so future client integrations can detect breaking changes without reading git logs.
 **Scope:**
 - `GET /version` — returns `{ version: "1.16.0", changelog: [{version, date, summary}] }`. Version is driven by a `VERSION` constant in `core/config.py`. Changelog is a static list maintained in code.
@@ -912,11 +912,11 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - Version bumped on each Phase completion going forward.
 
 **Acceptance Criteria:**
-- [ ] `GET /version` returns 200 with `version` and `changelog` array
-- [ ] No authentication required
-- [ ] `version` matches `VERSION` constant in `core/config.py`
-- [ ] At least current version entry in changelog
-- [ ] 2+ backend tests
+- [x] `GET /version` returns 200 with `version` and `changelog` array
+- [x] No authentication required
+- [x] `version` matches `VERSION` constant in `core/config.py`
+- [x] At least current version entry in changelog
+- [x] 2+ backend tests
 
 ---
 
@@ -955,7 +955,7 @@ Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE)
 
 Phase 16: Reliability, developer experience & user onboarding
   16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
-  → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint)
+  → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
 ```
 
 ---

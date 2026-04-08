@@ -24,7 +24,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from core.logging_config import setup_logging
-from core.config import settings
+from core.config import settings, VERSION, CHANGELOG
 from core.limiter import limiter
 from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
@@ -186,7 +186,13 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint used by Docker and Railway."""
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": VERSION}
+
+
+@app.get("/version")
+async def version():
+    """Public endpoint returning current API version and changelog."""
+    return {"version": VERSION, "changelog": CHANGELOG}
 
 @app.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")

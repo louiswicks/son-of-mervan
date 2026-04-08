@@ -10,6 +10,22 @@ from pydantic import field_validator
 logger = logging.getLogger(__name__)
 
 
+# Current application version — bump on each Phase completion going forward
+VERSION = "1.16.0"
+
+# Static changelog — newest entry first
+CHANGELOG: list[dict] = [
+    {"version": "1.16.0", "date": "2026-04-09", "summary": "Phase 16: Reliability & DX — email verification resend, token cleanup, iCal export, month-close card, API changelog"},
+    {"version": "1.15.0", "date": "2026-04-08", "summary": "Phase 15: Open Banking — TrueLayer OAuth, transaction sync, draft review, bank disconnect"},
+    {"version": "1.14.0", "date": "2026-04-07", "summary": "Phase 14: UI/UX Overhaul — navigation redesign, budget page layout, global visual polish"},
+    {"version": "1.13.0", "date": "2026-04-06", "summary": "Phase 13: Performance & Security — code splitting, TOTP 2FA, expense notes/tags, email preferences, session manager"},
+    {"version": "1.12.0", "date": "2026-04-05", "summary": "Phase 12: Usability & Production Hardening — budget copy forward, net worth tracker, accessibility, full data export, milestone notifications"},
+    {"version": "1.11.0", "date": "2026-04-04", "summary": "Phase 11: Power Features — custom categories, CSV import, cashflow forecast, debt payoff, spending streaks"},
+    {"version": "1.10.0", "date": "2026-04-03", "summary": "Phase 10: Operational Excellence — backup/restore scripts, audit log, currency support, AI financial review"},
+    {"version": "1.0.0", "date": "2026-01-01", "summary": "Initial release — core budget planning, monthly tracker, savings goals, recurring expenses, alerts"},
+]
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
