@@ -30,7 +30,7 @@ from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, AuditLog
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password, create_totp_challenge_token
@@ -924,6 +924,41 @@ def sync_all_investment_prices(session_factory):
         db.close()
 
 
+def purge_expired_tokens(session_factory):
+    """
+    APScheduler job: runs daily at 03:00 UTC.
+    Hard-deletes expired refresh tokens and expired/used password-reset tokens
+    so the token tables don't grow unbounded.
+    """
+    db = session_factory()
+    try:
+        now = datetime.utcnow()
+        refresh_deleted = (
+            db.query(RefreshToken)
+            .filter(RefreshToken.expires_at < now)
+            .delete(synchronize_session=False)
+        )
+        reset_deleted = (
+            db.query(PasswordResetToken)
+            .filter(
+                (PasswordResetToken.expires_at < now)
+                | (PasswordResetToken.used_at != None)  # noqa: E711
+            )
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        logger.info(
+            "Token cleanup complete — %d refresh token(s) and %d reset token(s) purged",
+            refresh_deleted,
+            reset_deleted,
+        )
+    except Exception:
+        logger.exception("Token cleanup job failed")
+        db.rollback()
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def _start_scheduler():
     from routers.recurring import generate_all_recurring
@@ -986,13 +1021,23 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    _scheduler.add_job(
+        purge_expired_tokens,
+        "cron",
+        hour=3,
+        minute=0,
+        id="purge_expired_tokens",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
         "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC, "
         "monthly digest on 1st of month at 08:00 UTC, "
         "investment price sync at 16:30 UTC, "
-        "milestone email checks on 1st of month at 09:00 UTC"
+        "milestone email checks on 1st of month at 09:00 UTC, "
+        "token cleanup daily at 03:00 UTC"
     )
 
 
