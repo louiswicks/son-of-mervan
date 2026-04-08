@@ -892,3 +892,32 @@
 - `.env.example`: Added `TRUELAYER_CLIENT_ID`, `TRUELAYER_CLIENT_SECRET`, `TRUELAYER_REDIRECT_URI` variables.
 
 **Tests:** 481 backend tests pass (all existing tests unaffected); alembic upgrade/downgrade verified; ruff lint clean; commit: `f3ac819`
+
+## Phase 15.2 — Backend: TrueLayer OAuth Flow [DONE] 2026-04-08
+
+**Problem solved:** No mechanism to authorise TrueLayer open banking access or persist OAuth tokens.
+
+**What was built:**
+- `routers/banking.py`: `GET /banking/connect` — generates HMAC-signed CSRF state token + TrueLayer authorisation URL with scopes `accounts transactions balance`; returns `{ auth_url }`.
+- `routers/banking.py`: `GET /banking/callback` — validates state, exchanges auth code for access+refresh tokens, fetches first account_id, upserts `BankConnection` row (encrypted tokens), redirects to frontend `/banking?connected=true`.
+- `routers/banking.py`: `POST /banking/refresh/{id}` — refreshes access token using stored refresh token; called automatically by sync endpoint on 401.
+- `routers/banking.py`: `GET /banking/connections` — lists active (non-disconnected) connections; token fields excluded from response.
+- `main.py`: banking router registered.
+- `models.py`: `BankConnectResponse`, `BankConnectionResponse`, `BankConnectionListResponse`.
+- `tests/test_banking.py`: 23 tests covering all endpoints.
+
+**Tests:** 504 backend tests pass; ruff lint clean; commit: `367dc39`
+
+## Phase 15.3 — Backend: Transaction Sync & Draft Review [DONE] 2026-04-08
+
+**Problem solved:** Once connected, users had no way to fetch transactions or review/confirm them as expenses.
+
+**What was built:**
+- `routers/banking.py`: `POST /banking/sync` — fetches transactions from TrueLayer `/data/v1/accounts/{id}/transactions` since `last_synced_at` (or 90-day window on first sync). Deduplicates by `external_id`. Calls inline category-suggestion logic (mirrors `GET /insights/suggest-category`). Creates `BankTransaction` draft rows. Auto-refreshes token on 401. Updates `last_synced_at`. Rate-limited 1/5min via slowapi.
+- `routers/banking.py`: `GET /banking/drafts?page&page_size` — paginated list of user's `status=draft` transactions (decrypted fields).
+- `routers/banking.py`: `PATCH /banking/drafts/{id}` — `action=confirm` creates a `MonthlyExpense` row (using `body.category` or `suggested_category` or "Other"), sets `status=confirmed` + `monthly_expense_id`; `action=reject` sets `status=rejected`. Returns 403 if draft belongs to another user.
+- `routers/banking.py`: `POST /banking/drafts/confirm-all` — bulk confirms all draft transactions for the authenticated user.
+- `models.py`: Added `BankSyncResponse`, `BankTransactionResponse`, `BankDraftsResponse`, `BankDraftActionRequest`, `BankDraftActionResponse`, `BankConfirmAllResponse`.
+- `tests/test_banking.py`: Extended with 26 new tests covering sync deduplication, pagination, confirm/reject ownership, confirm-all, and edge cases.
+
+**Tests:** 530 backend tests pass (91% coverage); ruff lint clean; commit: `4302a28`

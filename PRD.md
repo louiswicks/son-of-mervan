@@ -805,7 +805,7 @@ All financial and PII fields use Fernet hybrid properties (same pattern as `Mont
 **Files:** `routers/banking.py` (new), `main.py` (register router), `.env.example`
 **Acceptance Criteria:** Visiting `/banking/connect` URL redirects to TrueLayer sandbox login. After mock bank login, callback creates a `BankConnection` row. `GET /banking/connections` returns the linked account. Token fields are encrypted in the DB.
 
-### 15.3 Backend — Transaction Sync
+### 15.3 Backend — Transaction Sync ✅ DONE
 **Problem:** Once connected, users need transactions fetched and presented as categorised drafts.
 **Solution:**
 - `POST /banking/sync` (auth required) — fetches transactions from TrueLayer `/data/v1/accounts/{account_id}/transactions` for the period since `last_synced_at` (or last 90 days on first sync). For each transaction: check `_external_id_encrypted` for deduplication; call `GET /insights/suggest-category?name=<description>` for category suggestion; create `BankTransaction` draft row. Updates `last_synced_at`. Rate-limited to 1 call/5 minutes per user.
@@ -868,7 +868,8 @@ Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
   14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) [DONE] → 14.3 (Global visual polish) [DONE]
 
 Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
-  8.5 TrueLayer OAuth integration — sandbox first, then production credentials
+  15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
+  → 15.4 (Disconnect) → 15.5 (Frontend)
 ```
 
 ---
