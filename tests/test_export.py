@@ -2,11 +2,31 @@
 Tests for data export endpoints.
 
 Coverage targets:
-  routers/export.py — GET /export/csv, GET /export/pdf
+  routers/export.py — GET /export/csv, GET /export/pdf, GET /export/calendar.ics
 """
 import pytest
+from datetime import datetime
 
 from tests.conftest import make_month, make_expense
+from database import RecurringExpense
+
+
+def make_recurring(db, user, name="Rent", category="Housing", amount=1000.0,
+                   frequency="monthly", start_date=None, end_date=None):
+    """Create a RecurringExpense row owned by *user*."""
+    r = RecurringExpense(
+        user_id=user.id,
+        frequency=frequency,
+        start_date=start_date or datetime(2024, 1, 1),
+        end_date=end_date,
+    )
+    r.name = name
+    r.category = category
+    r.planned_amount = amount
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r
 
 
 class TestCSVExport:
@@ -231,3 +251,66 @@ class TestFullBackupExport:
             for e in m["expenses"]
         ]
         assert "OtherSecret" not in all_expense_names
+
+
+class TestCalendarExport:
+    """Tests for GET /export/calendar.ics."""
+
+    def test_calendar_empty_returns_valid_ical(self, auth_client):
+        """No recurring expenses → valid empty VCALENDAR (no VEVENTs)."""
+        r = auth_client.get("/export/calendar.ics")
+        assert r.status_code == 200
+        assert "text/calendar" in r.headers.get("content-type", "")
+        body = r.content.decode("utf-8")
+        assert "BEGIN:VCALENDAR" in body
+        assert "END:VCALENDAR" in body
+        assert "BEGIN:VEVENT" not in body
+
+    def test_calendar_content_disposition(self, auth_client):
+        r = auth_client.get("/export/calendar.ics")
+        assert r.status_code == 200
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert "recurring-expenses.ics" in cd
+
+    def test_calendar_with_expense_has_vevent(self, auth_client, db, verified_user):
+        make_recurring(db, verified_user, name="Rent", amount=1200.0, frequency="monthly")
+        r = auth_client.get("/export/calendar.ics")
+        assert r.status_code == 200
+        body = r.content.decode("utf-8")
+        assert "BEGIN:VEVENT" in body
+        assert "END:VEVENT" in body
+        assert "Rent" in body
+        assert "1200.00" in body
+
+    def test_calendar_rrule_frequencies(self, auth_client, db, verified_user):
+        """Each frequency maps to the correct RRULE FREQ value."""
+        for freq, expected in [
+            ("monthly", "FREQ=MONTHLY"),
+            ("weekly", "FREQ=WEEKLY"),
+            ("daily", "FREQ=DAILY"),
+            ("yearly", "FREQ=YEARLY"),
+        ]:
+            # Clean DB between sub-tests via a fresh recurring each time, but since
+            # clean_db runs per test we accumulate all four in one test — that's fine.
+            make_recurring(db, verified_user, name=f"Exp-{freq}", frequency=freq)
+
+        r = auth_client.get("/export/calendar.ics")
+        assert r.status_code == 200
+        body = r.content.decode("utf-8")
+        for expected in ["FREQ=MONTHLY", "FREQ=WEEKLY", "FREQ=DAILY", "FREQ=YEARLY"]:
+            assert expected in body
+
+    def test_calendar_unauthenticated(self, client):
+        r = client.get("/export/calendar.ics")
+        assert r.status_code in (401, 403)
+
+    def test_calendar_excludes_deleted_expenses(self, auth_client, db, verified_user):
+        """Soft-deleted recurring expenses must not appear in the calendar."""
+        exp = make_recurring(db, verified_user, name="DeletedRecurring", frequency="monthly")
+        exp.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.get("/export/calendar.ics")
+        assert r.status_code == 200
+        assert "DeletedRecurring" not in r.content.decode("utf-8")

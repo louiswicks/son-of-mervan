@@ -12,11 +12,12 @@ CSV/PDF endpoints are rate-limited to 1 request/minute per IP.
 Tax endpoints are rate-limited to 1 request/minute per IP.
 Full-backup endpoint is rate-limited to 1 request/hour per IP.
 """
+import calendar as _calendar
 import csv
 import io
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -766,4 +767,132 @@ def export_full_backup(
         iter([json_bytes]),
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# -------------------- iCal export --------------------
+
+_RRULE_FREQ = {
+    "daily": "DAILY",
+    "weekly": "WEEKLY",
+    "monthly": "MONTHLY",
+    "yearly": "YEARLY",
+}
+
+
+def _next_occurrence(start: date, frequency: str, today: date) -> date:
+    """Return the first occurrence of *start* that is >= *today*."""
+    if start >= today:
+        return start
+
+    if frequency == "daily":
+        return today
+
+    if frequency == "weekly":
+        days_since = (today - start).days
+        weeks_elapsed = days_since // 7
+        candidate = start + timedelta(weeks=weeks_elapsed)
+        if candidate < today:
+            candidate += timedelta(weeks=1)
+        return candidate
+
+    if frequency == "monthly":
+        day = start.day
+        y, m = today.year, today.month
+        max_day = _calendar.monthrange(y, m)[1]
+        candidate = date(y, m, min(day, max_day))
+        if candidate < today:
+            m += 1
+            if m > 12:
+                m, y = 1, y + 1
+            max_day = _calendar.monthrange(y, m)[1]
+            candidate = date(y, m, min(day, max_day))
+        return candidate
+
+    if frequency == "yearly":
+        day, mo = start.day, start.month
+        y = today.year
+        max_day = _calendar.monthrange(y, mo)[1]
+        candidate = date(y, mo, min(day, max_day))
+        if candidate < today:
+            y += 1
+            max_day = _calendar.monthrange(y, mo)[1]
+            candidate = date(y, mo, min(day, max_day))
+        return candidate
+
+    return today
+
+
+def _build_ical(expenses: list, base_currency: str, today: date) -> str:
+    """Return RFC 5545 iCalendar text for the given recurring expenses."""
+    dtstamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Son of Mervan//Personal Budget Tracker//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+
+    for exp in expenses:
+        freq_key = (exp.frequency or "monthly").lower()
+        rrule_freq = _RRULE_FREQ.get(freq_key, "MONTHLY")
+
+        start_dt = exp.start_date.date() if isinstance(exp.start_date, datetime) else exp.start_date
+        dtstart = _next_occurrence(start_dt, freq_key, today).strftime("%Y%m%d")
+
+        name = exp.name or "Expense"
+        amount = float(exp.planned_amount or 0.0)
+        currency = base_currency or "GBP"
+        category = exp.category or "Other"
+
+        summary = f"{name} - {currency}{amount:.2f}/{freq_key}"
+        description = f"Category: {category}\\nCurrency: {currency}"
+
+        # RRULE: add UNTIL if end_date is set
+        rrule = f"FREQ={rrule_freq}"
+        if exp.end_date:
+            end_dt = exp.end_date.date() if isinstance(exp.end_date, datetime) else exp.end_date
+            rrule += f";UNTIL={end_dt.strftime('%Y%m%d')}"
+
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:recurring-{exp.id}@son-of-mervan",
+            f"DTSTAMP:{dtstamp}",
+            f"DTSTART;VALUE=DATE:{dtstart}",
+            f"RRULE:{rrule}",
+            f"SUMMARY:{summary}",
+            f"DESCRIPTION:{description}",
+            "END:VEVENT",
+        ]
+
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
+
+
+@router.get("/calendar.ics")
+def export_calendar(
+    request: Request,  # noqa: ARG001 — kept for API consistency / future rate-limiting
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Export recurring expenses as an RFC 5545 iCalendar file."""
+    user = _require_user(db, current_user)
+
+    expenses = (
+        db.query(RecurringExpense)
+        .filter(
+            RecurringExpense.user_id == user.id,
+            RecurringExpense.deleted_at.is_(None),
+        )
+        .all()
+    )
+
+    today = date.today()
+    ical_text = _build_ical(expenses, user.base_currency or "GBP", today)
+
+    return StreamingResponse(
+        iter([ical_text.encode("utf-8")]),
+        media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="recurring-expenses.ics"'},
     )

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import PageWrapper from "./PageWrapper";
 import Card from "./Card";
-import { Plus, Pencil, Trash2, RefreshCw, X, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, X, Check, Calendar } from "lucide-react";
 import {
   useRecurring,
   useCreateRecurring,
@@ -13,6 +13,7 @@ import {
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
 import { useCategorySuggestion } from "../hooks/useInsights";
+import { exportCalendar } from "../api/export";
 
 const CATEGORIES = [
   "Housing", "Transportation", "Food", "Utilities",
@@ -157,6 +158,16 @@ export default function RecurringExpensesPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [calExporting, setCalExporting] = useState(false);
+
+  const handleExportCalendar = async () => {
+    setCalExporting(true);
+    try {
+      await exportCalendar();
+    } finally {
+      setCalExporting(false);
+    }
+  };
 
   const handleAdd = async () => {
     if (!addForm.name || !addForm.planned_amount) return;
@@ -211,6 +222,15 @@ export default function RecurringExpensesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleExportCalendar}
+            disabled={calExporting}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 min-h-[44px] disabled:opacity-50"
+            title="Export recurring expenses as iCalendar (.ics)"
+          >
+            <Calendar size={16} />
+            <span className="hidden sm:inline">{calExporting ? "Exporting…" : "Export to Calendar"}</span>
+          </button>
           <button
             onClick={() => generateMutation.mutate()}
             disabled={generateMutation.isPending}

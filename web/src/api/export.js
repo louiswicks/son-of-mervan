@@ -74,3 +74,11 @@ export async function exportFullBackup() {
   const res = await client.get('/export/full-backup', { responseType: 'blob' });
   downloadBlob(res.data, `backup-${today}.json`);
 }
+
+/**
+ * Download recurring expenses as an iCalendar (.ics) file.
+ */
+export async function exportCalendar() {
+  const res = await client.get('/export/calendar.ics', { responseType: 'blob' });
+  downloadBlob(res.data, 'recurring-expenses.ics');
+}
