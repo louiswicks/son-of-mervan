@@ -203,6 +203,41 @@ def monthly_summary(
     }
 
 
+@router.get("/month-close-summary")
+def month_close_summary(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Per-category unspent budget for the given month (planned - actual where positive).
+    Intended to surface surplus at month-end so the user can move it to savings.
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+
+    if not month_row:
+        return {"month": month_norm, "total_unspent": 0.0, "categories": []}
+
+    cat_data = _category_totals(db, month_row)
+
+    categories = []
+    for cat, v in cat_data.items():
+        planned = round(float(v["planned"]), 2)
+        actual = round(float(v["actual"]), 2)
+        unspent = round(max(0.0, planned - actual), 2)
+        categories.append({"category": cat, "planned": planned, "actual": actual, "unspent": unspent})
+
+    # Sort by unspent descending
+    categories.sort(key=lambda x: x["unspent"], reverse=True)
+    total_unspent = round(sum(c["unspent"] for c in categories), 2)
+
+    return {"month": month_norm, "total_unspent": total_unspent, "categories": categories}
+
+
 @router.get("/trends")
 def spending_trends(
     months: int = Query(6, ge=2, le=24, description="Number of months to include"),

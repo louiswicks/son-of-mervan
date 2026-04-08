@@ -716,3 +716,71 @@ class TestStreaks:
         body = r.json()
         assert body["current_streak"] == 0
         assert body["total_tracked"] == 0
+
+
+class TestMonthCloseSummary:
+    def test_no_data_returns_empty(self, auth_client):
+        """No MonthlyData for the month → empty categories, zero total."""
+        r = auth_client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month"] == "2026-03"
+        assert body["total_unspent"] == 0.0
+        assert body["categories"] == []
+
+    def test_unspent_computed_correctly(self, auth_client, db, verified_user):
+        """Unspent = planned - actual for under-budget categories."""
+        month = make_month(db, verified_user, month="2026-03")
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0, actual=600.0)
+        make_expense(db, month, name="Groceries", category="Food", planned=300.0, actual=200.0)
+
+        r = auth_client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total_unspent"] == pytest.approx(300.0)
+        cats = {c["category"]: c for c in body["categories"]}
+        assert cats["Housing"]["unspent"] == pytest.approx(200.0)
+        assert cats["Food"]["unspent"] == pytest.approx(100.0)
+
+    def test_overspend_clamped_to_zero(self, auth_client, db, verified_user):
+        """Categories where actual > planned must have unspent = 0 (not negative)."""
+        month = make_month(db, verified_user, month="2026-03")
+        make_expense(db, month, name="Dining", category="Food", planned=100.0, actual=180.0)
+
+        r = auth_client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code == 200
+        body = r.json()
+        cats = {c["category"]: c for c in body["categories"]}
+        assert cats["Food"]["unspent"] == 0.0
+        assert body["total_unspent"] == 0.0
+
+    def test_sorted_by_unspent_descending(self, auth_client, db, verified_user):
+        """Categories are returned sorted by unspent amount descending."""
+        month = make_month(db, verified_user, month="2026-03")
+        make_expense(db, month, name="Coffee", category="Entertainment", planned=50.0, actual=10.0)
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0, actual=400.0)
+        make_expense(db, month, name="Food", category="Food", planned=200.0, actual=150.0)
+
+        r = auth_client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code == 200
+        unspent_values = [c["unspent"] for c in r.json()["categories"]]
+        assert unspent_values == sorted(unspent_values, reverse=True)
+
+    def test_data_isolated_per_user(self, auth_client, db, verified_user, second_user):
+        """Another user's data does not bleed into the authenticated user's result."""
+        other_month = make_month(db, second_user, month="2026-03")
+        make_expense(db, other_month, name="Luxury", category="Other", planned=5000.0, actual=100.0)
+
+        r = auth_client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code == 200
+        assert r.json()["total_unspent"] == 0.0
+
+    def test_unauthenticated_returns_401(self, client):
+        """Unauthenticated request is rejected."""
+        r = client.get("/insights/month-close-summary", params={"month": "2026-03"})
+        assert r.status_code in (401, 403)
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        """Bad month param → 422 validation error."""
+        r = auth_client.get("/insights/month-close-summary", params={"month": "not-a-month"})
+        assert r.status_code == 422

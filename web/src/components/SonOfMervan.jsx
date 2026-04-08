@@ -2,17 +2,18 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   PlusCircle, Calculator, Trash2, TrendingUp,
-  DollarSign, PieChart, LayoutTemplate, X, Flame
+  DollarSign, PieChart, LayoutTemplate, X, Flame, Wallet
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid,
   XAxis, YAxis, Tooltip, BarChart, Bar
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 import { useCalculateBudget } from "../hooks/useBudget";
 import { useTheme } from "../hooks/useTheme";
 import { useCategories } from "../hooks/useCategories";
-import { useStreaks } from "../hooks/useInsights";
+import { useStreaks, useMonthCloseSummary } from "../hooks/useInsights";
 import { getMonthlyTracker } from "../api/expenses";
 import PageWrapper from "./PageWrapper";
 import Card from "./Card";
@@ -94,10 +95,17 @@ export default function SonOfMervan() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [loadingPrevMonth, setLoadingPrevMonth] = useState(false);
 
+  const navigate = useNavigate();
   const calculateMutation = useCalculateBudget();
   const { data: categoriesData } = useCategories();
   const { data: streakData } = useStreaks();
   const shownMilestoneRef = useRef(null);
+
+  // Month Close card: show from day 22 of the current month
+  const today = new Date();
+  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const showMonthCloseCard = today.getDate() >= 22;
+  const { data: monthCloseData } = useMonthCloseSummary(showMonthCloseCard ? currentMonthStr : null);
 
   useEffect(() => {
     if (!streakData) return;
@@ -273,6 +281,37 @@ export default function SonOfMervan() {
                 Best: {streakData.longest_streak}
               </span>
             )}
+          </div>
+        )}
+
+        {/* Month Close card — visible from day 22 when there is unspent budget */}
+        {showMonthCloseCard && monthCloseData && monthCloseData.total_unspent > 0 && (
+          <div
+            data-testid="month-close-card"
+            className="flex flex-col sm:flex-row sm:items-center gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-5 py-4 mb-5 sm:mb-6"
+          >
+            <div className="flex items-start gap-3 flex-1">
+              <Wallet className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm sm:text-base">
+                  You have{" "}
+                  <span className="font-bold">
+                    £{monthCloseData.total_unspent.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>{" "}
+                  unspent this month
+                </p>
+                <p className="text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm mt-0.5">
+                  Month-end is near — consider moving your surplus to savings.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/savings")}
+              className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+            >
+              Move to savings
+            </button>
           </div>
         )}
 

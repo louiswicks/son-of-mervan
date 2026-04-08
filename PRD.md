@@ -715,7 +715,7 @@ Phase 13 targets measurable performance improvements, stronger account security,
 - [x] Account Settings: "Email Preferences" section with three labelled toggles
 - [x] 3+ backend tests
 
-### 13.5 Active Session Manager
+### 13.5 Active Session Manager [DONE 2026-04-09]
 **Goal:** Give users visibility and control over where their account is logged in, improving security transparency.  
 **Scope:** Expose all non-revoked refresh tokens for the current user with metadata (created_at, last_used_at, user_agent snippet). Allow revoking any token individually or all except current. Store `user_agent` and `last_used_at` on `RefreshToken` model.
 
