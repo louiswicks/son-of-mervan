@@ -856,3 +856,19 @@
 - `web/src/tests/SonOfMervan.test.jsx`: Updated two tests — "no results shown initially" replaced with "live stat cards shown initially; charts not shown until after Calculate"; "after Calculate shows result cards" now asserts chart headings appear (not the always-visible stat card labels).
 
 **Tests:** 51 frontend tests pass (16 in SonOfMervan suite); build 320 kB gzip; commit: `c4da404`
+
+## Phase 14.3 — Global Visual Polish [DONE] 2026-04-08
+
+**Problem solved:** 18 page-level components each had their own ad-hoc card styles, max-widths, spacing, and input classNames added independently across phases. No consistent visual language.
+
+**What was built:**
+- `web/src/components/Card.jsx`: Reusable card primitive — `rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7`. Accepts `className` for overrides.
+- `web/src/components/PageWrapper.jsx`: Page-level centering wrapper — `max-w-6xl mx-auto space-y-6`. Accepts optional `className` for pages needing narrower max-width.
+- `web/src/styles/inputs.js`: Shared `INPUT_CLASS` and `INPUT_CLASS_INLINE` constants — `border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`.
+- `web/src/components/EmptyState.jsx`: Empty-state component — icon + heading + description + CTA button, centred with `py-16`.
+- All 18 page-level components updated: `PageWrapper` wraps the top-level return, inline card divs replaced with `<Card>`, input classNames replaced with `INPUT_CLASS`/`INPUT_CLASS_INLINE`.
+- `SavingsGoalsPage.jsx`: Added `<EmptyState>` when `goals.length === 0 && !showCreate`.
+- `NetWorthPage.jsx`: Added `<EmptyState>` when `snapshots.length === 0 && !showForm`. Fixed undefined `input-base` and `btn-primary` CSS classes (replaced with Tailwind equivalents).
+- `ScenarioPlannerPage.jsx`: Fixed mismatched `</div>` → `</Card>` closing tag introduced during the update.
+
+**Tests:** 51 frontend tests pass; build succeeds (no ESLint errors); commit: `af91eab`

@@ -759,7 +759,7 @@ The app has accumulated 13+ phases of feature work. Each Ralph-loop iteration ad
 **Files:** `web/src/components/SonOfMervan.jsx`, `web/src/tests/SonOfMervan.test.jsx`
 **Acceptance Criteria:** At 1440px, left and right columns are both visible with no empty grey wasteland. At 768px, layout collapses to single column (form then stats). Live preview updates within 100ms of keystroke. All existing tests pass.
 
-### 14.3 Global Visual Polish
+### 14.3 Global Visual Polish ✅ DONE
 **Problem:** Inconsistent card styles, spacing, and input heights across pages. Each feature phase added UI independently.
 **Solution:**
 - Extract a reusable `Card` component (`rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7`). Replace all inline card divs across all page components.
@@ -864,8 +864,8 @@ Phase 13 (DONE): Performance, security hardening & developer experience
   13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
   → 13.4 (Email preference center) → 13.5 (Active session manager)
 
-Phase 14 (In Progress): UI/UX Overhaul — fix visual quality before open banking
-  14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) → 14.3 (Global visual polish)
+Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
+  14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) [DONE] → 14.3 (Global visual polish) [DONE]
 
 Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
   8.5 TrueLayer OAuth integration — sandbox first, then production credentials
