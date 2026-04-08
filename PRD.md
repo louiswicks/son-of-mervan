@@ -679,18 +679,18 @@ Phase 13 targets measurable performance improvements, stronger account security,
 - [x] LoginPage.jsx detects `requires_2fa` and stores challenge token in Zustand; navigates to `/2fa`
 - [x] Rate-limited: setup/confirm 10/min, disable/verify-login 5-10/min
 
-### 13.3 Expense Notes & Tags
+### 13.3 Expense Notes & Tags [DONE 2026-04-08]
 **Goal:** Let users add context to individual expenses (a free-text note and up to 5 short tags) for richer filtering and personal reference.  
 **Scope:** Add `note` (text, optional, max 500 chars) and `tags` (JSON array of strings, max 5 tags, each max 30 chars) to `MonthlyExpense`. Expose in PUT `/expenses/{id}`. Show note/tag UI in MonthlyTracker row expand or edit modal.
 
 **Acceptance Criteria:**
-- [ ] `note` and `tags` columns added to `MonthlyExpense` via Alembic migration
-- [ ] `PUT /expenses/{id}` accepts and validates `note` and `tags`
-- [ ] `GET /monthly-tracker/{month}` includes `note` and `tags` in response
-- [ ] UI: edit expense modal shows note textarea and tag chip input (max 5 tags)
-- [ ] Tags support add/remove chip interaction; note is a multiline textarea
-- [ ] Advanced search endpoint (`GET /expenses/search`) filters by tag
-- [ ] 4+ backend tests
+- [x] `note` and `tags` columns added to `MonthlyExpense` via Alembic migration
+- [x] `PUT /expenses/{id}` accepts and validates `note` and `tags`
+- [x] `GET /monthly-tracker/{month}` includes `note` and `tags` in response
+- [x] UI: edit expense modal shows note textarea and tag chip input (max 5 tags)
+- [x] Tags support add/remove chip interaction; note is a multiline textarea
+- [x] Advanced search endpoint (`GET /expenses/search`) filters by tag
+- [x] 4+ backend tests (6 new tests added)
 
 ### 13.4 Email Notification Preference Center
 **Goal:** Give users granular control over which emails they receive to reduce notification fatigue and improve retention.  

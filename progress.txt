@@ -783,3 +783,30 @@
 - `web/src/components/LoginPage.jsx`: After login API call, checks `data.requires_2fa` — if truthy, calls `setTOTPChallenge(totp_challenge_token)` and navigates to `/2fa`.
 - `web/src/components/AccountSettings.jsx`: Imported `TwoFactorSetup`; added "Two-Factor Authentication" `<Section>` between Security and Email Notifications sections.
 - ruff: clean (1 spurious import caught and removed from totp.py); all backend file syntax OK
+
+---
+## Phase 13.3: Expense Notes & Tags [2026-04-08]
+
+**Summary:** Added free-text `note` and `tags` (JSON array) to individual expenses for richer context and filtering.
+
+**Backend changes:**
+- `database.py`: Added `_note_encrypted` (String 1024) and `_tags_encrypted` (String 512) columns to `MonthlyExpense`. Added hybrid properties `note` and `tags` following the existing Fernet encrypt/decrypt pattern. Tags are stored as JSON-encoded lists.
+- `alembic/versions/r8s9t0u1v2w3_add_notes_tags_to_expenses.py`: Migration adds `note_encrypted` and `tags_encrypted` columns to `monthly_expenses` table.
+- `models.py`: Added `note: Optional[str]` (max 500 chars via Field) and `tags: Optional[List[str]]` to `ExpenseUpdateRequest`; added `note: Optional[str]` and `tags: List[str]` to `ExpenseResponse`.
+- `main.py`: 
+  - `PUT /expenses/{id}`: handles `note` and `tags` from request; tags silently capped at 5 items, each trimmed to 30 chars; both included in response.
+  - `GET /monthly-tracker/{month}`: `note` and `tags` included in `expense_dicts`.
+  - `GET /expenses/search`: new `tag` query param for exact-match tag filtering; `note` and `tags` included in search results.
+
+**Frontend changes:**
+- `web/src/components/MonthlyTracker.jsx`: 
+  - `buildRowsFromExpenses` and the filtered-category path both now include `note` and `tags` when mapping API data to rows.
+  - `startEdit` initialises `editDraft.note` and `editDraft.tags` from the row.
+  - `saveEdit` includes `note` and `tags` in the `updateMutation` payload.
+  - Mobile card view: note textarea and tags comma-input shown in edit mode; italic note text and blue tag chips shown in read mode.
+  - Desktop table: new "Note / Tags" column with textarea+input in edit mode and chip display in read mode.
+
+**Tests:**
+- 6 new tests in `TestExpenseNotesTags` class in `tests/test_expenses.py`: note persist, tags persist, tags capped at 5, tracker response includes note/tags, search filters by tag, tag no-match returns empty.
+- Total: 459 tests, 88.54% coverage (target: 80%).
+- ruff: clean on all modified files.
