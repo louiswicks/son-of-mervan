@@ -876,7 +876,7 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Job registered in APScheduler startup block in `main.py`
 - [x] 7 backend tests covering all scenarios (expired, used, live, mixed batch, noop)
 
-### 16.3 iCal Export of Recurring Expenses
+### 16.3 iCal Export of Recurring Expenses ✅ DONE
 **Goal:** Let users export their recurring expense schedule as a `.ics` file importable into Google Calendar / Apple Calendar — bringing financial awareness into the tools users already check daily.
 **Scope:**
 - `GET /export/calendar.ics` — generates RFC 5545-compliant iCalendar file. Each active, non-deleted recurring expense becomes one VEVENT (or RRULE) with: SUMMARY = expense name + amount, DTSTART = next occurrence from today, RRULE matching the frequency (FREQ=MONTHLY / WEEKLY / DAILY / YEARLY). DESCRIPTION includes category and currency.
@@ -884,12 +884,12 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - Frontend: "Export to Calendar" button on RecurringExpensesPage; triggers download.
 
 **Acceptance Criteria:**
-- [ ] Response has `Content-Type: text/calendar` and `Content-Disposition: attachment; filename="recurring-expenses.ics"`
-- [ ] Output passes RFC 5545 basic structure (VCALENDAR > VEVENT per expense)
-- [ ] RRULE correctly maps: monthly → `FREQ=MONTHLY`, weekly → `FREQ=WEEKLY`, daily → `FREQ=DAILY`, yearly → `FREQ=YEARLY`
-- [ ] Empty response (no expenses) returns a valid empty calendar
-- [ ] Unauthenticated request → 401/403
-- [ ] 4+ backend tests; "Export to Calendar" button on RecurringExpensesPage
+- [x] Response has `Content-Type: text/calendar` and `Content-Disposition: attachment; filename="recurring-expenses.ics"`
+- [x] Output passes RFC 5545 basic structure (VCALENDAR > VEVENT per expense)
+- [x] RRULE correctly maps: monthly → `FREQ=MONTHLY`, weekly → `FREQ=WEEKLY`, daily → `FREQ=DAILY`, yearly → `FREQ=YEARLY`
+- [x] Empty response (no expenses) returns a valid empty calendar
+- [x] Unauthenticated request → 401/403
+- [x] 4+ backend tests; "Export to Calendar" button on RecurringExpensesPage
 
 ### 16.4 Spending Budget Carry-Forward Card
 **Goal:** Surface unspent budget at month-end so users are prompted to move the surplus to savings — turning passive awareness into active saving behaviour.
@@ -954,7 +954,7 @@ Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE)
   → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
 
 Phase 16: Reliability, developer experience & user onboarding
-  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export)
+  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
   → 16.4 (Month-close card) → 16.5 (API changelog endpoint)
 ```
 

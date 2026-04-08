@@ -965,3 +965,15 @@
 - `main.py`: Added `PasswordResetToken` to the database import line. Added `purge_expired_tokens(session_factory)` job function — hard-deletes `RefreshToken` rows where `expires_at < now` and `PasswordResetToken` rows where `expires_at < now` OR `used_at IS NOT NULL`. Registered in `_start_scheduler` as a daily cron at 03:00 UTC (`id="purge_expired_tokens"`). Updated startup log message to include the new job.
 - `tests/test_token_cleanup.py` (new): 7 tests across `TestPurgeExpiredTokens` — expired refresh deleted, live refresh kept, expired reset deleted, used reset deleted, live reset kept, mixed-batch (all combinations verified in one pass), noop when no tokens exist. Uses `session_factory` fixture pattern (MagicMock wrapping `db`, `db.close` mocked) consistent with `test_digest.py`.
 - 553 backend tests pass; 91.45% coverage; ruff clean.
+
+## Phase 16.3 — iCal Export of Recurring Expenses [DONE] 2026-04-09
+
+**Task:** Export recurring expense schedule as a `.ics` file importable into Google/Apple Calendar.
+
+**Files modified:**
+- `routers/export.py`: Added `_next_occurrence()` helper (computes first occurrence >= today per frequency), `_build_ical()` helper (generates RFC 5545 VCALENDAR text with one VEVENT+RRULE per active expense; UNTIL set when end_date present), and `GET /export/calendar.ics` endpoint (auth required, returns `text/calendar`, `Content-Disposition: attachment; filename="recurring-expenses.ics"`).
+- `web/src/api/export.js`: Added `exportCalendar()` function using blob download helper.
+- `web/src/components/RecurringExpensesPage.jsx`: Added "Export to Calendar" button (Calendar icon from lucide-react) with loading state, placed before the existing "Generate now" button.
+- `tests/test_export.py`: Added `make_recurring()` helper and `TestCalendarExport` class — 6 tests: empty calendar valid, content-disposition header, VEVENT with expense data, all 4 RRULE frequencies (MONTHLY/WEEKLY/DAILY/YEARLY), unauthenticated 401/403, soft-deleted expenses excluded.
+
+**Tests:** 559 backend tests pass; ruff clean; commit: `7352a0a`.
