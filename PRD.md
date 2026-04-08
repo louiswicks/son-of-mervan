@@ -720,12 +720,12 @@ Phase 13 targets measurable performance improvements, stronger account security,
 **Scope:** Expose all non-revoked refresh tokens for the current user with metadata (created_at, last_used_at, user_agent snippet). Allow revoking any token individually or all except current. Store `user_agent` and `last_used_at` on `RefreshToken` model.
 
 **Acceptance Criteria:**
-- [ ] `user_agent` (text) and `last_used_at` (timestamp, updated on each `/auth/refresh` call) added to `RefreshToken` via migration
-- [ ] `GET /auth/sessions` → returns list of active sessions (id, created_at, last_used_at, user_agent snippet, is_current)
-- [ ] `DELETE /auth/sessions/{id}` → revokes a single session (ownership enforced)
-- [ ] `DELETE /auth/sessions` → revokes all sessions except current
-- [ ] Account Settings: "Active Sessions" card lists sessions, "Sign out" button per row, "Sign out all other devices" button
-- [ ] 4+ backend tests
+- [x] `user_agent` (text) and `last_used_at` (timestamp, updated on each `/auth/refresh` call) added to `RefreshToken` via migration
+- [x] `GET /auth/sessions` → returns list of active sessions (id, created_at, last_used_at, user_agent snippet, is_current)
+- [x] `DELETE /auth/sessions/{id}` → revokes a single session (ownership enforced)
+- [x] `DELETE /auth/sessions` → revokes all sessions except current
+- [x] Account Settings: "Active Sessions" card lists sessions, "Sign out" button per row, "Sign out all other devices" button
+- [x] 4+ backend tests
 
 ---
 
@@ -860,7 +860,7 @@ Phase 12 (DONE): Usability, retention & production hardening
   12.1 (Budget copy forward) → 12.2 (Net worth tracker) → 12.3 (Accessibility)
   → 12.4 (Full data export) → 12.5 (Milestone email notifications)
 
-Phase 13 (Current): Performance, security hardening & developer experience
+Phase 13 (DONE): Performance, security hardening & developer experience
   13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
   → 13.4 (Email preference center) → 13.5 (Active session manager)
 

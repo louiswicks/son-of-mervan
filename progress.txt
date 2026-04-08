@@ -1,3 +1,15 @@
+## Phase 13.5 — Active Session Manager [DONE] 2026-04-08
+- `database.py`: Added `user_agent` (Text, nullable) and `last_used_at` (DateTime, nullable) columns to `RefreshToken` model
+- `alembic/versions/t0u1v2w3x4y5_add_session_metadata_to_refresh_tokens.py`: Migration adding both columns to `refresh_tokens` table; down_revision = s9t0u1v2w3x4
+- `main.py`: Updated `/login` endpoint to capture `request.headers.get("user-agent", "")[:512]` and pass `user_agent` + `last_used_at=datetime.utcnow()` when creating `RefreshToken`
+- `routers/totp.py`: Same user_agent capture added to the TOTP `/auth/2fa/verify-login` endpoint that also creates refresh tokens
+- `routers/signup.py`: (1) Added `verify_token as _verify_token` import from security + `Optional` from typing; (2) Updated `/auth/refresh` to set `rt.last_used_at = datetime.utcnow()` before issuing the new access token; (3) Added `SessionResponse` Pydantic model (id, created_at, last_used_at, user_agent, is_current); (4) Added `GET /auth/sessions` — returns active (non-revoked, non-expired) sessions for current user, marks is_current via cookie hash comparison; (5) Added `DELETE /auth/sessions/{id}` — revokes single session (ownership enforced, 404 if not found or wrong owner, 400 if already revoked); (6) Added `DELETE /auth/sessions` — revokes all sessions except current (identified via cookie)
+- `web/src/api/sessions.js` (new): `getSessions`, `revokeSession(id)`, `revokeAllOtherSessions` Axios wrappers
+- `web/src/hooks/useProfile.js`: Added `useSessions`, `useRevokeSession`, `useRevokeAllOtherSessions` React Query hooks with toast feedback
+- `web/src/components/AccountSettings.jsx`: Added "Active Sessions" Section between Email Preferences and Data & Privacy — lists sessions with user_agent, sign-in date, last-active date, "Current" badge, per-row "Sign out" button, and "Sign out all other devices" bulk button (shown only when 2+ non-current sessions exist)
+- `tests/test_sessions.py`: 10 tests across 3 classes — TestGetSessions (4 tests: returns active sessions, excludes revoked, excludes expired, unauthenticated 401), TestRevokeSession (4 tests: revoke own, cross-user 404, nonexistent 404, unauthenticated 401), TestRevokeAllOtherSessions (2 tests: revokes others, unauthenticated 401)
+- 481 backend tests pass; ruff clean; Phase 13 complete
+
 ## Phase 13.1 — Frontend Route-Based Code Splitting [DONE] 2026-04-08
 - `web/src/router.jsx`: Replaced all 24 eager `import` statements for route-level page components with `React.lazy()` calls; added `lazy` to the React import; split wrapping into two helpers: `withPageBoundary` (uses existing `AsyncBoundary` = ErrorBoundary + Suspense) for protected routes, and `withPublicSuspense` (ErrorBoundary + `<Suspense fallback={<PageSpinner />}`) for public routes
 - `PageSpinner` inline component: minimal centered CSS spinner (no dependency) used as Suspense fallback on public routes while the auth context is not yet available; uses `@keyframes spin` injected via `<style>` tag to avoid Tailwind dependency
