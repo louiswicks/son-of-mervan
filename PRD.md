@@ -562,16 +562,16 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 - [x] Total interest paid shown for each strategy
 - [x] 6+ backend tests; frontend renders payoff timeline (17 tests written)
 
-### 11.5 Spending Streak & Habit Tracker
+### 11.5 Spending Streak & Habit Tracker ✅ DONE
 **Goal:** Gamify budgeting to improve day-30 retention — reward users who stay on budget each month.  
 **Scope:** `GET /streaks` endpoint: computes current under-budget streak (consecutive months where actual ≤ planned) and longest streak ever. Frontend: streak badge on dashboard (🔥 N-month streak), animated milestone toasts at 3/6/12 months. Stored as a computed value, not a separate table.
 
 **Acceptance Criteria:**
-- [ ] Streak increments when a closed month's actual ≤ planned total
-- [ ] Streak resets to 0 on an over-budget month
-- [ ] Longest streak ever tracked separately
-- [ ] Milestone toasts at 3, 6, 12 months
-- [ ] 4+ backend tests
+- [x] Streak increments when a closed month's actual ≤ planned total
+- [x] Streak resets to 0 on an over-budget month
+- [x] Longest streak ever tracked separately
+- [x] Milestone toasts at 3, 6, 12 months
+- [x] 4+ backend tests (7 written)
 
 ---
 
@@ -597,7 +597,7 @@ Phase 10 (DONE): Operational excellence
 
 Phase 11 (Current): User experience & power features
   11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
-  → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks)
+  → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks) [DONE]
 ```
 
 ---

@@ -705,3 +705,11 @@
 - `web/src/components/AuthGuard.jsx`: Added `TrendingDown` lucide icon; added `["/debts", "Debt Payoff", TrendingDown]` to `NAV_TABS`
 - `tests/test_debts.py`: 17 tests — list empty, list own debts, excludes deleted, excludes other users, create 201, negative balance 422, invalid rate 422, zero minimum 422, update balance, update wrong user 404, delete 204, delete wrong user 404, empty payoff plan, invalid strategy 422, single-debt snowball pays off, avalanche less interest than snowball, snowball orders lowest balance first
 - All 403 backend tests pass (17 new); 88.50% coverage; ruff clean (excluding alembic/); build 317 kB gzip
+
+## Phase 11.5 — Spending Streak & Habit Tracker [DONE] 2026-04-08
+- `routers/insights.py`: Added `GET /insights/streaks` endpoint. Fetches all `MonthlyData` for user, filters to months with `total_actual > 0` (tracked months), sorts chronologically, computes `current_streak` (consecutive under-budget months at end of history) and `longest_streak` (max run ever). Returns `{ current_streak, longest_streak, total_tracked, months_under }`. Months with no actual data are skipped entirely (don't break streak).
+- `web/src/api/insights.js`: Added `getStreaks()` — `GET /insights/streaks` Axios wrapper
+- `web/src/hooks/useInsights.js`: Added `useStreaks()` React Query hook (staleTime 5 min)
+- `web/src/components/SonOfMervan.jsx`: Added `useStreaks()` hook; flame badge displayed above Inputs card when `current_streak > 0` (shows streak count, month label, best-ever badge if longest > current); `useEffect` + `useRef` fires `toast.success()` milestone toasts at 3, 6, 12 months (fires once per mount per milestone level reached)
+- `tests/test_insights.py`: 7 new tests — unauthenticated 401/403, no data zero streaks, single under-budget month streak=1, three consecutive months streak=3, over-budget month resets current but preserves longest, months with no actuals skipped (streak maintained across gap), data isolation from other users
+- 410 backend tests pass (7 new); 88.63% coverage; ruff clean
