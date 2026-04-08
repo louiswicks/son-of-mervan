@@ -937,7 +937,7 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Unauthenticated request returns 401
 - [x] 5+ backend tests
 
-### 17.2 Budget Templates
+### 17.2 Budget Templates [DONE]
 **Goal:** Reduce new-user friction by offering pre-built budget allocations they can apply in one click.
 **Scope:**
 - `GET /budget-templates` — returns a static list of templates (stored as Python constants, no DB).
@@ -946,11 +946,11 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - `POST /budget-templates/{id}/apply?month=YYYY-MM` — creates planned expense rows from the template using the user's existing salary for that month. Existing planned rows are left untouched (additive); the endpoint returns the list of created expenses.
 
 **Acceptance Criteria:**
-- [ ] `GET /budget-templates` returns 200 with 5+ templates, no auth required
-- [ ] Each template has `id`, `name`, `description`, `allocations`
-- [ ] `POST /budget-templates/{id}/apply` creates planned expense rows correctly; requires auth
-- [ ] Returns 404 for unknown template id
-- [ ] 4+ backend tests
+- [x] `GET /budget-templates` returns 200 with 5+ templates, no auth required
+- [x] Each template has `id`, `name`, `description`, `allocations`
+- [x] `POST /budget-templates/{id}/apply` creates planned expense rows correctly; requires auth
+- [x] Returns 404 for unknown template id
+- [x] 4+ backend tests
 
 ### 17.3 Spending Velocity Warnings
 **Goal:** Alert users intra-month when spending pace will exceed the plan — before it's too late to adjust.
@@ -1036,7 +1036,7 @@ Phase 16 (DONE): Reliability, developer experience & user onboarding
   → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
 
 Phase 17: Engagement, insight & polish
-  17.1 (Expense search) [DONE] → 17.2 (Budget templates) → 17.3 (Spending velocity warnings)
+  17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings)
   → 17.4 (Month performance endpoint) → 17.5 (Onboarding wizard)
 ```
 
