@@ -579,7 +579,7 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 
 Phase 12 addresses quality-of-life gaps identified after full feature coverage: reducing friction in the core budgeting loop, surfacing key financial metrics at a glance, and strengthening production readiness.
 
-### 12.1 Budget Copy Forward
+### 12.1 Budget Copy Forward ✅ DONE
 **Goal:** Eliminate the #1 friction point — re-entering the same planned budget each month.  
 **User story:** As a user, I want to pre-fill this month's budget form from last month's planned amounts so I can make minor tweaks rather than starting from scratch.  
 **Scope:**
@@ -590,13 +590,13 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - No backend changes required (existing endpoint serves all needed data)
 
 **Acceptance Criteria:**
-- [ ] Button appears above expense rows; label shows prev month (e.g. "Load March 2026 budget")
-- [ ] Clicking button fetches previous month and populates salary + expense rows
-- [ ] If previous month has no data, shows an informational toast ("No budget found for March 2026")
-- [ ] Existing form entries are replaced (not merged) when loading
-- [ ] Button is disabled while data is being fetched
-- [ ] Works correctly at year boundaries (e.g. loading from December when current month is January)
-- [ ] 2+ frontend tests covering: successful load, no prior data message
+- [x] Button appears above expense rows; label shows prev month (e.g. "Load March 2026 budget")
+- [x] Clicking button fetches previous month and populates salary + expense rows
+- [x] If previous month has no data, shows an informational toast ("No budget found for March 2026")
+- [x] Existing form entries are replaced (not merged) when loading
+- [x] Button is disabled while data is being fetched
+- [x] Works correctly at year boundaries (e.g. loading from December when current month is January)
+- [x] 2+ frontend tests covering: successful load, no prior data message (3 written)
 
 ### 12.2 Net Worth Tracker
 **Goal:** Give users a holistic financial picture beyond monthly cashflow by tracking assets and liabilities over time.  
