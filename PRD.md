@@ -540,16 +540,16 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 - [x] Persists confirmed rows to monthly_expenses via existing upsert logic
 - [x] 22 backend tests; 370 total; 87.95% coverage; frontend renders review table
 
-### 11.3 Cashflow Forecasting
+### 11.3 Cashflow Forecasting ✅ DONE
 **Goal:** Show users their projected account balance over the next 3–6 months based on income and recurring expenses.  
 **Scope:** `GET /forecast?months=3` endpoint: uses salary_planned and active recurring expenses to project a monthly balance. Frontend: ForecastPage with a Recharts area chart (months on X-axis, projected balance on Y-axis); colour band shows safe (green) / warning (amber) / deficit (red) zones.
 
 **Acceptance Criteria:**
-- [ ] Projection uses most recent planned salary or an explicit salary override param
-- [ ] Each recurring expense deducted at its effective monthly cost
-- [ ] Chart shows today's estimated balance + 3 projected months (default)
-- [ ] Deficit months highlighted red on chart
-- [ ] 5+ backend tests
+- [x] Projection uses most recent planned salary or an explicit salary override param
+- [x] Each recurring expense deducted at its effective monthly cost
+- [x] Chart shows today's estimated balance + 3 projected months (default)
+- [x] Deficit months highlighted red on chart
+- [x] 5+ backend tests (16 written, all passing)
 
 ### 11.4 Debt Payoff Calculator
 **Goal:** Help users eliminate debt faster by modelling snowball and avalanche payoff strategies.  
