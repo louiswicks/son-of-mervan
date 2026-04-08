@@ -513,20 +513,20 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 
 ## Phase 11: User Experience & Power Features
 
-### 11.1 Custom Expense Categories ← **CURRENT**
+### 11.1 Custom Expense Categories ✅ DONE
 **Goal:** Replace the 8 hardcoded category strings with user-defined categories that have names and display colours.  
 **Scope:** New `user_categories` DB table (name, color, is_default). `GET/POST/PUT/DELETE /categories` API. Lazy-seed 8 defaults on first call. Remove the `VALID_CATEGORIES` hard-gate from alerts.py. Frontend: `CategoriesPage.jsx` management UI; replace hardcoded arrays in SonOfMervan, MonthlyTracker, BudgetAlertsPage with dynamic `useCategories()` hook.
 
 **Acceptance Criteria:**
-- [ ] `GET /categories` seeds 8 defaults on first call and returns user's list
-- [ ] `POST /categories` creates a custom category (name + hex color)
-- [ ] `PUT /categories/{id}` updates name / color
-- [ ] `DELETE /categories/{id}` deletes custom categories; returns 400 for defaults
-- [ ] Duplicate name for same user → 409
-- [ ] Budget-alert create/update accepts any category string (VALID_CATEGORIES gate removed)
-- [ ] CategoriesPage reachable at `/categories`; shows colored pills, inline edit, add form
-- [ ] SonOfMervan, MonthlyTracker, BudgetAlertsPage dropdowns use dynamic categories
-- [ ] 8+ backend tests; all existing tests pass
+- [x] `GET /categories` seeds 8 defaults on first call and returns user's list
+- [x] `POST /categories` creates a custom category (name + hex color)
+- [x] `PUT /categories/{id}` updates name / color
+- [x] `DELETE /categories/{id}` deletes custom categories; returns 400 for defaults
+- [x] Duplicate name for same user → 409
+- [x] Budget-alert create/update accepts any category string (VALID_CATEGORIES gate removed)
+- [x] CategoriesPage reachable at `/categories`; shows colored pills, inline edit, add form
+- [x] SonOfMervan, MonthlyTracker, BudgetAlertsPage dropdowns use dynamic categories
+- [x] 19 backend tests; 348 total; 87.51% coverage
 
 ### 11.2 Bank Statement CSV Import
 **Goal:** Reduce manual data-entry by letting users import transactions from a bank's exported CSV.  

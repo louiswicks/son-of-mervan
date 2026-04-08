@@ -1,3 +1,22 @@
+## Phase 11.1 — Custom Expense Categories [DONE] 2026-04-08
+- `database.py`: Added `UserCategory` model (id, user_id, name, color, is_default, created_at); names stored unencrypted (labels aren't sensitive, and Fernet non-determinism would break the per-user UNIQUE constraint); `DEFAULT_CATEGORIES` constant defines the 8 built-in entries with hex colours
+- `models.py`: Added `UserCategoryCreate`, `UserCategoryUpdate`, `UserCategoryResponse` Pydantic schemas; imported `Field` from pydantic
+- `routers/categories.py`: New router with `GET/POST/PUT/DELETE /categories`; `_get_or_seed()` helper lazy-seeds 8 defaults on a user's first GET; POST returns 409 on duplicate name; DELETE returns 400 for is_default categories; all endpoints enforce ownership (404 on cross-user access)
+- `routers/alerts.py`: Removed `VALID_CATEGORIES` hard-gate (categories are now user-defined); replaced with `len(category) > 50` → 422 check so the field still has a sensible max length
+- `main.py`: Added `categories as categories_router` import and `app.include_router(categories_router.router)`
+- `alembic/versions/m3n4o5p6q7r8_add_user_categories.py`: Migration creates `user_categories` table with PK/FK indexes and `uq_user_category_name` unique constraint
+- `web/src/api/categories.js`: Axios wrappers for GET/POST/PUT/DELETE /categories
+- `web/src/hooks/useCategories.js`: `useCategories` (5-min stale), `useCreateCategory`, `useUpdateCategory`, `useDeleteCategory` React Query hooks; all mutations invalidate the `categories` cache key
+- `web/src/components/CategoriesPage.jsx`: Full management UI — colored circle pills, inline edit form with HTML `<input type="color">` picker, add new category form, delete with confirmation; default categories show "default" badge and cannot be deleted; count summary footer
+- `web/src/router.jsx`: Added `/categories` route
+- `web/src/components/AuthGuard.jsx`: Added "Categories" nav tab with `Tag` lucide icon
+- `web/src/components/SonOfMervan.jsx`: Replaced hardcoded `CATEGORIES` array with `useCategories()` hook + `useMemo`; falls back to 8 defaults while loading
+- `web/src/components/MonthlyTracker.jsx`: Replaced `BASE_CATEGORIES` constant with hook result; `buildRowsFromExpenses` accepts `categories` as 3rd param (default `FALLBACK_CATEGORIES`); hook result passed at call site
+- `web/src/components/BudgetAlertsPage.jsx`: `AlertForm` now accepts `categories` prop (falls back to `FALLBACK_CATEGORIES`); main page fetches via `useCategories` and passes down to both `AlertForm` instances
+- `tests/test_categories.py`: 19 new tests — seeding behaviour, list, create (duplicate 409), update (rename/recolour/conflict 409/404), delete (success/default 400/404/cross-user 404)
+- `tests/test_alerts.py`: Updated `test_create_invalid_category` → now verifies any ≤50-char category is accepted (201); added `test_create_category_too_long_returns_422`
+- 348 backend tests pass; 87.51% coverage; ruff clean on new files
+
 ## Phase 10.2 — Advanced Expense Search & Filtering [DONE] 2026-04-08
 - `main.py`: Added `GET /expenses/search?q=&category=&from=YYYY-MM&to=YYYY-MM&page=1&per_page=20` endpoint; loads all user MonthlyData, decrypts months and filters by date range in Python (Fernet non-deterministic), then decrypts each expense and applies case-insensitive partial-match on name and exact category filter; sorts results most-recent-month first; paginates with `X-Total-Count` and `X-Page` response headers; validates `from`/`to` format with `^\d{4}-\d{2}$` regex, 422 on invalid; 422 on `per_page` > 100
 - `web/src/api/expenses.js`: Added `searchExpenses({ q, category, from, to, page, per_page })` — wraps `GET /expenses/search`, extracts `x-total-count` header into response
