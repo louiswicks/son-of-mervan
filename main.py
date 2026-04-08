@@ -972,6 +972,7 @@ def _start_scheduler():
     from routers.recurring import generate_all_recurring
     from routers.alerts import check_budget_alerts
     from routers.currency import sync_exchange_rates
+    from routers.insights import check_spending_velocity
     _scheduler.add_job(
         sync_exchange_rates,
         "cron",
@@ -1038,6 +1039,15 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    _scheduler.add_job(
+        check_spending_velocity,
+        "cron",
+        hour="0,6,12,18",
+        minute=20,
+        id="check_spending_velocity",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
@@ -1045,7 +1055,8 @@ def _start_scheduler():
         "monthly digest on 1st of month at 08:00 UTC, "
         "investment price sync at 16:30 UTC, "
         "milestone email checks on 1st of month at 09:00 UTC, "
-        "token cleanup daily at 03:00 UTC"
+        "token cleanup daily at 03:00 UTC, "
+        "spending velocity checks every 6 hours"
     )
 
 

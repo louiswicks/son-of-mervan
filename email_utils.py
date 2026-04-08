@@ -336,6 +336,62 @@ def send_debt_payoff_email(to_email: str):
         logger.exception("[SG] EXCEPTION sending debt payoff to %s: %s", to_email, e)
 
 
+def send_velocity_warning_email(
+    to_email: str,
+    month: str,
+    actual_ytd: float,
+    planned_total: float,
+    projected_total: float,
+    currency: str = "GBP",
+):
+    """Send a spending velocity warning email when projected overspend exceeds 10%."""
+    overage = projected_total - planned_total
+    overage_pct = round((projected_total / planned_total - 1) * 100, 1) if planned_total > 0 else 0.0
+
+    if not SENDGRID_API_KEY:
+        logger.info(
+            "[DEV] Velocity warning for %s: month=%s projected=%.2f planned=%.2f (+%.1f%%)",
+            to_email, month, projected_total, planned_total, overage_pct,
+        )
+        return
+
+    body = (
+        f"Hi,\n\n"
+        f"Heads-up: based on your spending pace in {month}, you are projected to exceed "
+        f"your planned budget.\n\n"
+        f"  Spent so far:    {currency} {actual_ytd:.2f}\n"
+        f"  Monthly plan:    {currency} {planned_total:.2f}\n"
+        f"  Projected total: {currency} {projected_total:.2f} (+{overage_pct}%)\n\n"
+        f"You are on track to overspend by {currency} {overage:.2f}. "
+        f"Consider reviewing your expenses to get back on track.\n\n"
+        f"Log in to Son of Mervan to see the breakdown.\n"
+    )
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": f"Spending pace warning for {month} — Son of Mervan",
+        "content": [{"type": "text/plain", "value": body}],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] velocity warning accepted (%d) to=%s", r.status_code, to_email)
+        else:
+            logger.error("[SG] velocity warning ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending velocity warning to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

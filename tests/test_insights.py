@@ -784,3 +784,140 @@ class TestMonthCloseSummary:
         """Bad month param → 422 validation error."""
         r = auth_client.get("/insights/month-close-summary", params={"month": "not-a-month"})
         assert r.status_code == 422
+
+
+class TestSpendingVelocity:
+    """Tests for GET /insights/spending-velocity and check_spending_velocity job."""
+
+    def test_unauthenticated_returns_401(self, client):
+        """Unauthenticated request is rejected."""
+        r = client.get("/insights/spending-velocity", params={"month": "2026-03"})
+        assert r.status_code in (401, 403)
+
+    def test_no_data_returns_zeroed_structure(self, auth_client):
+        """No MonthlyData for month → zeroed structure with on_track=True."""
+        r = auth_client.get("/insights/spending-velocity", params={"month": "2025-01"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month"] == "2025-01"
+        assert body["actual_ytd"] == 0.0
+        assert body["planned_total"] == 0.0
+        assert body["projected_total"] == 0.0
+        assert body["on_track"] is True
+
+    def test_on_track_month_returns_on_track_true(self, auth_client, db, verified_user, monkeypatch):
+        """When projected spend is within 110% of plan, on_track is True."""
+        import datetime as dt
+        monkeypatch.setattr("routers.insights.datetime", type(
+            "FakeDatetime", (), {
+                "utcnow": staticmethod(lambda: dt.datetime(2026, 3, 15, 12, 0, 0)),
+                "date": dt.datetime,
+            }
+        ))
+
+        make_month(db, verified_user, month="2026-03", total_planned=1000.0, total_actual=400.0)
+
+        r = auth_client.get("/insights/spending-velocity", params={"month": "2026-03"})
+        assert r.status_code == 200
+        body = r.json()
+        # 400/15 * 31 ≈ 826 ≤ 1000 * 1.10 → on_track
+        assert body["on_track"] is True
+        assert body["days_elapsed"] > 0
+        assert body["planned_total"] == pytest.approx(1000.0)
+
+    def test_overspend_pace_returns_on_track_false(self, auth_client, db, verified_user, monkeypatch):
+        """When projected spend exceeds 110% of plan, on_track is False."""
+        import datetime as dt
+        monkeypatch.setattr("routers.insights.datetime", type(
+            "FakeDatetime", (), {
+                "utcnow": staticmethod(lambda: dt.datetime(2026, 3, 10, 12, 0, 0)),
+                "date": dt.datetime,
+            }
+        ))
+
+        # Spent 900 in 10 days → projected 900/10*31 = 2790 >> 1000*1.10
+        make_month(db, verified_user, month="2026-03", total_planned=1000.0, total_actual=900.0)
+
+        r = auth_client.get("/insights/spending-velocity", params={"month": "2026-03"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["on_track"] is False
+        assert body["projected_total"] > body["planned_total"] * 1.10
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        """Bad month format → 422."""
+        r = auth_client.get("/insights/spending-velocity", params={"month": "not-valid"})
+        assert r.status_code == 422
+
+    def test_check_velocity_job_fires_notification(self, db, verified_user, monkeypatch):
+        """Scheduler job fires a notification when projected spend exceeds 110% of plan."""
+        import datetime as dt
+        from database import Notification, SessionLocal
+        from routers.insights import check_spending_velocity
+
+        fixed_now = dt.datetime(2026, 3, 10, 12, 0, 0)
+        monkeypatch.setattr("routers.insights.datetime", type(
+            "FakeDatetime", (), {"utcnow": staticmethod(lambda: fixed_now)}
+        ))
+
+        # 900 actual in 10 days → projected ~2790 >> 1000 * 1.10
+        make_month(db, verified_user, month="2026-03", total_planned=1000.0, total_actual=900.0)
+        db.commit()
+
+        check_spending_velocity(SessionLocal)
+
+        notif = (
+            db.query(Notification)
+            .filter(Notification.user_id == verified_user.id, Notification.type == "velocity_warning")
+            .first()
+        )
+        assert notif is not None
+        assert "velocity:{}:2026-03:2026-03-10".format(verified_user.id) == notif.dedup_key
+
+    def test_check_velocity_job_dedup_prevents_duplicate(self, db, verified_user, monkeypatch):
+        """Running the job twice on the same day does not create a second notification."""
+        import datetime as dt
+        from database import Notification, SessionLocal
+        from routers.insights import check_spending_velocity
+
+        fixed_now = dt.datetime(2026, 3, 10, 12, 0, 0)
+        monkeypatch.setattr("routers.insights.datetime", type(
+            "FakeDatetime", (), {"utcnow": staticmethod(lambda: fixed_now)}
+        ))
+
+        make_month(db, verified_user, month="2026-03", total_planned=1000.0, total_actual=900.0)
+        db.commit()
+
+        check_spending_velocity(SessionLocal)
+        check_spending_velocity(SessionLocal)
+
+        count = (
+            db.query(Notification)
+            .filter(Notification.user_id == verified_user.id, Notification.type == "velocity_warning")
+            .count()
+        )
+        assert count == 1
+
+    def test_check_velocity_job_no_notification_when_on_track(self, db, verified_user, monkeypatch):
+        """No notification fires when projected spend is within plan."""
+        import datetime as dt
+        from database import Notification, SessionLocal
+        from routers.insights import check_spending_velocity
+
+        fixed_now = dt.datetime(2026, 3, 15, 12, 0, 0)
+        monkeypatch.setattr("routers.insights.datetime", type(
+            "FakeDatetime", (), {"utcnow": staticmethod(lambda: fixed_now)}
+        ))
+
+        # 400 actual / 15 days * 31 ≈ 826 ≤ 1100 → on track
+        make_month(db, verified_user, month="2026-03", total_planned=1000.0, total_actual=400.0)
+        db.commit()
+
+        check_spending_velocity(SessionLocal)
+
+        count = (
+            db.query(Notification)
+            .filter(Notification.user_id == verified_user.id, Notification.type == "velocity_warning")
+            .count()
+        )
+        assert count == 0

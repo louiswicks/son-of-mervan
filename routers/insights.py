@@ -2,14 +2,14 @@
 import calendar
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 
-from database import get_db, User, MonthlyData, MonthlyExpense, SavingsGoal, SavingsContribution
+from database import get_db, User, MonthlyData, MonthlyExpense, Notification, SavingsGoal, SavingsContribution
 from security import verify_token
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,10 @@ def _normalize_month(m: str) -> str:
     if len(parts) != 2:
         raise HTTPException(status_code=422, detail="month must be 'YYYY-MM'")
     y, mo = parts
-    return f"{int(y):04d}-{int(mo):02d}"
+    try:
+        return f"{int(y):04d}-{int(mo):02d}"
+    except ValueError:
+        raise HTTPException(status_code=422, detail="month must be 'YYYY-MM'")
 
 
 def _prev_month_str(month_norm: str) -> str:
@@ -1151,3 +1154,174 @@ def expense_search(
         "page": page,
         "page_size": page_size,
     }
+
+
+# -------------------- spending velocity --------------------
+
+@router.get("/spending-velocity")
+def spending_velocity(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Return the user's spending velocity projection for the given month.
+
+    Projects month-end spend as:
+        projected_total = (actual_ytd / days_elapsed) * days_in_month
+
+    on_track is True when projected_total <= planned_total * 1.10.
+    Returns zeroed structure when no data exists for the month.
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    year, mo = map(int, month_norm.split("-"))
+    days_in_month = calendar.monthrange(year, mo)[1]
+
+    today = datetime.utcnow().date()
+    month_start = date(year, mo, 1)
+    month_end = date(year, mo, days_in_month)
+
+    if today < month_start:
+        days_elapsed = 0
+    elif today >= month_end:
+        days_elapsed = days_in_month
+    else:
+        days_elapsed = today.day
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+
+    if not month_row:
+        return {
+            "month": month_norm,
+            "actual_ytd": 0.0,
+            "planned_total": 0.0,
+            "projected_total": 0.0,
+            "days_elapsed": days_elapsed,
+            "days_in_month": days_in_month,
+            "on_track": True,
+        }
+
+    actual_ytd = float(month_row.total_actual or 0.0)
+    planned_total = float(month_row.total_planned or 0.0)
+
+    if days_elapsed > 0:
+        projected_total = round((actual_ytd / days_elapsed) * days_in_month, 2)
+    else:
+        projected_total = 0.0
+
+    on_track = planned_total <= 0 or projected_total <= planned_total * 1.10
+
+    return {
+        "month": month_norm,
+        "actual_ytd": round(actual_ytd, 2),
+        "planned_total": round(planned_total, 2),
+        "projected_total": projected_total,
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "on_track": on_track,
+    }
+
+
+# -------------------- background job --------------------
+
+def check_spending_velocity(session_factory):
+    """
+    Evaluate spending velocity for all active users and fire in-app notifications
+    (plus email if opted in) when projected month-end spend exceeds planned_total * 1.10.
+
+    Called every 6 hours by APScheduler.
+    Dedup key: velocity_{user_id}_{YYYY-MM}_{YYYY-MM-DD} — prevents re-firing within 24 h.
+    """
+    from email_utils import send_velocity_warning_email  # local import avoids circular dependency
+
+    db = session_factory()
+    try:
+        now = datetime.utcnow()
+        current_month = now.strftime("%Y-%m")
+        today_str = now.strftime("%Y-%m-%d")
+
+        year, mo = map(int, current_month.split("-"))
+        days_in_month = calendar.monthrange(year, mo)[1]
+        today_day = now.day
+        # Cap at days_in_month to handle end-of-month gracefully
+        days_elapsed = min(today_day, days_in_month)
+
+        if days_elapsed == 0:
+            return  # First moment of month — no data yet
+
+        users = (
+            db.query(User)
+            .filter(User.deleted_at == None)  # noqa: E711
+            .all()
+        )
+
+        for user in users:
+            all_months = (
+                db.query(MonthlyData)
+                .filter(MonthlyData.user_id == user.id)
+                .all()
+            )
+            month_row = next((m for m in all_months if m.month == current_month), None)
+            if not month_row:
+                continue
+
+            actual_ytd = float(month_row.total_actual or 0.0)
+            planned_total = float(month_row.total_planned or 0.0)
+
+            if planned_total <= 0 or actual_ytd <= 0:
+                continue
+
+            projected_total = (actual_ytd / days_elapsed) * days_in_month
+
+            if projected_total <= planned_total * 1.10:
+                continue
+
+            # Dedup: one notification per user per day per month
+            dedup_key = f"velocity:{user.id}:{current_month}:{today_str}"
+            already_sent = (
+                db.query(Notification)
+                .filter(Notification.dedup_key == dedup_key)
+                .first()
+            )
+            if already_sent:
+                continue
+
+            overage_pct = round((projected_total / planned_total - 1) * 100, 1)
+            currency = user.base_currency or "GBP"
+
+            notif = Notification(
+                user_id=user.id,
+                type="velocity_warning",
+                dedup_key=dedup_key,
+            )
+            notif.title = "Spending pace warning"
+            notif.message = (
+                f"At your current pace you are projected to overspend your {current_month} "
+                f"budget by {overage_pct}% ({currency} {projected_total:.2f} vs "
+                f"{currency} {planned_total:.2f} planned)."
+            )
+            db.add(notif)
+            db.commit()
+
+            if getattr(user, "notif_budget_alerts", True):
+                try:
+                    send_velocity_warning_email(
+                        to_email=user.email,
+                        month=current_month,
+                        actual_ytd=actual_ytd,
+                        planned_total=planned_total,
+                        projected_total=round(projected_total, 2),
+                        currency=currency,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send velocity warning email to %s", user.email
+                    )
+
+    except Exception:
+        logger.exception("check_spending_velocity background job failed")
+    finally:
+        db.close()
