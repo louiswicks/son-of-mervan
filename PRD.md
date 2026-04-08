@@ -434,9 +434,10 @@ Previously out of scope items now included as future roadmap.
 **Scope:** Template selector on the Budget page pre-fills category rows; user adjusts amounts before saving.
 **Result:** Added `BUDGET_TEMPLATES` constant (4 templates: 50/30/20 Rule, Zero-Based, Minimalist, Student Budget) to `SonOfMervan.jsx`. "Use Template" button opens a modal with template cards showing name, description, savings percentage, and per-category allocations. Selecting a template replaces expense rows with template rows; amounts are auto-calculated if salary is already entered (percentage of salary), else left blank. Modal closes on selection or close button or backdrop click. 7 new frontend tests added in `SonOfMervan.test.jsx` (13 total in that suite, all passing). No backend changes required.
 
-### 9.5 Annual Financial Calendar [PENDING]
+### 9.5 Annual Financial Calendar [DONE 2026-04-08]
 **Goal:** Visualise upcoming recurring expenses and savings goal deadlines on a calendar so users can anticipate cash-flow pressure.  
 **Scope:** Read-only calendar view at `/calendar`; shows recurring expense due dates and savings goal target dates; colour-coded by category.
+**Result:** `CalendarPage.jsx` — 12-month grid with year navigation (prev/next buttons). Recurring expenses shown in every applicable month, colour-coded by category (Housing=blue, Transportation=green, Food=orange, Utilities=yellow, Insurance=purple, Healthcare=pink, Entertainment=indigo, Other=gray); yearly-frequency expenses shown only in their anniversary month. Savings goal deadlines shown with Target icon in emerald. Legend bar. Current month highlighted with blue ring and "Now" badge. Summary footer shows total recurring count and goal-with-deadline count. Loading skeleton (12 shimmer cards). Nav tab "Calendar" with CalendarDays icon added to desktop sidebar and mobile bottom bar. 9 new tests in `CalendarPage.test.jsx` (all pass). Build clean at 300.48 kB gzip.
 
 ---
 

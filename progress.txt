@@ -1,3 +1,11 @@
+## Phase 9.5 — Annual Financial Calendar [DONE] 2026-04-08
+- `web/src/components/CalendarPage.jsx` (new): 12-month grid calendar with year prev/next navigation; recurring expenses shown in each applicable month, colour-coded by category (Housing=blue, Transportation=green, Food=orange, Utilities=yellow, Insurance=purple, Healthcare=pink, Entertainment=indigo, Other=gray); yearly-frequency expenses appear only in their anniversary month; savings goal deadlines shown with Target icon in emerald; current month highlighted with blue ring + "Now" badge; legend bar; summary footer with total counts; 12-card loading skeleton
+- `web/src/tests/CalendarPage.test.jsx` (new): 9 tests — heading/month rendering, loading skeletons, empty months, monthly recurring in all 12 months, yearly recurring only in anniversary month, savings goal in correct month, year navigation, summary footer counts, goal-without-target-date not displayed
+- `web/src/router.jsx`: added `/calendar` route → `CalendarPage` with `withPageBoundary`
+- `web/src/components/AuthGuard.jsx`: imported `CalendarDays` from lucide-react; added `["/calendar", "Calendar", CalendarDays]` to `NAV_TABS`
+- 9 new frontend tests all pass (45 pass, 3 pre-existing AuthGuard failures unchanged); build clean at 300.48 kB gzip (+10.66 kB)
+- Files: web/src/components/CalendarPage.jsx (new), web/src/tests/CalendarPage.test.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, PRD.md, progress.txt
+
 ## Phase 9.3 — Progressive Web App (PWA) [DONE] 2026-04-08
 - `web/public/service-worker.js` (new): cache-first strategy for same-origin static assets; network-first for cross-origin (API) requests; SPA offline fallback — navigation requests always served `/index.html` from cache; stale cache cleanup on activate
 - `web/src/serviceWorkerRegistration.js` (new): `register()` / `unregister()` helpers; registration only occurs in `NODE_ENV=production` to prevent dev cache pollution
