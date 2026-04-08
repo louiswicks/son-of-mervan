@@ -35,6 +35,26 @@ jest.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'light', toggleTheme: jest.fn() }),
 }));
 
+jest.mock('../hooks/useCategories', () => ({
+  useCategories: () => ({ data: null }),
+}));
+
+jest.mock('../hooks/useInsights', () => ({
+  useStreaks: () => ({ data: null }),
+}));
+
+const mockGetMonthlyTracker = jest.fn();
+jest.mock('../api/expenses', () => ({
+  getMonthlyTracker: (...args) => mockGetMonthlyTracker(...args),
+}));
+
+jest.mock('react-hot-toast', () => {
+  const toastFn = jest.fn();
+  toastFn.success = jest.fn();
+  toastFn.error = jest.fn();
+  return { __esModule: true, default: toastFn };
+});
+
 import SonOfMervan from '../components/SonOfMervan';
 
 const mockResultsData = {
@@ -57,6 +77,18 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockIsPending = false;
   mockMutateAsync.mockResolvedValue(mockResultsData);
+  mockGetMonthlyTracker.mockResolvedValue({
+    salary_planned: 3000,
+    expenses: {
+      items: [
+        { name: 'Rent', category: 'Housing', planned_amount: 1000, actual_amount: 0 },
+        { name: 'Groceries', category: 'Food', planned_amount: 300, actual_amount: 0 },
+      ],
+      total: 2,
+      page: 1,
+      pages: 1,
+    },
+  });
 });
 
 describe('SonOfMervan', () => {
@@ -198,6 +230,48 @@ describe('SonOfMervan', () => {
       // First is salary (still empty), rest are expense amounts (also empty)
       amountInputs.forEach((input) => {
         expect(input.value).toBe('');
+      });
+    });
+  });
+
+  describe('Budget Copy Forward', () => {
+    test('"Load [prev month]" button is rendered', () => {
+      renderSonOfMervan();
+      const btn = screen.getByTestId('load-prev-month-btn');
+      expect(btn).toBeInTheDocument();
+    });
+
+    test('clicking load button pre-fills salary and expense rows from previous month', async () => {
+      renderSonOfMervan();
+      const btn = screen.getByTestId('load-prev-month-btn');
+      fireEvent.click(btn);
+
+      await waitFor(() => {
+        // Salary field should be populated
+        const salaryInput = screen.getAllByPlaceholderText(/0\.00/i)[0];
+        expect(salaryInput.value).toBe('3000');
+      });
+
+      // Expense name fields should contain previous month's expenses
+      expect(screen.getByDisplayValue('Rent')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Groceries')).toBeInTheDocument();
+    });
+
+    test('shows informational toast when previous month has no data', async () => {
+      const toast = require('react-hot-toast').default;
+      mockGetMonthlyTracker.mockResolvedValueOnce({
+        salary_planned: 0,
+        expenses: { items: [], total: 0, page: 1, pages: 0 },
+      });
+
+      renderSonOfMervan();
+      fireEvent.click(screen.getByTestId('load-prev-month-btn'));
+
+      await waitFor(() => {
+        expect(toast).toHaveBeenCalledWith(
+          expect.stringMatching(/no budget found/i),
+          expect.objectContaining({ icon: 'ℹ️' })
+        );
       });
     });
   });

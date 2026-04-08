@@ -575,6 +575,77 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 
 ---
 
+## Phase 12: Usability, Retention & Production Hardening
+
+Phase 12 addresses quality-of-life gaps identified after full feature coverage: reducing friction in the core budgeting loop, surfacing key financial metrics at a glance, and strengthening production readiness.
+
+### 12.1 Budget Copy Forward
+**Goal:** Eliminate the #1 friction point — re-entering the same planned budget each month.  
+**User story:** As a user, I want to pre-fill this month's budget form from last month's planned amounts so I can make minor tweaks rather than starting from scratch.  
+**Scope:**
+- "Load [prev month] budget" button in SonOfMervan.jsx budget-planning form
+- Calls existing `GET /monthly-tracker/{month}?page_size=100` for the previous month
+- Pre-fills salary input + expense rows (name, category, planned_amount) from response
+- Toast confirms load; user can edit before calculating/saving
+- No backend changes required (existing endpoint serves all needed data)
+
+**Acceptance Criteria:**
+- [ ] Button appears above expense rows; label shows prev month (e.g. "Load March 2026 budget")
+- [ ] Clicking button fetches previous month and populates salary + expense rows
+- [ ] If previous month has no data, shows an informational toast ("No budget found for March 2026")
+- [ ] Existing form entries are replaced (not merged) when loading
+- [ ] Button is disabled while data is being fetched
+- [ ] Works correctly at year boundaries (e.g. loading from December when current month is January)
+- [ ] 2+ frontend tests covering: successful load, no prior data message
+
+### 12.2 Net Worth Tracker
+**Goal:** Give users a holistic financial picture beyond monthly cashflow by tracking assets and liabilities over time.  
+**Scope:** New `net_worth_snapshots` table (date, assets_json, liabilities_json, total_assets, total_liabilities). `GET/POST/PUT/DELETE /net-worth/snapshots`. Frontend: NetWorthPage at `/net-worth` with asset/liability input form + Recharts area chart showing net worth trend.
+
+**Acceptance Criteria:**
+- [ ] `POST /net-worth/snapshots` creates snapshot with at least one asset or liability
+- [ ] `GET /net-worth/snapshots` returns chronological list with `net_worth = total_assets - total_liabilities`
+- [ ] Latest snapshot shows current net worth in a KPI card
+- [ ] Recharts area chart renders net worth trend over time
+- [ ] 4+ backend tests; frontend renders chart and KPI cards
+
+### 12.3 Accessibility (WCAG 2.1 AA)
+**Goal:** Make the app usable by users with disabilities and pass automated accessibility audits.  
+**Scope:** Audit all page components for missing ARIA labels, keyboard navigation, focus trapping in modals, color contrast, and screen-reader landmarks. Fix all Level A and Level AA violations found.
+
+**Acceptance Criteria:**
+- [ ] All interactive elements have descriptive `aria-label` or visible text labels
+- [ ] Modal dialogs trap focus and restore it on close
+- [ ] All form inputs have associated `<label>` elements
+- [ ] No color-only information conveyed without text equivalent
+- [ ] Tab order is logical across all pages
+- [ ] `axe-core` reports zero critical or serious violations on Budget and Tracker pages
+
+### 12.4 Full Account Data Export (JSON)
+**Goal:** Let users export all their data as a portable JSON backup — essential for trust and compliance.  
+**Scope:** `GET /export/full-backup` endpoint returns a single JSON containing all user data (months, expenses, recurring, savings goals, debts, categories). Rate-limited to 1/hour. Frontend: "Download full backup" button in AccountSettings.
+
+**Acceptance Criteria:**
+- [ ] Response contains months array, expenses (with month context), recurring, savings goals, debts, categories
+- [ ] All encrypted fields are decrypted in the export (user is authenticated)
+- [ ] Rate-limited 1 request/hour (slowapi)
+- [ ] `Content-Disposition: attachment; filename="backup-YYYY-MM-DD.json"` header set
+- [ ] 3+ backend tests; button visible in AccountSettings
+
+### 12.5 Milestone Email Notifications
+**Goal:** Celebrate user wins via email to reinforce positive habits and improve retention.  
+**Scope:** APScheduler job runs monthly to check for streak milestones (3/6/12 months), completed savings goals, and paid-off debts since last run. Sends congratulatory emails via SendGrid. New `milestone_notifications_sent` table to prevent duplicate sends.
+
+**Acceptance Criteria:**
+- [ ] Streak milestone emails sent at 3, 6, 12-month thresholds (one-time per threshold)
+- [ ] Savings goal completion email sent when `current_amount >= target_amount`
+- [ ] Debt payoff email sent when all debts reach zero balance
+- [ ] Duplicate-send prevention: each milestone type + user fires at most once
+- [ ] All emails are no-ops when `SENDGRID_API_KEY` is not set
+- [ ] 4+ backend tests
+
+---
+
 ## 9. Permanently Out of Scope
 
 - Mobile native app (iOS/Android) — web-first; PWA enhancements may be considered later
@@ -595,9 +666,13 @@ Phase 8 (DONE):  Expanded scope
 Phase 9 (DONE):  Retention & engagement
 Phase 10 (DONE): Operational excellence
 
-Phase 11 (Current): User experience & power features
+Phase 11 (DONE): User experience & power features
   11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
   → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks) [DONE]
+
+Phase 12 (Current): Usability, retention & production hardening
+  12.1 (Budget copy forward) → 12.2 (Net worth tracker) → 12.3 (Accessibility)
+  → 12.4 (Full data export) → 12.5 (Milestone email notifications)
 ```
 
 ---

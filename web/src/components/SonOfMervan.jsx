@@ -13,6 +13,7 @@ import { useCalculateBudget } from "../hooks/useBudget";
 import { useTheme } from "../hooks/useTheme";
 import { useCategories } from "../hooks/useCategories";
 import { useStreaks } from "../hooks/useInsights";
+import { getMonthlyTracker } from "../api/expenses";
 
 const FALLBACK_CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -89,6 +90,7 @@ export default function SonOfMervan() {
   ]);
   const [results, setResults] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [loadingPrevMonth, setLoadingPrevMonth] = useState(false);
 
   const calculateMutation = useCalculateBudget();
   const { data: categoriesData } = useCategories();
@@ -134,6 +136,45 @@ export default function SonOfMervan() {
       }))
     );
     setShowTemplateModal(false);
+  };
+
+  const prevMonthLabel = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth(); // 0-based, so current month index
+    const prevM = m === 0 ? 12 : m;
+    const prevY = m === 0 ? y - 1 : y;
+    return {
+      str: `${prevY}-${String(prevM).padStart(2, "0")}`,
+      display: new Date(prevY, prevM - 1).toLocaleString("default", { month: "long", year: "numeric" }),
+    };
+  })();
+
+  const loadPrevMonth = async () => {
+    setLoadingPrevMonth(true);
+    try {
+      const data = await getMonthlyTracker(prevMonthLabel.str, { page_size: 100 });
+      const items = data?.expenses?.items ?? [];
+      if (!items.length && !data?.salary_planned) {
+        toast(`No budget found for ${prevMonthLabel.display}`, { icon: "ℹ️" });
+        return;
+      }
+      if (data.salary_planned) setSalary(String(data.salary_planned));
+      if (items.length) {
+        setExpenses(
+          items.map((e) => ({
+            name: e.name,
+            category: e.category,
+            amount: String(e.planned_amount),
+          }))
+        );
+      }
+      toast.success(`Loaded budget from ${prevMonthLabel.display}`);
+    } catch {
+      toast.error("Could not load previous month's budget");
+    } finally {
+      setLoadingPrevMonth(false);
+    }
   };
 
   const doCalculate = async () => {
@@ -248,6 +289,16 @@ export default function SonOfMervan() {
                 Monthly expenses
               </label>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadPrevMonth}
+                  disabled={loadingPrevMonth}
+                  aria-label={`Load ${prevMonthLabel.display} budget`}
+                  data-testid="load-prev-month-btn"
+                  className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                >
+                  {loadingPrevMonth ? "Loading…" : `Load ${prevMonthLabel.display}`}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowTemplateModal(true)}
