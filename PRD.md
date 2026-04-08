@@ -367,12 +367,23 @@ Previously out of scope items now included as future roadmap.
 **Acceptance Criteria:** Export covers the correct UK tax year (April–April). Categories map correctly to HMRC allowable expense types. PDF is human-readable and print-ready.
 **Result:** `GET /export/tax-summary?tax_year=YYYY` returns JSON summary (total income, total expenses, net savings, savings rate, per-category breakdown with HMRC headings and deductibility flags, potentially-deductible total). `GET /export/tax-pdf?tax_year=YYYY` generates SA302-style PDF with income summary, category table, HMRC headings, deductible total, and professional advice disclaimer. HMRC category mapping for all 8 expense categories. `/tax` page with year selector (current + 4 prior years), 4 KPI cards, responsive category table with deductibility badges, PDF download button. "Tax" nav tab added (desktop + mobile). 9 new tests; 284 total, 85.79% coverage. Build 302.67 kB gzip.
 
-### 8.5 Open Banking Integration (Plaid / TrueLayer)
+### 8.5 Open Banking Integration (TrueLayer)
+**Status:** Not yet implemented — no `routers/banking.py`, no DB models, no frontend files exist. CSV import (Phase 11.2) is the current manual workaround.
 **Problem:** Manual expense entry is the biggest friction point in the app. Users who connect their bank accounts in competitors (Monzo, Emma) see instant categorised transactions with no manual input.
-**Solution:** Integrate TrueLayer (UK-first, FCA-regulated) for open banking connectivity. OAuth-based bank account linking — user authorises read-only access. Transaction sync via `POST /banking/sync` fetches new transactions since last sync and creates draft `MonthlyExpense` rows with AI-suggested categories (using Smart Categorisation from 7.6). User reviews and confirms drafts before they become permanent. Webhook support for real-time transaction push where the provider supports it.
-**Constraints:** TrueLayer sandbox available for development; production requires FCA registration or operating under TrueLayer's agent model. No write access to bank accounts ever. All bank tokens stored encrypted (Fernet). User can disconnect at any time and all bank-linked data is deleted.
-**Files:** new `routers/banking.py`, new `database.py` models (BankConnection, BankTransaction), new `web/src/components/BankConnectionPage.jsx`, new `alembic/versions/` migration, `requirements.txt` (truelayer-signing or plaid SDK)
-**Acceptance Criteria:** User can link a UK bank account via OAuth. Transactions sync within 60 seconds of connection. Draft expenses are pre-categorised using the user's own history. User can review, edit, and confirm or reject each draft. Disconnecting removes all stored bank tokens and unconfirmed drafts.
+**Prerequisite:** 7.6 Smart Categorisation must be complete (its `GET /insights/suggest-category` endpoint powers draft categorisation).
+**Development approach:** Build and test against TrueLayer sandbox (`https://auth.truelayer-sandbox.com`) first — no FCA registration required for sandbox. Promote to production credentials once ready.
+**Solution:** Integrate TrueLayer (UK-first, FCA-regulated) for OAuth-based read-only bank account linking. `GET /banking/connect` initiates the OAuth flow. TrueLayer redirects to `GET /banking/callback` which exchanges the code for tokens, stores them Fernet-encrypted in a `BankConnection` row. `POST /banking/sync` fetches new transactions from TrueLayer `/data/v1/accounts/{id}/transactions` since `last_synced_at`, calls the suggest-category endpoint for each, and creates draft `BankTransaction` rows. User reviews drafts via `GET /banking/drafts` (paginated), confirms via `PATCH /banking/drafts/{id}` (creates a real `MonthlyExpense`), or rejects. `DELETE /banking/connections/{id}` revokes the TrueLayer token and purges all stored tokens and unconfirmed drafts.
+**New environment variables:** `TRUELAYER_CLIENT_ID`, `TRUELAYER_CLIENT_SECRET`, `TRUELAYER_REDIRECT_URI`
+**Constraints:** No write access to bank accounts ever. All access tokens and refresh tokens stored Fernet-encrypted. User can disconnect at any time with full data purge. Sandbox mode uses mock bank data — clearly labelled in UI.
+**Files:** new `routers/banking.py`, new `database.py` models (`BankConnection`, `BankTransaction`), new `web/src/components/BankConnectionPage.jsx`, new `web/src/api/banking.js`, new `web/src/hooks/useBanking.js`, new `alembic/versions/*_add_banking_tables.py`, `.env.example` updates
+**Acceptance Criteria:**
+- OAuth flow completes and `BankConnection` row created with encrypted tokens
+- `POST /banking/sync` fetches real (or sandbox) transactions and creates draft rows with suggested categories
+- `GET /banking/drafts` returns paginated list of unconfirmed transactions
+- User can confirm (creates `MonthlyExpense`) or reject each draft individually
+- `DELETE /banking/connections/{id}` removes all tokens and unconfirmed drafts — verified by subsequent GET returning 404
+- All tokens are Fernet-encrypted in DB (no plaintext in DB dump)
+- Sandbox mode labelled clearly; switching to production requires only env var change
 
 ---
 
@@ -724,6 +735,42 @@ Phase 13 targets measurable performance improvements, stronger account security,
 
 ---
 
+## Phase 14: UI/UX Overhaul
+
+The app has accumulated 13+ phases of feature work. Each Ralph-loop iteration added UI with slightly different patterns. The result is a nav bar overflowing with 15+ items, a narrow budget card floating in empty space, and inconsistent styles across pages. This phase fixes the visual foundation before further features are added.
+
+### 14.1 Navigation Redesign
+**Problem:** 15+ nav items (Budget, Tracker, Annual, Recurring, Savings, Alerts, Insights, What-If, Portfolio, Calendar, Tax, Household, Categories, Import, Forecast, Debt Payoff, Net Worth, Settings) are crammed into a single horizontal bar. At normal viewport widths items overflow or become illegible. On mobile it's unusable.
+**Solution:**
+- **Desktop:** Collapsible left sidebar. Primary section (always expanded): Budget, Tracker, Annual, Insights. Secondary section (collapsible): Recurring, Savings, Alerts, What-If, Portfolio, Calendar, Tax, Household, Categories, Import, Forecast, Debt Payoff, Net Worth. Settings + Logout in sidebar footer.
+- **Mobile:** Bottom tab bar with the 4 primary items. All other pages accessible via a "More" tab that opens a bottom sheet.
+- Remove the current top nav bar entirely — sidebar/bottom tabs replace it.
+**Files:** `web/src/components/AuthGuard.jsx` (all nav logic lives here)
+**Acceptance Criteria:** All nav items accessible at 375px viewport width. Exactly 4 items visible in the primary nav at all times. No overflow or text truncation. Sidebar collapse state persists in localStorage. WCAG 2.1 AA keyboard navigation.
+
+### 14.2 Budget Page Layout Overhaul
+**Problem:** `max-w-3xl` (768px) card centred on a wide screen leaves vast empty dark space either side. No visual hierarchy — the form and results are not visually differentiated. Results only appear after clicking Calculate.
+**Solution:**
+- **Two-column desktop layout:** Left column (60%) = salary + expense rows + Calculate button. Right column (40%) = live stats panel showing salary, total expenses, and remaining budget updating as user types (no Calculate click needed for the preview).
+- Increase outer container to `max-w-6xl`.
+- Add a page header outside the card: large "Budget Planner" heading + "Plan your month" subtitle.
+- Results stat cards (salary / expenses / remaining) shown in the right column at all times — greyed out until salary is entered.
+- After Calculate is clicked, the right column also shows the savings projection chart and category breakdown.
+**Files:** `web/src/components/SonOfMervan.jsx`, `web/src/tests/SonOfMervan.test.jsx`
+**Acceptance Criteria:** At 1440px, left and right columns are both visible with no empty grey wasteland. At 768px, layout collapses to single column (form then stats). Live preview updates within 100ms of keystroke. All existing tests pass.
+
+### 14.3 Global Visual Polish
+**Problem:** Inconsistent card styles, spacing, and input heights across pages. Each feature phase added UI independently.
+**Solution:**
+- Extract a reusable `Card` component (`rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7`). Replace all inline card divs across all page components.
+- Extract a `PageWrapper` component (`max-w-6xl mx-auto px-4 sm:px-6 py-6`) and wrap all page-level components.
+- Standardise input className to a single shared constant in `web/src/styles/inputs.js` — used by all form components.
+- Add consistent empty-state component for pages with no data (Savings Goals, Insights, Net Worth): illustration + heading + CTA button.
+**Files:** new `web/src/components/Card.jsx`, new `web/src/components/PageWrapper.jsx`, new `web/src/styles/inputs.js`, new `web/src/components/EmptyState.jsx`, all page components updated
+**Acceptance Criteria:** `Card`, `PageWrapper`, and `EmptyState` are used in all page-level components. Visual consistency review: same border radius, shadow, input height, and label size on all pages. No page has a visible empty-state gap with no content and no CTA.
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -749,6 +796,12 @@ Phase 12 (DONE): Usability, retention & production hardening
 Phase 13 (Current): Performance, security hardening & developer experience
   13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
   → 13.4 (Email preference center) → 13.5 (Active session manager)
+
+Phase 14 (Next): UI/UX Overhaul — fix visual quality before open banking
+  14.1 (Navigation redesign) → 14.2 (Budget page layout) → 14.3 (Global visual polish)
+
+Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
+  8.5 TrueLayer OAuth integration — sandbox first, then production credentials
 ```
 
 ---
