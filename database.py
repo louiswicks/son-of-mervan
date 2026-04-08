@@ -784,6 +784,60 @@ class Debt(Base):
         self._balance_encrypted = encrypt_value(str(value))
 
 
+class NetWorthSnapshot(Base):
+    """
+    A point-in-time snapshot of the user's net worth.
+    assets_json and liabilities_json are encrypted JSON arrays: [{"name": "...", "value": 1234.0}].
+    total_assets and total_liabilities are computed sums stored as plaintext floats for read efficiency.
+    """
+    __tablename__ = "net_worth_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Plaintext date — not PII on its own
+    snapshot_date = Column(Date, nullable=False)
+
+    # Computed totals stored plaintext for efficiency (no sensitive PII on their own)
+    total_assets = Column(Float, nullable=False, default=0.0)
+    total_liabilities = Column(Float, nullable=False, default=0.0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
+    # ENCRYPTED JSON fields (stored as large strings)
+    _assets_json_encrypted = Column("assets_json_encrypted", String(4096), nullable=True)
+    _liabilities_json_encrypted = Column("liabilities_json_encrypted", String(4096), nullable=True)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def assets_json(self):
+        raw = decrypt_value(self._assets_json_encrypted) if self._assets_json_encrypted else None
+        if not raw:
+            return []
+        import json
+        return json.loads(raw)
+
+    @assets_json.setter
+    def assets_json(self, value):
+        import json
+        self._assets_json_encrypted = encrypt_value(json.dumps(value)) if value is not None else None
+
+    @hybrid_property
+    def liabilities_json(self):
+        raw = decrypt_value(self._liabilities_json_encrypted) if self._liabilities_json_encrypted else None
+        if not raw:
+            return []
+        import json
+        return json.loads(raw)
+
+    @liabilities_json.setter
+    def liabilities_json(self, value):
+        import json
+        self._liabilities_json_encrypted = encrypt_value(json.dumps(value)) if value is not None else None
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),

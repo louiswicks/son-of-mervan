@@ -598,16 +598,16 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - [x] Works correctly at year boundaries (e.g. loading from December when current month is January)
 - [x] 2+ frontend tests covering: successful load, no prior data message (3 written)
 
-### 12.2 Net Worth Tracker
+### 12.2 Net Worth Tracker ✅ DONE
 **Goal:** Give users a holistic financial picture beyond monthly cashflow by tracking assets and liabilities over time.  
 **Scope:** New `net_worth_snapshots` table (date, assets_json, liabilities_json, total_assets, total_liabilities). `GET/POST/PUT/DELETE /net-worth/snapshots`. Frontend: NetWorthPage at `/net-worth` with asset/liability input form + Recharts area chart showing net worth trend.
 
 **Acceptance Criteria:**
-- [ ] `POST /net-worth/snapshots` creates snapshot with at least one asset or liability
-- [ ] `GET /net-worth/snapshots` returns chronological list with `net_worth = total_assets - total_liabilities`
-- [ ] Latest snapshot shows current net worth in a KPI card
-- [ ] Recharts area chart renders net worth trend over time
-- [ ] 4+ backend tests; frontend renders chart and KPI cards
+- [x] `POST /net-worth/snapshots` creates snapshot with at least one asset or liability
+- [x] `GET /net-worth/snapshots` returns chronological list with `net_worth = total_assets - total_liabilities`
+- [x] Latest snapshot shows current net worth in a KPI card
+- [x] Recharts area chart renders net worth trend over time
+- [x] 4+ backend tests; frontend renders chart and KPI cards
 
 ### 12.3 Accessibility (WCAG 2.1 AA)
 **Goal:** Make the app usable by users with disabilities and pass automated accessibility audits.  

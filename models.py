@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import date, datetime
 
 class ExpenseItem(BaseModel):
     name: str
@@ -400,3 +400,33 @@ class PayoffPlanResponse(BaseModel):
     months: List[PayoffMonth]
     total_interest_paid: float
     payoff_months: int   # total number of months until all debts cleared
+
+
+# ---------- Net Worth ----------
+
+class NetWorthItem(BaseModel):
+    name: str
+    value: float
+
+
+class NetWorthSnapshotCreate(BaseModel):
+    snapshot_date: date
+    assets: List[NetWorthItem] = []
+    liabilities: List[NetWorthItem] = []
+
+
+class NetWorthSnapshotUpdate(BaseModel):
+    snapshot_date: Optional[date] = None
+    assets: Optional[List[NetWorthItem]] = None
+    liabilities: Optional[List[NetWorthItem]] = None
+
+
+class NetWorthSnapshotResponse(BaseModel):
+    id: int
+    snapshot_date: date
+    assets: List[NetWorthItem]
+    liabilities: List[NetWorthItem]
+    total_assets: float
+    total_liabilities: float
+    net_worth: float
+    created_at: datetime

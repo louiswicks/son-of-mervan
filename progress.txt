@@ -719,3 +719,17 @@
 - `web/src/tests/SonOfMervan.test.jsx`: Added mocks for `../hooks/useCategories`, `../hooks/useInsights` (useStreaks), `../api/expenses` (getMonthlyTracker), and `react-hot-toast`. Updated `beforeEach` to set default `mockGetMonthlyTracker` response. Added `Budget Copy Forward` describe block with 3 tests: button renders, clicking pre-fills salary + expense rows from prev month data, no-data informational toast.
 - `PRD.md`: Added Phase 12 (5 tasks: Budget Copy Forward, Net Worth Tracker, Accessibility, Full Data Export, Milestone Email Notifications); 12.1 marked DONE.
 - 16 frontend SonOfMervan tests pass (3 new); 410 backend tests unchanged; 88.63% coverage
+
+## Phase 12.2 — Net Worth Tracker [DONE] 2026-04-08
+- `database.py`: Added `NetWorthSnapshot` ORM model (`net_worth_snapshots` table). Fields: `id`, `user_id` (FK), `snapshot_date` (Date, plaintext), `total_assets` / `total_liabilities` (Float, plaintext computed sums), `created_at`, `deleted_at`. Encrypted hybrid properties: `assets_json` / `liabilities_json` (Fernet-encrypted JSON arrays of `{name, value}` dicts, stored in `String(4096)` columns).
+- `models.py`: Added `NetWorthItem`, `NetWorthSnapshotCreate`, `NetWorthSnapshotUpdate`, `NetWorthSnapshotResponse` Pydantic schemas. Added `date` to imports.
+- `routers/net_worth.py`: New router (`/net-worth/snapshots` prefix). `GET` lists all non-deleted snapshots chronologically with computed `net_worth` field. `POST` validates at least one asset or liability, computes totals, encrypts JSON, returns 201. `PUT` supports partial updates of date/assets/liabilities with total recalculation. `DELETE` soft-deletes.
+- `main.py`: Imported `net_worth as net_worth_router`; registered `net_worth_router.router` after debts router.
+- `alembic/versions/o5p6q7r8s9t0_add_net_worth_snapshots.py`: Migration creating `net_worth_snapshots` table with indexes on `id` and `user_id`.
+- `web/src/api/netWorth.js`: `listSnapshots`, `createSnapshot`, `updateSnapshot`, `deleteSnapshot` Axios wrappers.
+- `web/src/hooks/useNetWorth.js`: `useNetWorthSnapshots`, `useCreateSnapshot`, `useUpdateSnapshot`, `useDeleteSnapshot` React Query hooks (staleTime 5 min).
+- `web/src/components/NetWorthPage.jsx`: KPI cards (Net Worth, Total Assets, Total Liabilities) from latest snapshot; Recharts AreaChart showing net worth trend over time (only rendered when 2+ snapshots); collapsible snapshot history rows showing per-asset/liability breakdown; add-snapshot form with dynamic asset/liability item rows; soft-delete per snapshot. Theme-aware chart colours via `useTheme()`.
+- `web/src/router.jsx`: Added `NetWorthPage` import; added `/net-worth` route inside AuthGuard children.
+- `web/src/components/AuthGuard.jsx`: Added `BarChart3` lucide icon; added `["/net-worth", "Net Worth", BarChart3]` to `NAV_TABS`.
+- `tests/test_net_worth.py`: 22 tests — list empty, list own snapshots, excludes deleted, excludes other users, net_worth field correct, chronological order, unauthenticated 401/403, create 201, response shape, assets-only, liabilities-only, empty body 422, missing date 422, update assets, update date, update not found 404, update other user 404, delete 204, soft-delete verified, delete not found 404, delete other user 404.
+- 432 backend tests pass (22 new); 88.95% coverage; ruff clean on new files

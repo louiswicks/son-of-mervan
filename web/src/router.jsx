@@ -24,6 +24,7 @@ import CategoriesPage from "./components/CategoriesPage";
 import ImportPage from "./components/ImportPage";
 import ForecastPage from "./components/ForecastPage";
 import DebtPayoffPage from "./components/DebtPayoffPage";
+import NetWorthPage from "./components/NetWorthPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import OnboardingWizard from "./components/OnboardingWizard";
 
@@ -59,6 +60,7 @@ export const router = createHashRouter([
       { path: "import", element: withPageBoundary(<ImportPage />) },
       { path: "forecast", element: withPageBoundary(<ForecastPage />) },
       { path: "debts", element: withPageBoundary(<DebtPayoffPage />) },
+      { path: "net-worth", element: withPageBoundary(<NetWorthPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },

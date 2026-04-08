@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Moon, Sun, LayoutDashboard, Calendar, TrendingUp, Settings,
-  Repeat, PiggyBank, Bell, X, Trash2, BellOff, Lightbulb, Sliders, LineChart, CalendarDays, Receipt, Users, Tag, Upload, Waves, TrendingDown,
+  Repeat, PiggyBank, Bell, X, Trash2, BellOff, Lightbulb, Sliders, LineChart, CalendarDays, Receipt, Users, Tag, Upload, Waves, TrendingDown, BarChart3,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
@@ -32,6 +32,7 @@ const NAV_TABS = [
   ["/import", "Import", Upload],
   ["/forecast", "Forecast", Waves],
   ["/debts", "Debt Payoff", TrendingDown],
+  ["/net-worth", "Net Worth", BarChart3],
   ["/settings", "Settings", Settings],
 ];
 
