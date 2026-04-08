@@ -891,18 +891,18 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Unauthenticated request → 401/403
 - [x] 4+ backend tests; "Export to Calendar" button on RecurringExpensesPage
 
-### 16.4 Spending Budget Carry-Forward Card
+### 16.4 Spending Budget Carry-Forward Card [DONE 2026-04-09]
 **Goal:** Surface unspent budget at month-end so users are prompted to move the surplus to savings — turning passive awareness into active saving behaviour.
 **Scope:**
 - `GET /insights/month-close-summary?month=YYYY-MM` — returns per-category unspent amounts (`planned - actual` where positive) and `total_unspent`. Requires auth.
 - Frontend: Dashboard renders a "Month Close" card during days 22–28 of the current month (detected client-side). Card shows total unspent and a "Move to savings" CTA that pre-fills the contributions form with the surplus amount.
 
 **Acceptance Criteria:**
-- [ ] Endpoint returns `{ month, total_unspent, categories: [{category, planned, actual, unspent}] }` sorted by unspent descending
-- [ ] Categories where actual > planned (overspend) have `unspent = 0` (not negative)
-- [ ] Returns empty categories list with `total_unspent = 0` when no data for month
-- [ ] Dashboard renders card from day 22 of the current month onwards
-- [ ] 4+ backend tests; frontend card renders correctly with mock data
+- [x] Endpoint returns `{ month, total_unspent, categories: [{category, planned, actual, unspent}] }` sorted by unspent descending
+- [x] Categories where actual > planned (overspend) have `unspent = 0` (not negative)
+- [x] Returns empty categories list with `total_unspent = 0` when no data for month
+- [x] Dashboard renders card from day 22 of the current month onwards
+- [x] 4+ backend tests; frontend card renders correctly with mock data
 
 ### 16.5 API Changelog Endpoint
 **Goal:** Provide a machine-readable version history so future client integrations can detect breaking changes without reading git logs.
@@ -955,7 +955,7 @@ Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE)
 
 Phase 16: Reliability, developer experience & user onboarding
   16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
-  → 16.4 (Month-close card) → 16.5 (API changelog endpoint)
+  → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint)
 ```
 
 ---

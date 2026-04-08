@@ -977,3 +977,20 @@
 - `tests/test_export.py`: Added `make_recurring()` helper and `TestCalendarExport` class — 6 tests: empty calendar valid, content-disposition header, VEVENT with expense data, all 4 RRULE frequencies (MONTHLY/WEEKLY/DAILY/YEARLY), unauthenticated 401/403, soft-deleted expenses excluded.
 
 **Tests:** 559 backend tests pass; ruff clean; commit: `7352a0a`.
+
+## Phase 13.5 — Active Session Manager [DONE] (retroactive mark) 2026-04-09
+
+**Task:** PRD 13.5 was already fully implemented but not marked DONE. Marked DONE retroactively after confirming all backend (routers/signup.py sessions endpoints, migration), frontend (AccountSettings.jsx Active Sessions card, web/src/api/sessions.js, hooks), and tests (tests/test_sessions.py) were complete.
+
+## Phase 16.4 — Spending Budget Carry-Forward Card [DONE] 2026-04-09
+
+**Task:** Surface unspent budget at month-end so users can move the surplus to savings.
+
+**Files modified:**
+- `routers/insights.py`: Added `GET /insights/month-close-summary?month=YYYY-MM` endpoint. Returns `{ month, total_unspent, categories: [{category, planned, actual, unspent}] }` sorted by unspent descending. Overspend categories clamped to `unspent=0`. Returns empty list when no data exists for the month.
+- `web/src/api/insights.js`: Added `getMonthCloseSummary(month)` function.
+- `web/src/hooks/useInsights.js`: Added `useMonthCloseSummary(month)` React Query hook (staleTime 2 min).
+- `web/src/components/SonOfMervan.jsx`: Added Month Close card visible from day 22 of the current month when `total_unspent > 0`. Shows formatted surplus amount and a "Move to savings" button that navigates to `/savings`. Uses `Wallet` icon from lucide-react.
+- `tests/test_insights.py`: Added `TestMonthCloseSummary` class — 7 tests: empty data, unspent computed correctly, overspend clamped to zero, sorted descending, data isolation, unauthenticated 401, invalid month format 422.
+
+**Tests:** 566 backend tests pass; 91.6% coverage; ruff clean; commit: `b04cedf`.
