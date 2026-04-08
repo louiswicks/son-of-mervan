@@ -869,7 +869,7 @@ Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
 
 Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
   15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
-  → 15.4 (Disconnect) [DONE] → 15.5 (Frontend)
+  → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
 ```
 
 ---

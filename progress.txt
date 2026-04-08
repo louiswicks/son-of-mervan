@@ -934,3 +934,21 @@
 - `tests/test_banking.py`: 11 new tests covering: disconnected_at set, correct counts returned, draft hard-delete, confirmed FK nulled, connection excluded from list, 404 on missing/other-user/already-disconnected, revocation POST called with correct URL, graceful proceed on revocation network failure, unauthenticated 4xx.
 
 **Tests:** 541 backend tests pass (91% coverage); ruff lint clean; commit: `cd51a0c`
+
+---
+
+## Phase 15.5 — Frontend: Bank Connection Page (2026-04-09)
+
+**Task:** Build the full banking UI — connect, sync, review and disconnect flow.
+
+**Files created:**
+- `web/src/api/banking.js` — API wrappers: getConnectUrl, listConnections, syncTransactions, disconnectBank, listDrafts, reviewDraft, confirmAllDrafts
+- `web/src/hooks/useBanking.js` — React Query hooks: useConnections, useDrafts, useConnectBank, useSyncTransactions, useDisconnectBank, useReviewDraft, useConfirmAllDrafts
+- `web/src/components/BankConnectionPage.jsx` — Full page: disconnected CTA card, connected card (sync/disconnect), drafts table with per-row confirm/reject + bulk confirm-all, pagination, sandbox yellow banner, ConfirmModal for disconnect
+
+**Files modified:**
+- `web/src/router.jsx` — Added lazy `/banking` route
+- `web/src/components/AuthGuard.jsx` — Added `["/banking", "Banking", Landmark]` to SECONDARY_NAV
+
+**Tests:** 541 backend tests passing (91% coverage), 51 frontend tests passing, ruff clean.
+**Status:** DONE — committed and pushed (56bcefd).
