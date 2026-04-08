@@ -91,14 +91,18 @@ function NotificationPanel({ onClose }) {
         ref={panelRef}
         className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-white dark:bg-gray-900 shadow-2xl flex flex-col"
         role="dialog"
-        aria-label="Notifications"
+        aria-modal="true"
+        aria-labelledby="notifications-panel-title"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Notifications</h2>
+            <h2 id="notifications-panel-title" className="font-semibold text-gray-900 dark:text-white">Notifications</h2>
             {unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+              <span
+                className="bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center"
+                aria-label={`${unreadCount} unread`}
+              >
                 {unreadCount}
               </span>
             )}
@@ -114,6 +118,7 @@ function NotificationPanel({ onClose }) {
             )}
             <button
               onClick={onClose}
+              aria-label="Close notifications"
               className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X size={18} />
@@ -178,7 +183,7 @@ function NotificationPanel({ onClose }) {
                   <button
                     onClick={(e) => handleDelete(e, n.id)}
                     className="flex-shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors self-start"
-                    title="Delete"
+                    aria-label="Delete notification"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -211,12 +216,12 @@ function BellButton({ onClick }) {
   return (
     <button
       onClick={onClick}
-      aria-label="Notifications"
+      aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
       className="relative p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 min-w-[36px] min-h-[36px] flex items-center justify-center"
     >
-      <Bell size={18} />
+      <Bell size={18} aria-hidden="true" />
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none" aria-hidden="true">
           {unreadCount > 9 ? "9+" : unreadCount}
         </span>
       )}
@@ -252,6 +257,7 @@ function Nav() {
                 <button
                   key={path}
                   onClick={() => navigate(path)}
+                  aria-current={location.pathname === path ? "page" : undefined}
                   className={`px-3 py-1.5 rounded-lg font-medium text-sm transition-colors ${
                     location.pathname === path
                       ? "bg-blue-600 text-white"

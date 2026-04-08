@@ -609,17 +609,17 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - [x] Recharts area chart renders net worth trend over time
 - [x] 4+ backend tests; frontend renders chart and KPI cards
 
-### 12.3 Accessibility (WCAG 2.1 AA)
+### 12.3 Accessibility (WCAG 2.1 AA) ✅ DONE
 **Goal:** Make the app usable by users with disabilities and pass automated accessibility audits.  
 **Scope:** Audit all page components for missing ARIA labels, keyboard navigation, focus trapping in modals, color contrast, and screen-reader landmarks. Fix all Level A and Level AA violations found.
 
 **Acceptance Criteria:**
-- [ ] All interactive elements have descriptive `aria-label` or visible text labels
-- [ ] Modal dialogs trap focus and restore it on close
-- [ ] All form inputs have associated `<label>` elements
-- [ ] No color-only information conveyed without text equivalent
-- [ ] Tab order is logical across all pages
-- [ ] `axe-core` reports zero critical or serious violations on Budget and Tracker pages
+- [x] All interactive elements have descriptive `aria-label` or visible text labels
+- [x] Modal dialogs trap focus and restore it on close
+- [x] All form inputs have associated `<label>` elements
+- [x] No color-only information conveyed without text equivalent
+- [x] Tab order is logical across all pages
+- [x] `axe-core` reports zero critical or serious violations on Budget and Tracker pages
 
 ### 12.4 Full Account Data Export (JSON)
 **Goal:** Let users export all their data as a portable JSON backup — essential for trust and compliance.  

@@ -54,6 +54,10 @@ jest.mock('../hooks/useExpenses', () => ({
     mutateAsync: mockDeleteMutateAsync,
     isPending: false,
   }),
+  useExpenseSearch: () => ({
+    data: null,
+    isLoading: false,
+  }),
 }));
 
 const mockTrackerDataWithExpense = {

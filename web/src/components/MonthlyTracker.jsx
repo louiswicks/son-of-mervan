@@ -83,7 +83,7 @@ const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
   const { data: entries, isLoading, isError } = useExpenseAudit(expenseId, true);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="audit-drawer-title">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
@@ -92,7 +92,7 @@ const AuditDrawer = ({ expenseId, expenseName, onClose }) => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b dark:border-gray-700">
           <div>
-            <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-base">Change History</h2>
+            <h2 id="audit-drawer-title" className="font-semibold text-gray-900 dark:text-gray-100 text-base">Change History</h2>
             {expenseName && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[220px]">{expenseName}</p>
             )}
@@ -447,18 +447,20 @@ const MonthlyTracker = () => {
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
           <div className="flex-1 min-w-0 relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" aria-hidden="true" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search expense names…"
+              aria-label="Search expense names"
               className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
             />
           </div>
           <select
             value={searchCategory}
             onChange={(e) => { setSearchCategory(e.target.value); setSearchPage(1); }}
+            aria-label="Filter search by category"
             className="border rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px] sm:w-40"
           >
             <option value="All">All categories</option>
@@ -469,16 +471,16 @@ const MonthlyTracker = () => {
               type="month"
               value={searchFrom}
               onChange={(e) => { setSearchFrom(e.target.value); setSearchPage(1); }}
+              aria-label="Search from month"
               className="border rounded-lg px-2 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
-              title="From month"
             />
-            <span className="text-gray-400 text-sm">–</span>
+            <span className="text-gray-400 text-sm" aria-hidden="true">–</span>
             <input
               type="month"
               value={searchTo}
               onChange={(e) => { setSearchTo(e.target.value); setSearchPage(1); }}
+              aria-label="Search to month"
               className="border rounded-lg px-2 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
-              title="To month"
             />
           </div>
           {isSearchMode && (
@@ -554,8 +556,9 @@ const MonthlyTracker = () => {
 
       {/* Filter bar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by category:</label>
+        <label htmlFor="tracker-filter-category" className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by category:</label>
         <select
+          id="tracker-filter-category"
           value={filterCategory}
           onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
           className="border rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 w-full sm:w-auto min-h-[44px]"
@@ -596,8 +599,9 @@ const MonthlyTracker = () => {
 
       {/* Salary input */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 gap-2">
-        <label className="text-gray-700 dark:text-gray-300 font-medium">Monthly Salary ({sym}):</label>
+        <label htmlFor="tracker-salary" className="text-gray-700 dark:text-gray-300 font-medium">Monthly Salary ({sym}):</label>
         <input
+          id="tracker-salary"
           type="text"
           inputMode="decimal"
           pattern="[0-9]*[.]?[0-9]*"

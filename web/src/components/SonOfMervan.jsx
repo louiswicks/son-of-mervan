@@ -266,12 +266,13 @@ export default function SonOfMervan() {
 
           {/* Salary */}
           <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            <label htmlFor="budget-salary" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
               Monthly take-home salary (£)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-medium select-none">£</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-medium select-none" aria-hidden="true">£</span>
               <input
+                id="budget-salary"
                 inputMode="decimal"
                 pattern="[0-9]*[.]?[0-9]*"
                 value={salary}
@@ -338,6 +339,7 @@ export default function SonOfMervan() {
                     <input
                       className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
                       placeholder="e.g. Rent"
+                      aria-label={`Expense ${i + 1} name`}
                       value={exp.name}
                       onChange={(e) => updateExpense(i, "name", e.target.value)}
                     />
@@ -347,10 +349,11 @@ export default function SonOfMervan() {
                   <div className="sm:col-span-3">
                     <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Amount</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none">£</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none" aria-hidden="true">£</span>
                       <input
                         inputMode="decimal"
                         pattern="[0-9]*[.]?[0-9]*"
+                        aria-label={`Expense ${i + 1} amount`}
                         className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
                         placeholder="0.00"
                         value={exp.amount}
@@ -363,6 +366,7 @@ export default function SonOfMervan() {
                   <div className="sm:col-span-3">
                     <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Category</label>
                     <select
+                      aria-label={`Expense ${i + 1} category`}
                       className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm min-h-[44px] sm:min-h-0"
                       value={exp.category}
                       onChange={(e) => updateExpense(i, "category", e.target.value)}

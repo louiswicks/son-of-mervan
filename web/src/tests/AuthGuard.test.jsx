@@ -21,6 +21,17 @@ jest.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'light', toggleTheme: jest.fn() }),
 }));
 
+jest.mock('../hooks/useProfile', () => ({
+  useProfile: () => ({ data: { has_completed_onboarding: true }, isLoading: false }),
+}));
+
+jest.mock('../hooks/useAlerts', () => ({
+  useNotifications: () => ({ data: { items: [], unread_count: 0 }, isLoading: false }),
+  useMarkRead: () => ({ mutate: jest.fn() }),
+  useMarkAllRead: () => ({ mutate: jest.fn() }),
+  useDeleteNotification: () => ({ mutate: jest.fn() }),
+}));
+
 function renderAuthGuard(initialPath = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

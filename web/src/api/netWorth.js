@@ -1,4 +1,4 @@
-import { client } from "./client";
+import client from "./client";
 
 export const listSnapshots = () => client.get("/net-worth/snapshots");
 export const createSnapshot = (data) => client.post("/net-worth/snapshots", data);
