@@ -1,9 +1,10 @@
 // src/components/SonOfMervan.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   PlusCircle, Calculator, Trash2, TrendingUp,
-  DollarSign, PieChart, LayoutTemplate, X
+  DollarSign, PieChart, LayoutTemplate, X, Flame
 } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid,
   XAxis, YAxis, Tooltip, BarChart, Bar
@@ -11,6 +12,7 @@ import {
 import { useCalculateBudget } from "../hooks/useBudget";
 import { useTheme } from "../hooks/useTheme";
 import { useCategories } from "../hooks/useCategories";
+import { useStreaks } from "../hooks/useInsights";
 
 const FALLBACK_CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -90,6 +92,24 @@ export default function SonOfMervan() {
 
   const calculateMutation = useCalculateBudget();
   const { data: categoriesData } = useCategories();
+  const { data: streakData } = useStreaks();
+  const shownMilestoneRef = useRef(null);
+
+  useEffect(() => {
+    if (!streakData) return;
+    const streak = streakData.current_streak;
+    const milestones = [12, 6, 3];
+    for (const m of milestones) {
+      if (streak === m && shownMilestoneRef.current !== m) {
+        shownMilestoneRef.current = m;
+        toast.success(`🔥 ${m}-month streak! You're on a roll — ${m} months under budget!`, {
+          duration: 6000,
+          icon: "🏆",
+        });
+        break;
+      }
+    }
+  }, [streakData]);
   const CATEGORIES = useMemo(
     () => categoriesData?.map((c) => c.name) ?? FALLBACK_CATEGORIES,
     [categoriesData]
@@ -172,6 +192,27 @@ export default function SonOfMervan() {
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 p-3 sm:p-6">
       <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
+
+        {/* Streak Badge */}
+        {streakData && streakData.current_streak > 0 && (
+          <div
+            className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl px-4 py-3"
+            data-testid="streak-badge"
+          >
+            <Flame className="text-orange-500 shrink-0" size={20} />
+            <span className="font-semibold text-orange-700 dark:text-orange-400">
+              {streakData.current_streak}-month streak
+            </span>
+            <span className="text-orange-600 dark:text-orange-500 text-sm">
+              — {streakData.current_streak} consecutive month{streakData.current_streak !== 1 ? "s" : ""} under budget!
+            </span>
+            {streakData.longest_streak > streakData.current_streak && (
+              <span className="ml-auto text-xs text-orange-500 dark:text-orange-400">
+                Best: {streakData.longest_streak}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Inputs Card */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-7">

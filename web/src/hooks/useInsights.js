@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace, suggestCategory, getHealthScore, getAnomalyDetection } from "../api/insights";
+import { getMonthlySummary, getSpendingTrends, getSpendingHeatmap, getSpendingPace, suggestCategory, getHealthScore, getAnomalyDetection, getStreaks } from "../api/insights";
 
 export function useMonthlySummary(month) {
   return useQuery({
@@ -50,6 +50,14 @@ export function useAnomalyDetection(month, lookback = 3) {
     queryFn: () => getAnomalyDetection(month, lookback),
     enabled: !!month,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useStreaks() {
+  return useQuery({
+    queryKey: ["insights-streaks"],
+    queryFn: getStreaks,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

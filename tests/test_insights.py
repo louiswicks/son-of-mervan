@@ -600,3 +600,119 @@ class TestAnomalyDetection:
         assert r.status_code == 200
         body = r.json()
         assert body["lookback_months"] == 2
+
+
+class TestStreaks:
+    """Tests for GET /insights/streaks."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/streaks")
+        assert r.status_code in (401, 403)
+
+    def test_no_data_returns_zero_streaks(self, auth_client):
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 0
+        assert body["longest_streak"] == 0
+        assert body["total_tracked"] == 0
+        assert body["months_under"] == 0
+
+    def test_single_under_budget_month_gives_streak_one(self, auth_client, db, verified_user):
+        """One month with actual ≤ planned produces a streak of 1."""
+        make_month(
+            db, verified_user, month="2026-01",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=1800.0,
+        )
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 1
+        assert body["longest_streak"] == 1
+        assert body["months_under"] == 1
+
+    def test_consecutive_under_budget_months_counted(self, auth_client, db, verified_user):
+        """Three consecutive under-budget months yield streak of 3."""
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            make_month(
+                db, verified_user, month=mo,
+                salary_planned=3000.0, total_planned=2000.0,
+                total_actual=1500.0,
+            )
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 3
+        assert body["longest_streak"] == 3
+        assert body["total_tracked"] == 3
+
+    def test_over_budget_month_resets_current_streak(self, auth_client, db, verified_user):
+        """An over-budget month breaks the current streak but longest is preserved."""
+        # 2 under-budget months (2026-01, 2026-02)
+        for mo in ["2026-01", "2026-02"]:
+            make_month(
+                db, verified_user, month=mo,
+                salary_planned=3000.0, total_planned=2000.0,
+                total_actual=1500.0,
+            )
+        # 1 over-budget month (2026-03)
+        make_month(
+            db, verified_user, month="2026-03",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=2500.0,
+        )
+        # 1 under-budget month (2026-04) — new streak starts
+        make_month(
+            db, verified_user, month="2026-04",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=1800.0,
+        )
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 1
+        assert body["longest_streak"] == 2
+        assert body["months_under"] == 3
+
+    def test_months_without_actuals_excluded(self, auth_client, db, verified_user):
+        """Months with no actual spend (total_actual=0) are skipped — don't break streak."""
+        # Month with actuals: under-budget
+        make_month(
+            db, verified_user, month="2026-01",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=1500.0,
+        )
+        # Month with no actuals (not yet tracked)
+        make_month(
+            db, verified_user, month="2026-02",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=0.0,
+        )
+        # Month with actuals: under-budget — streak continues
+        make_month(
+            db, verified_user, month="2026-03",
+            salary_planned=3000.0, total_planned=2000.0,
+            total_actual=1800.0,
+        )
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 2
+        assert body["total_tracked"] == 2  # zero-actual month not counted
+
+    def test_only_own_data_returned(self, auth_client, db, verified_user, second_user):
+        """Streak data is isolated to the authenticated user."""
+        # Give second user a long streak
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            make_month(
+                db, second_user, month=mo,
+                salary_planned=5000.0, total_planned=3000.0,
+                total_actual=2000.0,
+            )
+        # Auth user has no data
+        r = auth_client.get("/insights/streaks")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["current_streak"] == 0
+        assert body["total_tracked"] == 0

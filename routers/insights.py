@@ -871,6 +871,76 @@ def spending_anomalies(
     }
 
 
+# -------------------- spending streaks --------------------
+
+@router.get("/streaks")
+def spending_streaks(
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Compute the user's under-budget streak.
+
+    A month is "tracked" when it has non-zero total_actual spend recorded.
+    Among tracked months:
+      - Under-budget: total_actual <= total_planned (and total_planned > 0)
+      - Over-budget: total_actual > total_planned, or no planned amount set
+
+    current_streak  — consecutive under-budget months ending at the most recent tracked month.
+    longest_streak  — maximum streak across all history.
+    total_tracked   — total number of months with actual data.
+    months_under    — total number of months that were under-budget.
+    """
+    user = _require_user(db, current_user)
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # Filter to months that have actual spending data and sort chronologically
+    tracked: list[tuple[str, bool]] = []  # (month_str, is_under_budget)
+    for row in all_rows:
+        month_str = row.month
+        if not month_str:
+            continue
+        total_actual = float(row.total_actual or 0.0)
+        if total_actual <= 0:
+            continue  # No actual data recorded — skip
+        total_planned = float(row.total_planned or 0.0)
+        is_under = total_planned > 0 and total_actual <= total_planned
+        tracked.append((month_str, is_under))
+
+    # Sort oldest → newest
+    tracked.sort(key=lambda x: x[0])
+
+    if not tracked:
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "total_tracked": 0,
+            "months_under": 0,
+        }
+
+    # Compute longest streak and current streak
+    longest = 0
+    run = 0
+    for _, is_under in tracked:
+        if is_under:
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+
+    # Current streak = run at end of sorted list (already computed as `run`)
+    current = run
+
+    months_under = sum(1 for _, is_under in tracked if is_under)
+
+    return {
+        "current_streak": current,
+        "longest_streak": longest,
+        "total_tracked": len(tracked),
+        "months_under": months_under,
+    }
+
+
 # -------------------- AI review endpoint --------------------
 
 @router.post("/ai-review")

@@ -24,6 +24,9 @@ export const getAnomalyDetection = (month, lookback = 3) =>
     .get("/insights/anomalies", { params: { month, lookback } })
     .then((r) => r.data);
 
+export const getStreaks = () =>
+  client.get("/insights/streaks").then((r) => r.data);
+
 /**
  * Stream an AI financial review for the given month.
  * Uses native fetch() so the response body can be read as a stream.
