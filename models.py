@@ -358,3 +358,45 @@ class CSVConfirmRequest(BaseModel):
 class CSVImportResult(BaseModel):
     imported: int
     skipped: int
+
+
+# ---------- Debt Payoff ----------
+
+class DebtCreate(BaseModel):
+    name: str
+    balance: float
+    interest_rate: float   # annual APR as decimal, e.g. 0.18 = 18%
+    minimum_payment: float
+
+
+class DebtUpdate(BaseModel):
+    name: Optional[str] = None
+    balance: Optional[float] = None
+    interest_rate: Optional[float] = None
+    minimum_payment: Optional[float] = None
+
+
+class DebtResponse(BaseModel):
+    id: int
+    name: str
+    balance: float
+    interest_rate: float
+    minimum_payment: float
+    created_at: datetime
+
+
+class PayoffDebtMonth(BaseModel):
+    name: str
+    remaining_balance: float
+
+
+class PayoffMonth(BaseModel):
+    month: int           # 1-based month index from today
+    debts: List[PayoffDebtMonth]
+
+
+class PayoffPlanResponse(BaseModel):
+    strategy: str        # "snowball" | "avalanche"
+    months: List[PayoffMonth]
+    total_interest_paid: float
+    payoff_months: int   # total number of months until all debts cleared

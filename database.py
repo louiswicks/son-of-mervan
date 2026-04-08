@@ -741,6 +741,49 @@ class UserCategory(Base):
     )
 
 
+class Debt(Base):
+    """
+    A user's debt entry (credit card, loan, etc.).
+    Name and balance are encrypted at rest. interest_rate and minimum_payment
+    are stored as plaintext floats — not PII on their own.
+    """
+    __tablename__ = "debts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Annual interest rate as a decimal (e.g. 0.18 = 18% APR)
+    interest_rate = Column(Float, nullable=False)
+
+    # Fixed monthly minimum payment amount
+    minimum_payment = Column(Float, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True, default=None)
+
+    # ENCRYPTED fields
+    _name_encrypted = Column("name_encrypted", String(512), nullable=False)
+    _balance_encrypted = Column("balance_encrypted", String(512), nullable=False)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def name(self):
+        return decrypt_value(self._name_encrypted) if self._name_encrypted else None
+
+    @name.setter
+    def name(self, value):
+        self._name_encrypted = encrypt_value(value) if value else None
+
+    @hybrid_property
+    def balance(self):
+        val = decrypt_value(self._balance_encrypted) if self._balance_encrypted else "0.0"
+        return float(val)
+
+    @balance.setter
+    def balance(self, value):
+        self._balance_encrypted = encrypt_value(str(value))
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),

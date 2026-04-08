@@ -556,11 +556,11 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 **Scope:** New `debts` table (name, balance, interest_rate, minimum_payment). `GET/POST/PUT/DELETE /debts`. `GET /debts/payoff-plan?strategy=snowball|avalanche` returns month-by-month payoff schedule. Frontend: DebtsPage with debt list + payoff plan toggle.
 
 **Acceptance Criteria:**
-- [ ] Snowball strategy: lowest balance first
-- [ ] Avalanche strategy: highest interest rate first
-- [ ] Payoff plan returns list of `{ month, debts: [{name, remaining_balance}] }` until all zero
-- [ ] Total interest paid shown for each strategy
-- [ ] 6+ backend tests; frontend renders payoff timeline
+- [x] Snowball strategy: lowest balance first
+- [x] Avalanche strategy: highest interest rate first
+- [x] Payoff plan returns list of `{ month, debts: [{name, remaining_balance}] }` until all zero
+- [x] Total interest paid shown for each strategy
+- [x] 6+ backend tests; frontend renders payoff timeline (17 tests written)
 
 ### 11.5 Spending Streak & Habit Tracker
 **Goal:** Gamify budgeting to improve day-30 retention — reward users who stay on budget each month.  
@@ -597,7 +597,7 @@ Phase 10 (DONE): Operational excellence
 
 Phase 11 (Current): User experience & power features
   11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
-  → 11.4 (Debt payoff) → 11.5 (Spending streaks)
+  → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks)
 ```
 
 ---

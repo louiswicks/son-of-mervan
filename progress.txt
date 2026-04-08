@@ -691,3 +691,17 @@
 - All 303 tests pass, 86.66% coverage (exceeds 80% target)
 - Build: 305.12 kB gzip (clean, no warnings)
 - Files changed: database.py, models.py, main.py, routers/household.py (new), alembic/versions/137017825f82_add_household_tables.py (new), tests/test_household.py (new), web/src/api/household.js (new), web/src/hooks/useHousehold.js (new), web/src/components/HouseholdPage.jsx (new), web/src/router.jsx, web/src/components/AuthGuard.jsx, PRD.md, progress.txt
+
+## Phase 11.4 — Debt Payoff Calculator [DONE] 2026-04-08
+- `database.py`: Added `Debt` model — `id`, `user_id` (FK), `interest_rate` (plaintext float, annual APR as decimal), `minimum_payment` (plaintext float), `created_at`, `deleted_at`; encrypted fields: `_name_encrypted` (`name` hybrid property), `_balance_encrypted` (`balance` hybrid property returning float)
+- `models.py`: Added `DebtCreate`, `DebtUpdate`, `DebtResponse`, `PayoffDebtMonth`, `PayoffMonth`, `PayoffPlanResponse` Pydantic schemas
+- `routers/debts.py` (new): Full CRUD `GET/POST/PUT/DELETE /debts` + `GET /debts/payoff-plan?strategy=snowball|avalanche`. Payoff plan simulation: applies monthly interest to all live debts, pays minimum on each, rolls freed minimums to top-priority debt (sorted by ascending balance for snowball, descending rate for avalanche). Capped at 360 months. Returns `{ strategy, months: [{month, debts: [{name, remaining_balance}]}], total_interest_paid, payoff_months }`.
+- `main.py`: Imported and registered `debts_router`
+- `alembic/versions/n4o5p6q7r8s9_add_debts_table.py`: Migration creating `debts` table with indexes on `id` and `user_id`
+- `web/src/api/debts.js`: `listDebts`, `createDebt`, `updateDebt`, `deleteDebt`, `getPayoffPlan` Axios wrappers
+- `web/src/hooks/useDebts.js`: `useDebts`, `usePayoffPlan`, `useCreateDebt`, `useUpdateDebt`, `useDeleteDebt` React Query hooks
+- `web/src/components/DebtPayoffPage.jsx`: Debt list table with edit/delete per row; add-debt modal (name, balance, APR%, minimum payment); 4 KPI cards (total owed, monthly minimums, months to freedom, total interest); payoff timeline Recharts LineChart with one line per debt; avalanche/snowball strategy toggle; empty state; ConfirmModal for delete
+- `web/src/router.jsx`: Added `/debts` route → `DebtPayoffPage`
+- `web/src/components/AuthGuard.jsx`: Added `TrendingDown` lucide icon; added `["/debts", "Debt Payoff", TrendingDown]` to `NAV_TABS`
+- `tests/test_debts.py`: 17 tests — list empty, list own debts, excludes deleted, excludes other users, create 201, negative balance 422, invalid rate 422, zero minimum 422, update balance, update wrong user 404, delete 204, delete wrong user 404, empty payoff plan, invalid strategy 422, single-debt snowball pays off, avalanche less interest than snowball, snowball orders lowest balance first
+- All 403 backend tests pass (17 new); 88.50% coverage; ruff clean (excluding alembic/); build 317 kB gzip
