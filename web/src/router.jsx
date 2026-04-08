@@ -36,6 +36,7 @@ const ImportPage = lazy(() => import("./components/ImportPage"));
 const ForecastPage = lazy(() => import("./components/ForecastPage"));
 const DebtPayoffPage = lazy(() => import("./components/DebtPayoffPage"));
 const NetWorthPage = lazy(() => import("./components/NetWorthPage"));
+const BankConnectionPage = lazy(() => import("./components/BankConnectionPage"));
 
 // Minimal spinner for public-route Suspense fallbacks (no auth context available)
 function PageSpinner() {
@@ -113,6 +114,7 @@ export const router = createHashRouter([
       { path: "forecast", element: withPageBoundary(<ForecastPage />) },
       { path: "debts", element: withPageBoundary(<DebtPayoffPage />) },
       { path: "net-worth", element: withPageBoundary(<NetWorthPage />) },
+      { path: "banking", element: withPageBoundary(<BankConnectionPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },
