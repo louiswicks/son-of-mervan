@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount } from "../hooks/useProfile";
 import { useCurrencies } from "../hooks/useCurrency";
 import { exportFullBackup } from "../api/export";
+import TwoFactorSetup from "./TwoFactorSetup";
 
 function Section({ title, children }) {
   return (
@@ -217,6 +218,11 @@ export default function AccountSettings() {
             {changePasswordMutation.isPending ? "Updating…" : "Change Password"}
           </button>
         </form>
+      </Section>
+
+      {/* Two-Factor Authentication */}
+      <Section title="Two-Factor Authentication">
+        <TwoFactorSetup />
       </Section>
 
       {/* Email Notifications */}

@@ -33,9 +33,10 @@ from alembic import command as alembic_command
 from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, AuditLog
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
-from security import create_access_token, verify_token, verify_password
+from security import create_access_token, verify_token, verify_password, create_totp_challenge_token
 from models import ExpenseUpdateRequest
 from routers import tracker, overview, signup, users as users_router, recurring as recurring_router, savings as savings_router, alerts as alerts_router, insights as insights_router, export as export_router, audit as audit_router, currency as currency_router, investments as investments_router, household as household_router, categories as categories_router, import_csv as import_csv_router, forecast as forecast_router, debts as debts_router, net_worth as net_worth_router
+from routers import totp as totp_router
 import email_utils
 from collections import defaultdict
 
@@ -99,8 +100,10 @@ class LoginRequest(BaseModel):
     password: str
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+    requires_2fa: Optional[bool] = None
+    totp_challenge_token: Optional[str] = None
 
 class ExpenseItem(BaseModel):
     name: str
@@ -207,6 +210,12 @@ def login(request: Request, response: Response, payload: LoginRequest, db: Sessi
     if not user.email_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Please verify your email before logging in.")
+
+    # If 2FA is enabled, return a short-lived challenge token instead of a full session.
+    # The client must complete /auth/2fa/verify-login to obtain the access token.
+    if user.totp_enabled:
+        challenge_token = create_totp_challenge_token(user.id, user.email)
+        return {"requires_2fa": True, "totp_challenge_token": challenge_token}
 
     # 15-min access token (short-lived; refresh token handles long-term sessions)
     access_token = create_access_token({"sub": user.email}, expires_delta=timedelta(minutes=15))
@@ -772,6 +781,7 @@ app.include_router(import_csv_router.router)
 app.include_router(forecast_router.router)
 app.include_router(debts_router.router)
 app.include_router(net_worth_router.router)
+app.include_router(totp_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

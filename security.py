@@ -82,6 +82,33 @@ def authenticate_user(username: str, password: str) -> bool:
     finally:
         db.close()
 
+TOTP_CHALLENGE_AUDIENCE = "totp-challenge"
+TOTP_CHALLENGE_TTL_MIN = 5  # Short-lived — must complete 2FA within 5 minutes
+
+def create_totp_challenge_token(user_id: int, email: str) -> str:
+    """Create a short-lived JWT presented during 2FA login challenge."""
+    expire = datetime.utcnow() + timedelta(minutes=TOTP_CHALLENGE_TTL_MIN)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "aud": TOTP_CHALLENGE_AUDIENCE,
+        "exp": expire,
+        "typ": "totp_challenge",
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_totp_challenge_token(token: str) -> dict:
+    """Decode and validate a TOTP challenge token."""
+    try:
+        data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], audience=TOTP_CHALLENGE_AUDIENCE)
+        if data.get("typ") != "totp_challenge":
+            raise JWTError("Wrong token type")
+        return data
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="2FA challenge expired — please log in again.")
+    except JWTError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid 2FA challenge token: {e}")
+
 EMAIL_VERIFY_AUDIENCE = "email-verify"
 EMAIL_VERIFY_TTL_MIN = settings.EMAIL_VERIFY_TTL_MIN
 

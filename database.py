@@ -92,6 +92,10 @@ class User(Base):
     # Onboarding wizard completion flag (default False — new users see the wizard)
     has_completed_onboarding = Column(Boolean, nullable=False, default=False, server_default="0")
 
+    # TOTP 2FA — secret encrypted at rest; enabled flag is unencrypted for fast checks
+    _totp_secret_encrypted = Column("totp_secret_encrypted", String(512), nullable=True)
+    totp_enabled = Column(Boolean, nullable=False, default=False, server_default="0")
+
     months = relationship("MonthlyData", back_populates="owner", cascade="all, delete-orphan")
     
     # Hybrid property for transparent encryption/decryption
@@ -121,6 +125,25 @@ class User(Base):
         property is referenced at class level (e.g. in a filter clause).
         """
         return cls._username_encrypted
+
+    @hybrid_property
+    def totp_secret(self):
+        """Decrypt TOTP secret when accessed."""
+        if self._totp_secret_encrypted:
+            return decrypt_value(self._totp_secret_encrypted)
+        return None
+
+    @totp_secret.setter
+    def totp_secret(self, value):
+        """Encrypt TOTP secret when set."""
+        if value:
+            self._totp_secret_encrypted = encrypt_value(value)
+        else:
+            self._totp_secret_encrypted = None
+
+    @totp_secret.expression
+    def totp_secret(cls):
+        return cls._totp_secret_encrypted
 
 
 class MonthlyData(Base):

@@ -10,6 +10,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 
 // Public routes — lazy loaded
 const LoginPage = lazy(() => import("./components/LoginPage"));
+const TwoFactorPage = lazy(() => import("./components/TwoFactorPage"));
 const SignUpPage = lazy(() => import("./components/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("./components/ForgotPasswordPage"));
 const VerifyEmailPage = lazy(() => import("./components/VerifyEmailPage"));
@@ -84,6 +85,7 @@ function withPublicSuspense(element) {
 
 export const router = createHashRouter([
   { path: "/login", element: withPublicSuspense(<LoginPage />) },
+  { path: "/2fa", element: withPublicSuspense(<TwoFactorPage />) },
   { path: "/register", element: withPublicSuspense(<SignUpPage />) },
   { path: "/forgot-password", element: withPublicSuspense(<ForgotPasswordPage />) },
   { path: "/verify-email", element: withPublicSuspense(<VerifyEmailPage />) },

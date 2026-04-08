@@ -3,10 +3,12 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { useAuthStore } from "../store/authStore";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { handleLogin } = useAuth();
+  const setTOTPChallenge = useAuthStore((s) => s.setTOTPChallenge);
   const goToSignup = () => navigate("/register");
   const goToForgotPassword = () => navigate("/forgot-password");
   const [identifier, setIdentifier] = useState(""); // email or username
@@ -23,6 +25,14 @@ export default function LoginPage() {
 
     try {
       const data = await login(identifier, password);
+
+      // 2FA gate — server returned a challenge token instead of an access token
+      if (data?.requires_2fa && data?.totp_challenge_token) {
+        setTOTPChallenge(data.totp_challenge_token);
+        navigate("/2fa");
+        return;
+      }
+
       if (!data?.access_token) throw new Error("No access token returned");
       handleLogin(data.access_token);
       navigate("/budget");

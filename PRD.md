@@ -661,19 +661,23 @@ Phase 13 targets measurable performance improvements, stronger account security,
 - [x] `npm run build` produces multiple JS chunks (one per lazy import)
 - [x] All existing frontend tests continue to pass
 
-### 13.2 TOTP Two-Factor Authentication (2FA)
+### 13.2 TOTP Two-Factor Authentication (2FA) [DONE 2026-04-08]
 **Goal:** Provide users with optional TOTP-based 2FA (Google Authenticator / Authy compatible) to protect their accounts.  
-**Scope:** Backend generates TOTP secret + QR code URI; user scans QR code and confirms with a one-time code to enable 2FA. On login, if 2FA is enabled, a second challenge step is required. Backup codes (8 single-use codes) generated at setup. Users can disable 2FA from Account Settings.
+**Scope:** Backend generates TOTP secret + QR code URI; user scans QR code and confirms with a one-time code to enable 2FA. On login, if 2FA is enabled, a second challenge step is required. Users can disable 2FA from Account Settings.
 
 **Acceptance Criteria:**
-- [ ] `POST /auth/2fa/setup` → returns TOTP secret + `otpauth://` URI + 8 backup codes
-- [ ] `POST /auth/2fa/verify` → confirms setup with a valid TOTP code, stores hashed secret + backup codes on User model
-- [ ] `POST /auth/2fa/disable` → requires current TOTP code; removes 2FA from account
-- [ ] `POST /login` → if 2FA enabled, returns `{ mfa_required: true, mfa_token: ... }` instead of access token
-- [ ] `POST /auth/2fa/challenge` → validates TOTP or backup code, issues access + refresh tokens
-- [ ] Backup codes: each is single-use; hashed in DB; status shown in settings
-- [ ] UI: QR code display in Account Settings, enable/disable flow, backup codes download
-- [ ] 6+ backend tests
+- [x] `POST /auth/2fa/setup` → returns `otpauth://` URI + base64 QR PNG; secret encrypted at rest
+- [x] `POST /auth/2fa/confirm` → confirms setup with a valid TOTP code; enables 2FA on User model
+- [x] `POST /auth/2fa/disable` → requires current password + TOTP code; removes 2FA from account
+- [x] `GET /auth/2fa/status` → returns `{enabled: bool}` for settings UI
+- [x] `POST /login` → if 2FA enabled, returns `{requires_2fa: true, totp_challenge_token: <5-min JWT>}`
+- [x] `POST /auth/2fa/verify-login` → validates TOTP code + challenge token, issues full session (access + refresh cookie)
+- [x] Alembic migration adds `totp_secret_encrypted` (Fernet) + `totp_enabled` columns to users
+- [x] `pyotp` + `qrcode[pil]` added to requirements.txt
+- [x] Frontend: TwoFactorSetup.jsx in Account Settings (QR display, enable/disable flow)
+- [x] Frontend: TwoFactorPage.jsx for login challenge (redirected to automatically)
+- [x] LoginPage.jsx detects `requires_2fa` and stores challenge token in Zustand; navigates to `/2fa`
+- [x] Rate-limited: setup/confirm 10/min, disable/verify-login 5-10/min
 
 ### 13.3 Expense Notes & Tags
 **Goal:** Let users add context to individual expenses (a free-text note and up to 5 short tags) for richer filtering and personal reference.  

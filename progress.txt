@@ -767,3 +767,19 @@
 - `web/src/tests/MonthlyTracker.test.jsx`: Added `useExpenseSearch` mock (returns null data) so cross-month search feature doesn't crash in tests.
 - `web/src/tests/AuthGuard.test.jsx`: Added `useProfile` and `useAlerts` mocks so AuthGuard renders nav (not spinner) in authenticated tests.
 - 51 frontend tests pass (2 test file fixes, no new tests needed); build 320 kB gzip; 432 backend tests unchanged
+
+## Phase 13.2 — TOTP Two-Factor Authentication (2FA) [DONE] 2026-04-08
+- `requirements.txt`: Added `pyotp>=2.9.0` and `qrcode[pil]>=7.4.2`.
+- `database.py`: Added `_totp_secret_encrypted` (Fernet-encrypted Column), `totp_enabled` (Boolean, default False) and `totp_secret` hybrid property (getter/setter/expression) to the `User` model.
+- `alembic/versions/q7r8s9t0u1v2_add_totp_2fa.py`: Migration adds `totp_secret_encrypted` (String 512, nullable) and `totp_enabled` (Boolean, server_default "0") to `users`.
+- `security.py`: Added `create_totp_challenge_token(user_id, email)` (5-min JWT, aud=totp-challenge, typ=totp_challenge) and `decode_totp_challenge_token(token)` with graceful error handling.
+- `routers/totp.py` (new): 5 endpoints — `GET /auth/2fa/status`, `POST /auth/2fa/setup` (generates pyotp base32 secret, stores encrypted, returns `otpauth://` URI + base64 QR PNG via qrcode library), `POST /auth/2fa/confirm` (verifies first TOTP code, enables 2FA), `POST /auth/2fa/disable` (requires password + TOTP code, clears secret), `POST /auth/2fa/verify-login` (validates challenge JWT + TOTP code, issues full session with access token + 30-day httpOnly refresh cookie). All rate-limited via slowapi.
+- `main.py`: Imported `create_totp_challenge_token` from security; modified `LoginResponse` to include optional `requires_2fa` and `totp_challenge_token`; login endpoint now short-circuits with `{requires_2fa: true, totp_challenge_token: <JWT>}` if `user.totp_enabled`; registered `totp_router`.
+- `web/src/api/totp.js` (new): `getTOTPStatus`, `setupTOTP`, `confirmTOTP`, `disableTOTP`, `verifyTOTPLogin` Axios wrappers.
+- `web/src/store/authStore.js`: Added `totpChallengeToken` state field, `setTOTPChallenge(token)` action; `handleLogin` and `clearAuth` clear `totpChallengeToken`.
+- `web/src/components/TwoFactorPage.jsx` (new): Public route page shown after login when 2FA is required. Reads `totpChallengeToken` from store; submits code via `verifyTOTPLogin`; on success calls `handleLogin` and navigates to `/budget`; redirects to `/login` if no challenge token.
+- `web/src/components/TwoFactorSetup.jsx` (new): Settings panel using React Query to display 2FA status and manage setup/disable flow. Setup: calls `setupTOTP`, shows QR image and manual URI, confirms with `confirmTOTP`. Disable: password + TOTP code form calling `disableTOTP`.
+- `web/src/router.jsx`: Added lazy import for `TwoFactorPage`; registered public `/2fa` route.
+- `web/src/components/LoginPage.jsx`: After login API call, checks `data.requires_2fa` — if truthy, calls `setTOTPChallenge(totp_challenge_token)` and navigates to `/2fa`.
+- `web/src/components/AccountSettings.jsx`: Imported `TwoFactorSetup`; added "Two-Factor Authentication" `<Section>` between Security and Email Notifications sections.
+- ruff: clean (1 spurious import caught and removed from totp.py); all backend file syntax OK
