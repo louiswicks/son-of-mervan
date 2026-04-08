@@ -1048,3 +1048,106 @@ async def ai_financial_review(
             "X-RateLimit-Remaining": str(remaining),
         },
     )
+
+
+# -------------------- expense search --------------------
+
+@router.get("/search")
+def expense_search(
+    q: Optional[str] = Query(None, description="Keyword substring match on expense name"),
+    category: Optional[str] = Query(None, description="Exact category match (case-insensitive)"),
+    from_month: Optional[str] = Query(None, alias="from", description="Start month YYYY-MM (inclusive)"),
+    to_month: Optional[str] = Query(None, alias="to", description="End month YYYY-MM (inclusive)"),
+    sort: str = Query("date", description="Sort order: 'date' (default, month desc) or 'amount' (planned_amount desc)"),
+    page: int = Query(1, ge=1, description="1-based page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Results per page (max 100)"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Full-text search across all expenses for the authenticated user.
+
+    Because all financial fields are Fernet-encrypted (non-deterministic), all
+    filtering happens in Python after fetching from the DB — O(n) by design.
+    """
+    user = _require_user(db, current_user)
+
+    # Normalize optional month bounds
+    from_norm = _normalize_month(from_month) if from_month else None
+    to_norm = _normalize_month(to_month) if to_month else None
+
+    # Load all MonthlyData for this user, build a month→row map
+    all_rows: List[MonthlyData] = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    # Build dict of month_str → row so we can attach month to each expense
+    month_map: Dict[int, str] = {row.id: (row.month or "") for row in all_rows}
+
+    if not all_rows:
+        return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
+    monthly_ids = [row.id for row in all_rows]
+
+    # Fetch all non-deleted expenses across all months
+    all_expenses: List[MonthlyExpense] = (
+        db.query(MonthlyExpense)
+        .filter(
+            MonthlyExpense.monthly_data_id.in_(monthly_ids),
+            MonthlyExpense.deleted_at == None,  # noqa: E711
+        )
+        .all()
+    )
+
+    # Python-side filtering (encryption prevents SQL predicates)
+    q_lower = q.strip().lower() if q else None
+    cat_lower = category.strip().lower() if category else None
+
+    results = []
+    for exp in all_expenses:
+        month_str = month_map.get(exp.monthly_data_id, "")
+
+        # Month range filter
+        if from_norm and month_str < from_norm:
+            continue
+        if to_norm and month_str > to_norm:
+            continue
+
+        # Keyword filter (case-insensitive substring)
+        if q_lower:
+            exp_name = (exp.name or "").lower()
+            if q_lower not in exp_name:
+                continue
+
+        # Category filter (case-insensitive exact match)
+        if cat_lower:
+            exp_cat = (exp.category or "").lower()
+            if exp_cat != cat_lower:
+                continue
+
+        results.append({
+            "id": exp.id,
+            "month": month_str,
+            "name": exp.name,
+            "category": exp.category,
+            "planned_amount": round(float(exp.planned_amount or 0), 2),
+            "actual_amount": round(float(exp.actual_amount or 0), 2),
+            "currency": exp.currency,
+            "note": exp.note,
+            "tags": exp.tags,
+        })
+
+    # Sorting
+    if sort == "amount":
+        results.sort(key=lambda x: x["planned_amount"], reverse=True)
+    else:
+        # Default: newest month first, then by name within the same month
+        results.sort(key=lambda x: (x["month"], x["name"] or ""), reverse=True)
+
+    total = len(results)
+    offset = (page - 1) * page_size
+    page_items = results[offset: offset + page_size]
+
+    return {
+        "items": page_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }

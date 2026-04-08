@@ -920,6 +920,84 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 
 ---
 
+## Phase 17: Engagement, Insight & Polish
+
+### 17.1 Expense Search & Advanced Filtering [DONE]
+**Goal:** Let users find any expense across all months without scrolling month-by-month.
+**Scope:**
+- `GET /insights/search?q=<keyword>&category=<name>&from=<YYYY-MM>&to=<YYYY-MM>&sort=<date|amount>&page=<n>` — paginated, returns matching expenses across all months for the authenticated user.
+- No frontend work in this task — the endpoint is the deliverable; frontend can be added in a follow-up.
+
+**Acceptance Criteria:**
+- [x] Endpoint returns `{ items: [...], total, page, page_size }` with correct pagination
+- [x] `q` filters by decrypted expense name (case-insensitive substring)
+- [x] `category` filters by decrypted category (exact match)
+- [x] `from` / `to` filter by month range (inclusive)
+- [x] `sort=amount` sorts by planned_amount descending; `sort=date` (default) sorts by month descending
+- [x] Unauthenticated request returns 401
+- [x] 5+ backend tests
+
+### 17.2 Budget Templates
+**Goal:** Reduce new-user friction by offering pre-built budget allocations they can apply in one click.
+**Scope:**
+- `GET /budget-templates` — returns a static list of templates (stored as Python constants, no DB).
+- Each template has: `id`, `name`, `description`, `allocations: [{category, pct_of_salary}]`.
+- 5+ templates covering: Student, Single Professional, Family, Frugal, High Earner.
+- `POST /budget-templates/{id}/apply?month=YYYY-MM` — creates planned expense rows from the template using the user's existing salary for that month. Existing planned rows are left untouched (additive); the endpoint returns the list of created expenses.
+
+**Acceptance Criteria:**
+- [ ] `GET /budget-templates` returns 200 with 5+ templates, no auth required
+- [ ] Each template has `id`, `name`, `description`, `allocations`
+- [ ] `POST /budget-templates/{id}/apply` creates planned expense rows correctly; requires auth
+- [ ] Returns 404 for unknown template id
+- [ ] 4+ backend tests
+
+### 17.3 Spending Velocity Warnings
+**Goal:** Alert users intra-month when spending pace will exceed the plan — before it's too late to adjust.
+**Scope:**
+- APScheduler job `check_spending_velocity` runs every 6 hours.
+- For each user with a current-month plan: project end-of-month spend as `(actual_ytd / days_elapsed) * days_in_month`. If projection > planned_total * 1.10, fire an in-app notification.
+- Respect `notif_budget_alerts` email preference for email delivery.
+- Dedup key prevents re-firing within 24 hours per user.
+- `GET /insights/spending-velocity?month=YYYY-MM` — returns projection data for the frontend.
+
+**Acceptance Criteria:**
+- [ ] Scheduler job runs every 6 hours and evaluates all active users
+- [ ] Notification fires only when projected overage exceeds 10%
+- [ ] Dedup key (`velocity_{user_id}_{YYYY-MM}_{date}`) prevents duplicate notifications within 24 hours
+- [ ] `GET /insights/spending-velocity` returns `{ month, actual_ytd, planned_total, projected_total, days_elapsed, days_in_month, on_track: bool }`
+- [ ] Unauthenticated request returns 401
+- [ ] 5+ backend tests covering: projection logic, dedup, no-data-month, on-track month (no notification)
+
+### 17.4 Monthly Budget Performance Endpoint
+**Goal:** Power a glanceable "This Month" KPI card on the dashboard.
+**Scope:**
+- `GET /insights/month-performance?month=YYYY-MM` — returns salary, actual vs planned YTD, daily spending array for sparkline, and a traffic-light status.
+- Status: `on_track` (≤100%), `warning` (101–110%), `over_budget` (>110%).
+
+**Acceptance Criteria:**
+- [ ] Returns `{ month, salary_planned, actual_ytd, planned_ytd, remaining, savings_rate_pct, daily_actuals: [{date, amount}], status }`
+- [ ] Empty month returns zeroed structure with `status: "on_track"`
+- [ ] `savings_rate_pct` = `(salary_planned - actual_ytd) / salary_planned * 100`, clamped to 0–100
+- [ ] Unauthenticated request returns 401
+- [ ] 4+ backend tests
+
+### 17.5 Onboarding Wizard
+**Goal:** Guide new users through their first budget setup so they don't land on a blank dashboard.
+**Scope:**
+- Backend: `GET /onboarding/status` returns `{ completed: bool, steps: [{id, label, done: bool}] }` based on whether the user has: set salary, added any planned expense, added a savings goal, linked a bank or added a recurring expense.
+- Frontend: `OnboardingWizard.jsx` modal that shows on dashboard when `completed=false`. 4-step flow: (1) Set salary, (2) Add first expense, (3) Add savings goal, (4) Explore (dismissed). Persists dismissal in Zustand store.
+
+**Acceptance Criteria:**
+- [ ] `GET /onboarding/status` returns correct step completion based on DB state
+- [ ] Each step's `done` flag is derived from real data (not user-input flag)
+- [ ] `POST /onboarding/dismiss` marks onboarding as permanently dismissed (stored on User model as `onboarding_dismissed_at`)
+- [ ] Frontend wizard appears on dashboard for users with `completed=false` and no prior dismissal
+- [ ] Wizard is skippable (dismiss button on any step)
+- [ ] 4+ backend tests; frontend wizard renders correctly with mock data
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -953,9 +1031,13 @@ Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE)
   15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
   → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
 
-Phase 16: Reliability, developer experience & user onboarding
+Phase 16 (DONE): Reliability, developer experience & user onboarding
   16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
   → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
+
+Phase 17: Engagement, insight & polish
+  17.1 (Expense search) [DONE] → 17.2 (Budget templates) → 17.3 (Spending velocity warnings)
+  → 17.4 (Month performance endpoint) → 17.5 (Onboarding wizard)
 ```
 
 ---

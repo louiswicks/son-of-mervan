@@ -1,3 +1,8 @@
+## Phase 17.1 — Expense Search & Advanced Filtering [DONE] 2026-04-09
+- `routers/insights.py`: Added `GET /insights/search` endpoint. Accepts `q` (case-insensitive name substring), `category` (exact, case-insensitive), `from` / `to` (month range, inclusive), `sort` (`date` desc default or `amount` desc), `page` + `page_size` (1-based, max 100). Requires auth. All filtering done in Python after bulk fetch (Fernet encryption prevents SQL predicates). Also added Phase 17 to PRD.md with 5 new tasks.
+- `tests/test_expense_search.py`: 18 tests covering: unauthenticated 401, empty DB, no-filter returns all, keyword filter, case-insensitive keyword, category filter, case-insensitive category, from/to range filters, combined filters, sort by amount and date, pagination (page 1 + page 2), deleted expense exclusion, response item shape, cross-user isolation.
+- 591 backend tests pass; 91.78% coverage; ruff clean.
+
 ## Phase 16.5 — API Changelog Endpoint [DONE] 2026-04-09
 - `core/config.py`: Added `VERSION = "1.16.0"` constant and `CHANGELOG` static list (8 entries, newest-first, covering Phases 1–16). Both are module-level so they can be imported by tests directly.
 - `main.py`: Imported `VERSION` and `CHANGELOG` from `core.config`. Updated `/health` to report `VERSION` instead of the old hardcoded `"1.0.0"`. Added public `GET /version` endpoint — no auth required — returns `{ version, changelog }`.
