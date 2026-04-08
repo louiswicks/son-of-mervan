@@ -434,3 +434,22 @@ class NetWorthSnapshotResponse(BaseModel):
     total_liabilities: float
     net_worth: float
     created_at: datetime
+
+
+# ---------- Open Banking ----------
+
+class BankConnectResponse(BaseModel):
+    auth_url: str
+
+
+class BankConnectionResponse(BaseModel):
+    id: int
+    provider: Optional[str]
+    account_id: Optional[str]
+    last_synced_at: Optional[datetime]
+    created_at: datetime
+    is_sandbox: bool = False
+
+
+class BankConnectionListResponse(BaseModel):
+    connections: List[BankConnectionResponse]

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # Anthropic API key for AI financial review — leave empty to disable (safe for local dev)
     ANTHROPIC_API_KEY: str = ""
 
+    # TrueLayer open banking — leave empty to disable (safe for local dev)
+    TRUELAYER_CLIENT_ID: str = ""
+    TRUELAYER_CLIENT_SECRET: str = ""
+    TRUELAYER_REDIRECT_URI: str = "http://localhost:8000/banking/callback"
+    # Set to True to use TrueLayer sandbox (mock bank data)
+    TRUELAYER_SANDBOX: bool = True
+
     @field_validator("JWT_SECRET_KEY")
     @classmethod
     def jwt_secret_must_not_be_empty(cls, v: str) -> str:
