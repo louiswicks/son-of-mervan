@@ -921,3 +921,16 @@
 - `tests/test_banking.py`: Extended with 26 new tests covering sync deduplication, pagination, confirm/reject ownership, confirm-all, and edge cases.
 
 **Tests:** 530 backend tests pass (91% coverage); ruff lint clean; commit: `4302a28`
+
+## Phase 15.4 — Backend: Bank Connection Disconnect [DONE] 2026-04-08
+
+**Problem solved:** Users had no way to revoke TrueLayer access or clean up imported banking data.
+
+**What was built:**
+- `routers/banking.py`: `DELETE /banking/connections/{id}` — verifies ownership; calls TrueLayer token revocation (`POST {auth_base}/connect/revoke`) best-effort (proceeds on network failure); sets `disconnected_at` on `BankConnection` (soft-delete from connections list); hard-deletes all `BankTransaction` rows in `draft` status for the connection; nulls `bank_connection_id` on `confirmed`/`rejected` rows (preserving confirmed expense data).
+- `database.py`: Made `bank_connection_id` nullable on `BankTransaction` to support the FK-null pattern for confirmed rows post-disconnect.
+- `alembic/versions/v2w3x4y5z6a7_make_bank_connection_id_nullable.py`: Migration alters column to nullable; downgrade restores NOT NULL.
+- `models.py`: Added `BankDisconnectResponse` (id, drafts_deleted, confirmed_preserved).
+- `tests/test_banking.py`: 11 new tests covering: disconnected_at set, correct counts returned, draft hard-delete, confirmed FK nulled, connection excluded from list, 404 on missing/other-user/already-disconnected, revocation POST called with correct URL, graceful proceed on revocation network failure, unauthenticated 4xx.
+
+**Tests:** 541 backend tests pass (91% coverage); ruff lint clean; commit: TBD

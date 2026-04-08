@@ -816,7 +816,7 @@ All financial and PII fields use Fernet hybrid properties (same pattern as `Mont
 **Files:** `routers/banking.py`, `database.py` (Pydantic schemas), `models.py`, `tests/test_banking.py` (new)
 **Acceptance Criteria:** After sync, `GET /banking/drafts` returns transactions with suggested categories. Confirming a draft creates a real `MonthlyExpense` row. Rejecting sets status to rejected and excludes from future `GET /banking/drafts`. Duplicate `external_id` on re-sync is silently skipped. Test coverage ≥80%.
 
-### 15.4 Backend — Disconnect
+### 15.4 Backend — Disconnect ✅ DONE
 **Problem:** Users must be able to revoke access and have all their banking data deleted.
 **Solution:**
 - `DELETE /banking/connections/{id}` — calls TrueLayer token revocation endpoint, sets `disconnected_at` on the `BankConnection` row, hard-deletes all `BankTransaction` rows in `draft` status for this connection, sets `bank_connection_id=null` on any `confirmed` rows (preserves confirmed expenses)
@@ -869,7 +869,7 @@ Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
 
 Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
   15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
-  → 15.4 (Disconnect) → 15.5 (Frontend)
+  → 15.4 (Disconnect) [DONE] → 15.5 (Frontend)
 ```
 
 ---

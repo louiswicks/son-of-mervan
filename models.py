@@ -493,3 +493,9 @@ class BankDraftActionResponse(BaseModel):
 
 class BankConfirmAllResponse(BaseModel):
     confirmed: int
+
+
+class BankDisconnectResponse(BaseModel):
+    id: int
+    drafts_deleted: int
+    confirmed_preserved: int

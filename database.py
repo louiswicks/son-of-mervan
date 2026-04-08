@@ -1000,7 +1000,7 @@ class BankTransaction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    bank_connection_id = Column(Integer, ForeignKey("bank_connections.id"), nullable=False, index=True)
+    bank_connection_id = Column(Integer, ForeignKey("bank_connections.id"), nullable=True, index=True)
     monthly_expense_id = Column(Integer, ForeignKey("monthly_expenses.id"), nullable=True)
 
     _external_id_encrypted = Column("external_id_encrypted", String(512), nullable=False)

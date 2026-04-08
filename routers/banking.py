@@ -2,14 +2,15 @@
 routers/banking.py — TrueLayer open banking OAuth integration.
 
 Endpoints:
-  GET  /banking/connect                 Generate TrueLayer authorisation URL (auth required)
-  GET  /banking/callback?code=&state=   OAuth callback — exchanges code, stores BankConnection
-  POST /banking/refresh/{id}            Refresh access token for a connection (auth required)
-  GET  /banking/connections             List the current user's active bank connections (auth required)
-  POST /banking/sync                    Fetch transactions from TrueLayer and create draft rows (auth required)
-  GET  /banking/drafts                  List pending draft transactions (auth required)
-  PATCH /banking/drafts/{id}            Confirm or reject a draft transaction (auth required)
-  POST /banking/drafts/confirm-all      Bulk confirm all drafts for the authenticated user (auth required)
+  GET    /banking/connect                 Generate TrueLayer authorisation URL (auth required)
+  GET    /banking/callback?code=&state=   OAuth callback — exchanges code, stores BankConnection
+  POST   /banking/refresh/{id}            Refresh access token for a connection (auth required)
+  GET    /banking/connections             List the current user's active bank connections (auth required)
+  DELETE /banking/connections/{id}        Disconnect a bank connection; deletes drafts, nulls confirmed (auth required)
+  POST   /banking/sync                    Fetch transactions from TrueLayer and create draft rows (auth required)
+  GET    /banking/drafts                  List pending draft transactions (auth required)
+  PATCH  /banking/drafts/{id}             Confirm or reject a draft transaction (auth required)
+  POST   /banking/drafts/confirm-all      Bulk confirm all drafts for the authenticated user (auth required)
 """
 import hashlib
 import hmac
@@ -31,6 +32,7 @@ from models import (
     BankConnectResponse,
     BankConnectionListResponse,
     BankConnectionResponse,
+    BankDisconnectResponse,
     BankDraftActionRequest,
     BankDraftActionResponse,
     BankDraftsResponse,
@@ -338,6 +340,91 @@ def list_connections(
     )
     return BankConnectionListResponse(
         connections=[_connection_response(c) for c in connections]
+    )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /banking/connections/{connection_id}
+# ---------------------------------------------------------------------------
+
+@router.delete("/connections/{connection_id}", response_model=BankDisconnectResponse)
+def disconnect_bank(
+    connection_id: int,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke a bank connection.
+
+    - Calls TrueLayer token revocation endpoint (best-effort; proceeds even on failure).
+    - Sets disconnected_at on the BankConnection row (soft-delete from connections list).
+    - Hard-deletes all BankTransaction rows in 'draft' status for this connection.
+    - Nulls bank_connection_id on 'confirmed' rows (preserves confirmed expenses).
+    """
+    user = _require_user(db, current_user)
+    conn = (
+        db.query(BankConnection)
+        .filter(
+            BankConnection.id == connection_id,
+            BankConnection.user_id == user.id,
+            BankConnection.disconnected_at.is_(None),
+        )
+        .first()
+    )
+    if not conn:
+        raise HTTPException(status_code=404, detail="Bank connection not found")
+
+    # Best-effort token revocation — don't fail disconnect if TrueLayer is unreachable
+    if _truelayer_configured() and conn.access_token:
+        try:
+            revoke_url = f"{_auth_base()}/connect/revoke"
+            httpx.post(
+                revoke_url,
+                data={"token": conn.access_token},
+                timeout=10,
+            )
+            logger.info("Revoked TrueLayer token for connection %s", conn.id)
+        except Exception as exc:
+            logger.warning("TrueLayer token revocation failed (proceeding anyway): %s", exc)
+
+    # Hard-delete draft transactions for this connection
+    draft_txns = (
+        db.query(BankTransaction)
+        .filter(
+            BankTransaction.bank_connection_id == conn.id,
+            BankTransaction.status == "draft",
+        )
+        .all()
+    )
+    drafts_deleted = len(draft_txns)
+    for txn in draft_txns:
+        db.delete(txn)
+
+    # Null the connection FK on confirmed/rejected rows (preserve the expense data)
+    confirmed_txns = (
+        db.query(BankTransaction)
+        .filter(
+            BankTransaction.bank_connection_id == conn.id,
+            BankTransaction.status.in_(["confirmed", "rejected"]),
+        )
+        .all()
+    )
+    confirmed_preserved = len(confirmed_txns)
+    for txn in confirmed_txns:
+        txn.bank_connection_id = None
+
+    # Mark connection as disconnected
+    conn.disconnected_at = datetime.utcnow()
+    db.commit()
+
+    logger.info(
+        "Disconnected BankConnection %s for user %s: %d drafts deleted, %d confirmed preserved",
+        conn.id, user.id, drafts_deleted, confirmed_preserved,
+    )
+    return BankDisconnectResponse(
+        id=connection_id,
+        drafts_deleted=drafts_deleted,
+        confirmed_preserved=confirmed_preserved,
     )
 
 

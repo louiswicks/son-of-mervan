@@ -1,15 +1,17 @@
 """
-Tests for the open banking OAuth flow (Phase 15.2) and transaction sync (Phase 15.3).
+Tests for the open banking OAuth flow (Phase 15.2), transaction sync (Phase 15.3),
+and disconnect (Phase 15.4).
 
 Coverage targets:
-  routers/banking.py — GET /banking/connect
-                        GET /banking/callback
-                        POST /banking/refresh/{id}
-                        GET /banking/connections
-                        POST /banking/sync
-                        GET /banking/drafts
-                        PATCH /banking/drafts/{id}
-                        POST /banking/drafts/confirm-all
+  routers/banking.py — GET    /banking/connect
+                        GET    /banking/callback
+                        POST   /banking/refresh/{id}
+                        GET    /banking/connections
+                        DELETE /banking/connections/{id}
+                        POST   /banking/sync
+                        GET    /banking/drafts
+                        PATCH  /banking/drafts/{id}
+                        POST   /banking/drafts/confirm-all
 """
 import hashlib
 import hmac
@@ -662,4 +664,138 @@ class TestConfirmAll:
 
     def test_unauthenticated_returns_4xx(self, client):
         r = client.post("/banking/drafts/confirm-all")
+        assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /banking/connections/{id}
+# ---------------------------------------------------------------------------
+
+class TestDisconnect:
+    def test_disconnect_sets_disconnected_at(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post") as mock_post:
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            mock_post.return_value = MagicMock()
+            r = auth_client.delete(f"/banking/connections/{conn.id}")
+
+        assert r.status_code == 200
+        db.refresh(conn)
+        assert conn.disconnected_at is not None
+
+    def test_disconnect_returns_correct_counts(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="d1", status="draft")
+        _make_transaction(db, verified_user, conn, external_id="d2", status="draft")
+        _make_transaction(db, verified_user, conn, external_id="c1", status="confirmed")
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post"):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.delete(f"/banking/connections/{conn.id}")
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["id"] == conn.id
+        assert body["drafts_deleted"] == 2
+        assert body["confirmed_preserved"] == 1
+
+    def test_disconnect_hard_deletes_draft_transactions(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="draft_1", status="draft")
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post"):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            auth_client.delete(f"/banking/connections/{conn.id}")
+
+        deleted = db.query(BankTransaction).filter(BankTransaction.id == txn.id).first()
+        assert deleted is None
+
+    def test_disconnect_nulls_connection_id_on_confirmed_rows(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="conf_1", status="confirmed")
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post"):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            auth_client.delete(f"/banking/connections/{conn.id}")
+
+        db.refresh(txn)
+        assert txn.bank_connection_id is None
+
+    def test_disconnect_connection_excluded_from_list(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post"):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            auth_client.delete(f"/banking/connections/{conn.id}")
+
+        r = auth_client.get("/banking/connections")
+        assert r.status_code == 200
+        assert r.json()["connections"] == []
+
+    def test_disconnect_not_found_returns_404(self, auth_client):
+        r = auth_client.delete("/banking/connections/99999")
+        assert r.status_code == 404
+
+    def test_disconnect_other_users_connection_returns_404(self, auth_client, db, second_user):
+        conn = _make_connection(db, second_user)
+        r = auth_client.delete(f"/banking/connections/{conn.id}")
+        assert r.status_code == 404
+
+    def test_disconnect_already_disconnected_returns_404(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        conn.disconnected_at = datetime.utcnow()
+        db.commit()
+        r = auth_client.delete(f"/banking/connections/{conn.id}")
+        assert r.status_code == 404
+
+    def test_disconnect_calls_truelayer_revocation(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user, access_token="tok_to_revoke")
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post") as mock_post:
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            mock_post.return_value = MagicMock()
+            auth_client.delete(f"/banking/connections/{conn.id}")
+
+        # Ensure revocation POST was called (sandbox URL)
+        call_args = mock_post.call_args
+        assert call_args is not None
+        assert "revoke" in call_args[0][0]
+
+    def test_disconnect_proceeds_even_if_revocation_fails(self, auth_client, db, verified_user):
+        """Network failure during revocation should not block the disconnect."""
+        import httpx as _httpx
+        conn = _make_connection(db, verified_user)
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.post", side_effect=_httpx.RequestError("timeout")):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.delete(f"/banking/connections/{conn.id}")
+
+        assert r.status_code == 200
+        db.refresh(conn)
+        assert conn.disconnected_at is not None
+
+    def test_unauthenticated_returns_4xx(self, client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        r = client.delete(f"/banking/connections/{conn.id}")
         assert r.status_code in (401, 403)
