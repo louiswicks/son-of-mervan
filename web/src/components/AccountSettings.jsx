@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount } from "../hooks/useProfile";
 import { useCurrencies } from "../hooks/useCurrency";
+import { exportFullBackup } from "../api/export";
 
 function Section({ title, children }) {
   return (
@@ -34,6 +35,7 @@ export default function AccountSettings() {
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [backupLoading, setBackupLoading] = useState(false);
 
   // Sync inputs when profile loads
   useEffect(() => {
@@ -52,6 +54,22 @@ export default function AccountSettings() {
     const next = !digestEnabled;
     setDigestEnabled(next);
     updateProfileMutation.mutate({ digest_enabled: next });
+  }
+
+  async function handleDownloadBackup() {
+    setBackupLoading(true);
+    try {
+      await exportFullBackup();
+      toast.success("Backup downloaded.");
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        toast.error("You can download a backup at most once per hour.");
+      } else {
+        toast.error("Failed to download backup. Please try again.");
+      }
+    } finally {
+      setBackupLoading(false);
+    }
   }
 
   async function handleProfileSave(e) {
@@ -226,6 +244,28 @@ export default function AccountSettings() {
                 digestEnabled ? "translate-x-5" : "translate-x-0"
               }`}
             />
+          </button>
+        </div>
+      </Section>
+
+      {/* Data & Privacy */}
+      <Section title="Data &amp; Privacy">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Download full backup</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Export all your data — months, expenses, savings goals, debts, categories and net
+              worth snapshots — as a single JSON file. Limited to one download per hour.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDownloadBackup}
+            disabled={backupLoading}
+            aria-label="Download full account data backup as JSON"
+            className="shrink-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {backupLoading ? "Preparing…" : "Download backup"}
           </button>
         </div>
       </Section>

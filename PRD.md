@@ -621,16 +621,16 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - [x] Tab order is logical across all pages
 - [x] `axe-core` reports zero critical or serious violations on Budget and Tracker pages
 
-### 12.4 Full Account Data Export (JSON)
+### 12.4 Full Account Data Export (JSON) ✅ DONE
 **Goal:** Let users export all their data as a portable JSON backup — essential for trust and compliance.  
 **Scope:** `GET /export/full-backup` endpoint returns a single JSON containing all user data (months, expenses, recurring, savings goals, debts, categories). Rate-limited to 1/hour. Frontend: "Download full backup" button in AccountSettings.
 
 **Acceptance Criteria:**
-- [ ] Response contains months array, expenses (with month context), recurring, savings goals, debts, categories
-- [ ] All encrypted fields are decrypted in the export (user is authenticated)
-- [ ] Rate-limited 1 request/hour (slowapi)
-- [ ] `Content-Disposition: attachment; filename="backup-YYYY-MM-DD.json"` header set
-- [ ] 3+ backend tests; button visible in AccountSettings
+- [x] Response contains months array, expenses (with month context), recurring, savings goals, debts, categories
+- [x] All encrypted fields are decrypted in the export (user is authenticated)
+- [x] Rate-limited 1 request/hour (slowapi)
+- [x] `Content-Disposition: attachment; filename="backup-YYYY-MM-DD.json"` header set
+- [x] 3+ backend tests; button visible in AccountSettings (5 tests written)
 
 ### 12.5 Milestone Email Notifications
 **Goal:** Celebrate user wins via email to reinforce positive habits and improve retention.  

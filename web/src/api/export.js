@@ -64,3 +64,13 @@ export async function exportTaxPDF(taxYear) {
   });
   downloadBlob(res.data, `tax_summary_${taxYear}_${taxYear + 1}.pdf`);
 }
+
+/**
+ * Download a full account data backup as JSON.
+ * Rate-limited to 1 request/hour server-side.
+ */
+export async function exportFullBackup() {
+  const today = new Date().toISOString().slice(0, 10);
+  const res = await client.get('/export/full-backup', { responseType: 'blob' });
+  downloadBlob(res.data, `backup-${today}.json`);
+}

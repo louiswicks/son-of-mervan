@@ -174,3 +174,60 @@ class TestTaxSummary:
     def test_tax_pdf_invalid_year(self, auth_client):
         r = auth_client.get("/export/tax-pdf?tax_year=1990")
         assert r.status_code in (422, 503)
+
+
+class TestFullBackupExport:
+    """Tests for GET /export/full-backup."""
+
+    def test_full_backup_returns_200_with_json(self, auth_client):
+        r = auth_client.get("/export/full-backup")
+        assert r.status_code == 200
+        assert "application/json" in r.headers.get("content-type", "")
+        body = r.json()
+        assert "profile" in body
+        assert "months" in body
+        assert "recurring_expenses" in body
+        assert "savings_goals" in body
+        assert "debts" in body
+        assert "categories" in body
+        assert "net_worth_snapshots" in body
+
+    def test_full_backup_unauthenticated(self, client):
+        r = client.get("/export/full-backup")
+        assert r.status_code in (401, 403)
+
+    def test_full_backup_content_disposition_header(self, auth_client):
+        r = auth_client.get("/export/full-backup")
+        assert r.status_code == 200
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert "backup-" in cd
+        assert ".json" in cd
+
+    def test_full_backup_includes_expense_data(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-03", salary_planned=4000.0)
+        make_expense(db, month, name="Groceries", category="Food", planned=300.0, actual=280.0)
+
+        r = auth_client.get("/export/full-backup")
+        assert r.status_code == 200
+        body = r.json()
+        months = body["months"]
+        assert any(m["month"] == "2026-03" for m in months)
+        march = next(m for m in months if m["month"] == "2026-03")
+        expense_names = [e["name"] for e in march["expenses"]]
+        assert "Groceries" in expense_names
+
+    def test_full_backup_only_own_data(self, auth_client, db, second_user):
+        # Expense owned by second_user must not appear in authenticated user's backup
+        month = make_month(db, second_user, month="2026-04")
+        make_expense(db, month, name="OtherSecret", category="Other")
+
+        r = auth_client.get("/export/full-backup")
+        assert r.status_code == 200
+        body = r.json()
+        all_expense_names = [
+            e["name"]
+            for m in body["months"]
+            for e in m["expenses"]
+        ]
+        assert "OtherSecret" not in all_expense_names

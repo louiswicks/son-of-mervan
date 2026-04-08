@@ -6,12 +6,15 @@ GET /export/csv?from_month=YYYY-MM&to_month=YYYY-MM  — expense CSV download
 GET /export/pdf?month=YYYY-MM                         — monthly budget report PDF
 GET /export/tax-summary?tax_year=YYYY                 — UK tax-year spending summary (JSON)
 GET /export/tax-pdf?tax_year=YYYY                     — SA302-style tax summary PDF
+GET /export/full-backup                               — full account data export as JSON (1/hour)
 
 CSV/PDF endpoints are rate-limited to 1 request/minute per IP.
 Tax endpoints are rate-limited to 1 request/minute per IP.
+Full-backup endpoint is rate-limited to 1 request/hour per IP.
 """
 import csv
 import io
+import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -21,7 +24,11 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from core.limiter import limiter
-from database import get_db, User, MonthlyData, MonthlyExpense
+from database import (
+    get_db, User, MonthlyData, MonthlyExpense,
+    RecurringExpense, SavingsGoal, SavingsContribution,
+    Debt, UserCategory, NetWorthSnapshot,
+)
 from models import TaxSummaryResponse, TaxCategoryBreakdown
 from security import verify_token
 
@@ -558,5 +565,205 @@ def export_tax_pdf(
     return StreamingResponse(
         iter([bytes(pdf_bytes)]),
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# -------------------- Full account data export --------------------
+
+@router.get("/full-backup")
+@limiter.limit("1/hour")
+def export_full_backup(
+    request: Request,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Export all account data as a portable JSON backup.
+
+    Includes: profile, months + expenses, recurring expenses, savings goals
+    with contributions, debts, custom categories, and net worth snapshots.
+    All encrypted fields are decrypted. Rate-limited to 1 request/hour.
+    """
+    user = _require_user(db, current_user)
+
+    # ---- Profile ----
+    profile = {
+        "email": user.email,
+        "username": user.username if hasattr(user, "username") else None,
+        "base_currency": user.base_currency,
+        "digest_enabled": getattr(user, "digest_enabled", True),
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+    # ---- Months + expenses ----
+    all_months = (
+        db.query(MonthlyData)
+        .filter(MonthlyData.user_id == user.id)
+        .all()
+    )
+    months_data = []
+    for m in all_months:
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == m.id,
+                MonthlyExpense.deleted_at.is_(None),
+            )
+            .all()
+        )
+        months_data.append({
+            "month": m.month,
+            "salary_planned": m.salary_planned,
+            "salary_actual": m.salary_actual,
+            "total_planned": m.total_planned,
+            "total_actual": m.total_actual,
+            "remaining_planned": m.remaining_planned,
+            "remaining_actual": m.remaining_actual,
+            "expenses": [
+                {
+                    "id": e.id,
+                    "name": e.name,
+                    "category": e.category,
+                    "planned_amount": e.planned_amount,
+                    "actual_amount": e.actual_amount,
+                    "currency": e.currency,
+                }
+                for e in expenses
+            ],
+        })
+
+    # ---- Recurring expenses ----
+    recurring = (
+        db.query(RecurringExpense)
+        .filter(
+            RecurringExpense.user_id == user.id,
+            RecurringExpense.deleted_at.is_(None),
+        )
+        .all()
+    )
+    recurring_data = [
+        {
+            "id": r.id,
+            "name": r.name,
+            "category": r.category,
+            "planned_amount": r.planned_amount,
+            "frequency": r.frequency,
+            "start_date": r.start_date.isoformat() if r.start_date else None,
+            "end_date": r.end_date.isoformat() if r.end_date else None,
+        }
+        for r in recurring
+    ]
+
+    # ---- Savings goals + contributions ----
+    goals = (
+        db.query(SavingsGoal)
+        .filter(
+            SavingsGoal.user_id == user.id,
+            SavingsGoal.deleted_at.is_(None),
+        )
+        .all()
+    )
+    goals_data = []
+    for g in goals:
+        contribs = (
+            db.query(SavingsContribution)
+            .filter(SavingsContribution.goal_id == g.id)
+            .all()
+        )
+        current_amount = sum(c.amount for c in contribs)
+        goals_data.append({
+            "id": g.id,
+            "name": g.name,
+            "target_amount": g.target_amount,
+            "current_amount": current_amount,
+            "target_date": g.target_date.isoformat() if g.target_date else None,
+            "contributions": [
+                {
+                    "id": c.id,
+                    "amount": c.amount,
+                    "note": c.note,
+                    "contributed_at": c.contributed_at.isoformat(),
+                }
+                for c in contribs
+            ],
+        })
+
+    # ---- Debts ----
+    debts = (
+        db.query(Debt)
+        .filter(
+            Debt.user_id == user.id,
+            Debt.deleted_at.is_(None),
+        )
+        .all()
+    )
+    debts_data = [
+        {
+            "id": d.id,
+            "name": d.name,
+            "balance": d.balance,
+            "interest_rate": d.interest_rate,
+            "minimum_payment": d.minimum_payment,
+        }
+        for d in debts
+    ]
+
+    # ---- Custom categories ----
+    categories = (
+        db.query(UserCategory)
+        .filter(UserCategory.user_id == user.id)
+        .all()
+    )
+    categories_data = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "color": c.color,
+            "is_default": c.is_default,
+        }
+        for c in categories
+    ]
+
+    # ---- Net worth snapshots ----
+    snapshots = (
+        db.query(NetWorthSnapshot)
+        .filter(
+            NetWorthSnapshot.user_id == user.id,
+            NetWorthSnapshot.deleted_at.is_(None),
+        )
+        .order_by(NetWorthSnapshot.snapshot_date)
+        .all()
+    )
+    snapshots_data = [
+        {
+            "id": s.id,
+            "snapshot_date": s.snapshot_date.isoformat(),
+            "total_assets": s.total_assets,
+            "total_liabilities": s.total_liabilities,
+            "net_worth": s.total_assets - s.total_liabilities,
+            "assets": s.assets_json,
+            "liabilities": s.liabilities_json,
+        }
+        for s in snapshots
+    ]
+
+    payload = {
+        "profile": profile,
+        "months": months_data,
+        "recurring_expenses": recurring_data,
+        "savings_goals": goals_data,
+        "debts": debts_data,
+        "categories": categories_data,
+        "net_worth_snapshots": snapshots_data,
+    }
+
+    json_bytes = json.dumps(payload, indent=2, default=str).encode("utf-8")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    filename = f"backup-{today}.json"
+
+    return StreamingResponse(
+        iter([json_bytes]),
+        media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
