@@ -14,7 +14,9 @@ from sqlalchemy.exc import IntegrityError
 logger = logging.getLogger(__name__)
 
 from database import get_db, User, PasswordResetToken, RefreshToken
-from security import get_password_hash, create_access_token, create_email_verify_token, decode_email_verify_token
+from typing import Optional
+
+from security import get_password_hash, create_access_token, create_email_verify_token, decode_email_verify_token, verify_token as _verify_token
 from email_utils import send_verification_email, send_password_reset_email
 from core.limiter import limiter
 from core.config import settings
@@ -219,6 +221,9 @@ async def refresh_access_token(request: Request, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
 
+    rt.last_used_at = datetime.utcnow()
+    db.commit()
+
     access_token = create_access_token({"sub": user.email}, expires_delta=timedelta(minutes=15))
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -237,3 +242,103 @@ async def logout(request: Request, response: Response, db: Session = Depends(get
 
     response.delete_cookie(key="refresh_token", path="/")
     return {"message": "Logged out successfully."}
+
+
+class SessionResponse(BaseModel):
+    id: int
+    created_at: datetime
+    last_used_at: Optional[datetime]
+    user_agent: Optional[str]
+    is_current: bool
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/sessions", response_model=list[SessionResponse])
+async def list_sessions(
+    request: Request,
+    current_user_email: str = Depends(_verify_token),
+    db: Session = Depends(get_db),
+):
+    """Return all active (non-revoked, non-expired) sessions for the current user."""
+    from database import User as UserModel
+    user = db.query(UserModel).filter(UserModel.email == current_user_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    now = datetime.utcnow()
+    sessions = db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.revoked_at == None,  # noqa: E711
+        RefreshToken.expires_at > now,
+    ).order_by(RefreshToken.created_at.desc()).all()
+
+    # Identify current session from cookie
+    current_hash = None
+    raw_token = request.cookies.get("refresh_token")
+    if raw_token:
+        current_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    return [
+        SessionResponse(
+            id=s.id,
+            created_at=s.created_at,
+            last_used_at=s.last_used_at,
+            user_agent=s.user_agent[:80] if s.user_agent else None,
+            is_current=(s.token_hash == current_hash),
+        )
+        for s in sessions
+    ]
+
+
+@router.delete("/sessions/{session_id}", response_model=VerifyResponse)
+async def revoke_session(
+    session_id: int,
+    current_user_email: str = Depends(_verify_token),
+    db: Session = Depends(get_db),
+):
+    """Revoke a single session by ID (ownership enforced)."""
+    from database import User as UserModel
+    user = db.query(UserModel).filter(UserModel.email == current_user_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    session = db.query(RefreshToken).filter(RefreshToken.id == session_id).first()
+    if not session or session.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    if session.revoked_at is not None:
+        raise HTTPException(status_code=400, detail="Session already revoked.")
+
+    session.revoked_at = datetime.utcnow()
+    db.commit()
+    return {"message": "Session revoked."}
+
+
+@router.delete("/sessions", response_model=VerifyResponse)
+async def revoke_all_other_sessions(
+    request: Request,
+    current_user_email: str = Depends(_verify_token),
+    db: Session = Depends(get_db),
+):
+    """Revoke all sessions except the current one."""
+    from database import User as UserModel
+    user = db.query(UserModel).filter(UserModel.email == current_user_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    current_hash = None
+    raw_token = request.cookies.get("refresh_token")
+    if raw_token:
+        current_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    query = db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.revoked_at == None,  # noqa: E711
+    )
+    if current_hash:
+        query = query.filter(RefreshToken.token_hash != current_hash)
+
+    count = query.update({"revoked_at": datetime.utcnow()})
+    db.commit()
+    return {"message": f"Revoked {count} other session(s)."}

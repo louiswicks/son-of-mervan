@@ -224,7 +224,8 @@ def login(request: Request, response: Response, payload: LoginRequest, db: Sessi
     raw_refresh = secrets.token_urlsafe(32)
     refresh_hash = hashlib.sha256(raw_refresh.encode()).hexdigest()
     refresh_expires = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_TTL_DAYS)
-    db.add(RefreshToken(user_id=user.id, token_hash=refresh_hash, expires_at=refresh_expires))
+    user_agent = request.headers.get("user-agent", "")[:512]
+    db.add(RefreshToken(user_id=user.id, token_hash=refresh_hash, expires_at=refresh_expires, user_agent=user_agent, last_used_at=datetime.utcnow()))
     db.commit()
 
     response.set_cookie(

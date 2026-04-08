@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount, useNotificationPreferences, useUpdateNotificationPreferences } from "../hooks/useProfile";
+import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount, useNotificationPreferences, useUpdateNotificationPreferences, useSessions, useRevokeSession, useRevokeAllOtherSessions } from "../hooks/useProfile";
 import { useCurrencies } from "../hooks/useCurrency";
 import { exportFullBackup } from "../api/export";
 import TwoFactorSetup from "./TwoFactorSetup";
@@ -28,6 +28,9 @@ export default function AccountSettings() {
   const deleteAccountMutation = useDeleteAccount();
   const { data: notifPrefs } = useNotificationPreferences();
   const updateNotifPrefsMutation = useUpdateNotificationPreferences();
+  const { data: sessions = [], isLoading: sessionsLoading } = useSessions();
+  const revokeSessionMutation = useRevokeSession();
+  const revokeAllOtherMutation = useRevokeAllOtherSessions();
 
   const { data: currencies = [] } = useCurrencies();
 
@@ -307,6 +310,60 @@ export default function AccountSettings() {
               </button>
             </div>
           ))}
+        </div>
+      </Section>
+
+      {/* Active Sessions */}
+      <Section title="Active Sessions">
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">
+            These are the devices and browsers currently signed in to your account.
+          </p>
+          {sessionsLoading ? (
+            <p className="text-sm text-gray-400">Loading sessions…</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-gray-400">No active sessions found.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {sessions.map((s) => (
+                <li key={s.id} className="flex items-start justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">
+                      {s.user_agent || "Unknown browser"}
+                      {s.is_current && (
+                        <span className="ml-2 inline-block text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
+                          Current
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Signed in {new Date(s.created_at).toLocaleDateString()}{s.last_used_at ? ` · Last active ${new Date(s.last_used_at).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                  {!s.is_current && (
+                    <button
+                      type="button"
+                      onClick={() => revokeSessionMutation.mutate(s.id)}
+                      disabled={revokeSessionMutation.isPending}
+                      className="shrink-0 text-sm text-red-600 hover:text-red-700 disabled:opacity-50 font-medium"
+                    >
+                      Sign out
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {sessions.filter((s) => !s.is_current).length > 1 && (
+            <button
+              type="button"
+              onClick={() => revokeAllOtherMutation.mutate()}
+              disabled={revokeAllOtherMutation.isPending}
+              className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50 font-medium"
+            >
+              {revokeAllOtherMutation.isPending ? "Signing out…" : "Sign out all other devices"}
+            </button>
+          )}
         </div>
       </Section>
 

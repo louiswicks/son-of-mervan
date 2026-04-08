@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProfile, updateProfile, changePassword, deleteAccount, getNotificationPreferences, updateNotificationPreferences } from '../api/users';
+import { getSessions, revokeSession, revokeAllOtherSessions } from '../api/sessions';
 import toast from 'react-hot-toast';
 
 export function useProfile(options = {}) {
@@ -70,6 +71,42 @@ export function useUpdateNotificationPreferences() {
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || err.message || 'Update failed.');
+    },
+  });
+}
+
+export function useSessions() {
+  return useQuery({
+    queryKey: ['sessions'],
+    queryFn: getSessions,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useRevokeSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => revokeSession(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      toast.success('Session signed out.');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || err.message || 'Failed to revoke session.');
+    },
+  });
+}
+
+export function useRevokeAllOtherSessions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeAllOtherSessions,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      toast.success(data?.message || 'All other sessions signed out.');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || err.message || 'Failed to revoke sessions.');
     },
   });
 }

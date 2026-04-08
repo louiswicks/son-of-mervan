@@ -359,6 +359,8 @@ class RefreshToken(Base):
     expires_at = Column(DateTime, nullable=False)
     revoked_at = Column(DateTime, nullable=True, default=None)
     created_at = Column(DateTime, default=datetime.utcnow)
+    user_agent = Column(Text, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
 
     user = relationship("User")
 
