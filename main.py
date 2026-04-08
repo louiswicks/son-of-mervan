@@ -946,12 +946,24 @@ def _start_scheduler():
         replace_existing=True,
         args=[SessionLocal],
     )
+    from routers.milestones import check_milestones
+    _scheduler.add_job(
+        check_milestones,
+        "cron",
+        day=1,
+        hour=9,
+        minute=0,
+        id="check_milestones",
+        replace_existing=True,
+        args=[SessionLocal],
+    )
     _scheduler.start()
     logger.info(
         "APScheduler started — recurring-expense generation at 00:05 UTC, "
         "budget alert checks at 00:10 UTC, exchange rate sync at 00:15 UTC, "
         "monthly digest on 1st of month at 08:00 UTC, "
-        "investment price sync at 16:30 UTC"
+        "investment price sync at 16:30 UTC, "
+        "milestone email checks on 1st of month at 09:00 UTC"
     )
 
 

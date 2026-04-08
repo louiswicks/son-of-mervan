@@ -216,6 +216,126 @@ def send_monthly_digest_email(
         logger.exception("[SG] EXCEPTION sending digest to %s: %s", to_email, e)
 
 
+def send_streak_milestone_email(to_email: str, streak_months: int):
+    """Send a congratulatory email when a user hits a 3/6/12-month under-budget streak."""
+    if not SENDGRID_API_KEY:
+        logger.info("[DEV] Streak milestone email for %s: %d-month streak", to_email, streak_months)
+        return
+
+    body = (
+        f"Hi,\n\n"
+        f"Congratulations! You've just hit a {streak_months}-month under-budget streak on Son of Mervan. "
+        f"That's {streak_months} consecutive months where your actual spending stayed within your planned budget.\n\n"
+        f"Keep it up — every month under budget puts more money in your pocket.\n\n"
+        f"Log in to Son of Mervan to see your streak badge and financial health score.\n"
+    )
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": f"\U0001f525 {streak_months}-month under-budget streak! — Son of Mervan",
+        "content": [{"type": "text/plain", "value": body}],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] streak milestone accepted (%d) to=%s streak=%d", r.status_code, to_email, streak_months)
+        else:
+            logger.error("[SG] streak milestone ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending streak milestone to %s: %s", to_email, e)
+
+
+def send_savings_goal_complete_email(to_email: str, goal_name: str, target_amount: float, currency: str = "GBP"):
+    """Send a congratulatory email when a savings goal is fully funded."""
+    if not SENDGRID_API_KEY:
+        logger.info(
+            "[DEV] Savings goal complete email for %s: goal='%s' target=%.2f %s",
+            to_email, goal_name, target_amount, currency,
+        )
+        return
+
+    body = (
+        f"Hi,\n\n"
+        f"You've reached your savings goal: {goal_name}!\n\n"
+        f"  Target: {currency} {target_amount:.2f}\n\n"
+        f"This is a significant financial achievement. Log in to Son of Mervan to review your "
+        f"savings progress and set your next goal.\n"
+    )
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": f"Savings goal reached: {goal_name} — Son of Mervan",
+        "content": [{"type": "text/plain", "value": body}],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] savings goal complete accepted (%d) to=%s goal=%r", r.status_code, to_email, goal_name)
+        else:
+            logger.error("[SG] savings goal complete ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending savings goal complete to %s: %s", to_email, e)
+
+
+def send_debt_payoff_email(to_email: str):
+    """Send a congratulatory email when the user has paid off all their debts."""
+    if not SENDGRID_API_KEY:
+        logger.info("[DEV] Debt payoff email for %s: all debts cleared", to_email)
+        return
+
+    body = (
+        "Hi,\n\n"
+        "You're debt-free! All of your tracked debts on Son of Mervan have reached a zero balance.\n\n"
+        "This is a major financial milestone. Consider redirecting those freed-up payments toward "
+        "your savings goals or investments.\n\n"
+        "Log in to Son of Mervan to update your financial plan.\n"
+    )
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": "You're debt-free! — Son of Mervan",
+        "content": [{"type": "text/plain", "value": body}],
+    }
+
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code in (200, 202):
+            logger.info("[SG] debt payoff accepted (%d) to=%s", r.status_code, to_email)
+        else:
+            logger.error("[SG] debt payoff ERROR %d: %s", r.status_code, r.text)
+    except Exception as e:
+        logger.exception("[SG] EXCEPTION sending debt payoff to %s: %s", to_email, e)
+
+
 def send_verification_email(to_email: str, verify_url: str):
     # If no key set, behave like dev: log link and return
     if not SENDGRID_API_KEY:

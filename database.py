@@ -838,6 +838,30 @@ class NetWorthSnapshot(Base):
         self._liabilities_json_encrypted = encrypt_value(json.dumps(value)) if value is not None else None
 
 
+class MilestoneNotificationSent(Base):
+    """
+    Tracks which milestone emails have already been sent to each user,
+    preventing duplicate congratulatory emails.
+
+    milestone_type examples:
+      "streak_3"          — under-budget 3-month streak
+      "streak_6"          — under-budget 6-month streak
+      "streak_12"         — under-budget 12-month streak
+      "savings_goal_<id>" — savings goal with the given ID was completed
+      "debt_free"         — all debts reached zero balance
+    """
+    __tablename__ = "milestone_notifications_sent"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    milestone_type = Column(String(128), nullable=False)
+    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (UniqueConstraint("user_id", "milestone_type"),)
+
+    user = relationship("User")
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),
