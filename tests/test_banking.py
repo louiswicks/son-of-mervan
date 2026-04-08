@@ -1,21 +1,25 @@
 """
-Tests for the open banking OAuth flow (Phase 15.2).
+Tests for the open banking OAuth flow (Phase 15.2) and transaction sync (Phase 15.3).
 
 Coverage targets:
   routers/banking.py — GET /banking/connect
                         GET /banking/callback
                         POST /banking/refresh/{id}
                         GET /banking/connections
+                        POST /banking/sync
+                        GET /banking/drafts
+                        PATCH /banking/drafts/{id}
+                        POST /banking/drafts/confirm-all
 """
 import hashlib
 import hmac
 import json
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from database import BankConnection
+from database import BankConnection, BankTransaction, MonthlyExpense
 from tests.conftest import TEST_EMAIL
 
 
@@ -326,3 +330,336 @@ class TestListConnections:
         r = auth_client.get("/banking/connections")
         assert r.status_code == 200
         assert r.json()["connections"] == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 15.3 helpers
+# ---------------------------------------------------------------------------
+
+def _make_transaction(db, user, conn, external_id="ext_001", description="Tesco",
+                      amount=15.50, currency="GBP", txn_date=None, status="draft",
+                      suggested_category=None):
+    txn = BankTransaction(
+        user_id=user.id,
+        bank_connection_id=conn.id,
+        transaction_date=txn_date or date(2026, 4, 1),
+        suggested_category=suggested_category,
+        status=status,
+    )
+    txn.external_id = external_id
+    txn.description = description
+    txn.amount = amount
+    txn.currency = currency
+    db.add(txn)
+    db.commit()
+    db.refresh(txn)
+    return txn
+
+
+def _mock_truelayer_transactions(txns: list[dict]):
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {"results": txns}
+    return mock_resp
+
+
+_SAMPLE_TXN = {
+    "transaction_id": "txn_abc123",
+    "description": "TESCO STORES",
+    "amount": -12.50,
+    "currency": "GBP",
+    "timestamp": "2026-04-01T10:00:00Z",
+}
+
+
+# ---------------------------------------------------------------------------
+# POST /banking/sync
+# ---------------------------------------------------------------------------
+
+class TestSync:
+    def test_sync_creates_draft_transactions(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        mock_resp = _mock_truelayer_transactions([_SAMPLE_TXN])
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.get", return_value=mock_resp):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.post("/banking/sync")
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["synced"] == 1
+        assert body["skipped"] == 0
+        assert body["connection_id"] == conn.id
+
+        txns = db.query(BankTransaction).filter(BankTransaction.user_id == verified_user.id).all()
+        assert len(txns) == 1
+        assert txns[0].status == "draft"
+        assert txns[0].description == "TESCO STORES"
+
+    def test_sync_deduplicates_existing_external_id(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="txn_abc123")
+        mock_resp = _mock_truelayer_transactions([_SAMPLE_TXN])
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.get", return_value=mock_resp):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.post("/banking/sync")
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["synced"] == 0
+        assert body["skipped"] == 1
+
+    def test_sync_updates_last_synced_at(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        assert conn.last_synced_at is None
+        mock_resp = _mock_truelayer_transactions([])
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.get", return_value=mock_resp):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.post("/banking/sync")
+
+        assert r.status_code == 200
+        db.refresh(conn)
+        assert conn.last_synced_at is not None
+
+    def test_sync_503_when_not_configured(self, auth_client):
+        with patch("routers.banking.settings") as ms:
+            ms.TRUELAYER_CLIENT_ID = ""
+            ms.TRUELAYER_CLIENT_SECRET = ""
+            r = auth_client.post("/banking/sync")
+        assert r.status_code == 503
+
+    def test_sync_404_when_no_active_connection(self, auth_client):
+        with patch("routers.banking.settings") as ms:
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.post("/banking/sync")
+        assert r.status_code == 404
+
+    def test_sync_unauthenticated_returns_4xx(self, client):
+        r = client.post("/banking/sync")
+        assert r.status_code in (401, 403)
+
+    def test_sync_handles_date_without_timestamp(self, auth_client, db, verified_user):
+        _make_connection(db, verified_user)
+        txn_with_date = {**_SAMPLE_TXN, "transaction_id": "txn_date_only",
+                         "timestamp": None, "date": "2026-04-02"}
+        mock_resp = _mock_truelayer_transactions([txn_with_date])
+
+        with patch("routers.banking.settings") as ms, \
+             patch("httpx.get", return_value=mock_resp):
+            ms.TRUELAYER_CLIENT_ID = "cid"
+            ms.TRUELAYER_CLIENT_SECRET = "secret"
+            ms.TRUELAYER_SANDBOX = True
+            r = auth_client.post("/banking/sync")
+
+        assert r.status_code == 200
+        txns = db.query(BankTransaction).filter(BankTransaction.user_id == verified_user.id).all()
+        assert len(txns) == 1
+        assert txns[0].transaction_date == date(2026, 4, 2)
+
+
+# ---------------------------------------------------------------------------
+# GET /banking/drafts
+# ---------------------------------------------------------------------------
+
+class TestListDrafts:
+    def test_returns_empty_when_no_drafts(self, auth_client):
+        r = auth_client.get("/banking/drafts")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["drafts"] == []
+        assert body["total"] == 0
+
+    def test_returns_draft_transactions(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="e1", description="Sainsbury's")
+        _make_transaction(db, verified_user, conn, external_id="e2", description="Costa Coffee")
+        r = auth_client.get("/banking/drafts")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 2
+        assert len(body["drafts"]) == 2
+
+    def test_excludes_confirmed_and_rejected(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="e_draft", status="draft")
+        _make_transaction(db, verified_user, conn, external_id="e_conf", status="confirmed")
+        _make_transaction(db, verified_user, conn, external_id="e_rej", status="rejected")
+        r = auth_client.get("/banking/drafts")
+        body = r.json()
+        assert body["total"] == 1
+        assert body["drafts"][0]["status"] == "draft"
+
+    def test_pagination(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        for i in range(5):
+            _make_transaction(db, verified_user, conn, external_id=f"e_{i}")
+        r = auth_client.get("/banking/drafts?page=1&page_size=3")
+        body = r.json()
+        assert body["total"] == 5
+        assert len(body["drafts"]) == 3
+        r2 = auth_client.get("/banking/drafts?page=2&page_size=3")
+        body2 = r2.json()
+        assert len(body2["drafts"]) == 2
+
+    def test_does_not_return_other_users_drafts(self, auth_client, db, second_user):
+        conn2 = _make_connection(db, second_user)
+        _make_transaction(db, second_user, conn2, external_id="other_txn")
+        r = auth_client.get("/banking/drafts")
+        body = r.json()
+        assert body["total"] == 0
+
+    def test_unauthenticated_returns_4xx(self, client):
+        r = client.get("/banking/drafts")
+        assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# PATCH /banking/drafts/{id}
+# ---------------------------------------------------------------------------
+
+class TestActionDraft:
+    def test_reject_sets_status_to_rejected(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "reject"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "rejected"
+        db.refresh(txn)
+        assert txn.status == "rejected"
+
+    def test_confirm_creates_monthly_expense(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1",
+                                 description="Tesco", amount=12.50, currency="GBP",
+                                 suggested_category="Groceries")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "confirm"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "confirmed"
+        assert body["monthly_expense_id"] is not None
+
+        expense = db.query(MonthlyExpense).filter(
+            MonthlyExpense.id == body["monthly_expense_id"]
+        ).first()
+        assert expense is not None
+        assert expense.name == "Tesco"
+        assert expense.category == "Groceries"
+        assert expense.actual_amount == 12.50
+        assert expense.currency == "GBP"
+
+    def test_confirm_uses_custom_category(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1",
+                                 suggested_category="Groceries")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}",
+                               json={"action": "confirm", "category": "Transport"})
+        assert r.status_code == 200
+        expense = db.query(MonthlyExpense).filter(
+            MonthlyExpense.id == r.json()["monthly_expense_id"]
+        ).first()
+        assert expense.category == "Transport"
+
+    def test_confirm_falls_back_to_other_when_no_category(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1",
+                                 suggested_category=None)
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "confirm"})
+        assert r.status_code == 200
+        expense = db.query(MonthlyExpense).filter(
+            MonthlyExpense.id == r.json()["monthly_expense_id"]
+        ).first()
+        assert expense.category == "Other"
+
+    def test_action_on_confirmed_returns_409(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1", status="confirmed")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "reject"})
+        assert r.status_code == 409
+
+    def test_action_on_other_users_draft_returns_403(self, auth_client, db, second_user):
+        conn2 = _make_connection(db, second_user)
+        txn = _make_transaction(db, second_user, conn2, external_id="e1")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "reject"})
+        assert r.status_code == 403
+
+    def test_action_on_missing_draft_returns_404(self, auth_client):
+        r = auth_client.patch("/banking/drafts/99999", json={"action": "reject"})
+        assert r.status_code == 404
+
+    def test_invalid_action_returns_422(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1")
+        r = auth_client.patch(f"/banking/drafts/{txn.id}", json={"action": "delete"})
+        assert r.status_code == 422
+
+    def test_unauthenticated_returns_4xx(self, client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        txn = _make_transaction(db, verified_user, conn, external_id="e1")
+        r = client.patch(f"/banking/drafts/{txn.id}", json={"action": "reject"})
+        assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# POST /banking/drafts/confirm-all
+# ---------------------------------------------------------------------------
+
+class TestConfirmAll:
+    def test_confirms_all_drafts(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="e1",
+                          description="Tesco", suggested_category="Groceries")
+        _make_transaction(db, verified_user, conn, external_id="e2",
+                          description="Netflix", suggested_category="Entertainment")
+        r = auth_client.post("/banking/drafts/confirm-all")
+        assert r.status_code == 200
+        assert r.json()["confirmed"] == 2
+
+        remaining = db.query(BankTransaction).filter(
+            BankTransaction.user_id == verified_user.id,
+            BankTransaction.status == "draft",
+        ).count()
+        assert remaining == 0
+
+    def test_confirm_all_returns_zero_when_no_drafts(self, auth_client):
+        r = auth_client.post("/banking/drafts/confirm-all")
+        assert r.status_code == 200
+        assert r.json()["confirmed"] == 0
+
+    def test_confirm_all_only_affects_own_drafts(self, auth_client, db, second_user):
+        conn2 = _make_connection(db, second_user)
+        _make_transaction(db, second_user, conn2, external_id="e_other")
+        r = auth_client.post("/banking/drafts/confirm-all")
+        assert r.status_code == 200
+        assert r.json()["confirmed"] == 0
+
+        # Other user's draft untouched
+        other_txns = db.query(BankTransaction).filter(
+            BankTransaction.user_id == second_user.id,
+            BankTransaction.status == "draft",
+        ).count()
+        assert other_txns == 1
+
+    def test_confirm_all_skips_non_draft_statuses(self, auth_client, db, verified_user):
+        conn = _make_connection(db, verified_user)
+        _make_transaction(db, verified_user, conn, external_id="e_draft", status="draft")
+        _make_transaction(db, verified_user, conn, external_id="e_rej", status="rejected")
+        r = auth_client.post("/banking/drafts/confirm-all")
+        assert r.json()["confirmed"] == 1
+
+    def test_unauthenticated_returns_4xx(self, client):
+        r = client.post("/banking/drafts/confirm-all")
+        assert r.status_code in (401, 403)

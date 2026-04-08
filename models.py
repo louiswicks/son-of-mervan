@@ -453,3 +453,43 @@ class BankConnectionResponse(BaseModel):
 
 class BankConnectionListResponse(BaseModel):
     connections: List[BankConnectionResponse]
+
+
+class BankSyncResponse(BaseModel):
+    synced: int
+    skipped: int
+    connection_id: int
+
+
+class BankTransactionResponse(BaseModel):
+    id: int
+    connection_id: int
+    description: Optional[str]
+    amount: Optional[float]
+    currency: Optional[str]
+    transaction_date: date
+    suggested_category: Optional[str]
+    status: str
+    created_at: datetime
+
+
+class BankDraftsResponse(BaseModel):
+    drafts: List[BankTransactionResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class BankDraftActionRequest(BaseModel):
+    action: str  # "confirm" or "reject"
+    category: Optional[str] = None  # override suggested_category on confirm
+
+
+class BankDraftActionResponse(BaseModel):
+    id: int
+    status: str
+    monthly_expense_id: Optional[int] = None
+
+
+class BankConfirmAllResponse(BaseModel):
+    confirmed: int
