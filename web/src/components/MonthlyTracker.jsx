@@ -304,7 +304,7 @@ const MonthlyTracker = () => {
     setRows(allRows);
     const s = salary_actual ?? salary_planned;
     setSalary(s ? String(s) : '');
-  }, [trackerData, filterCategory, baseCurrency]);
+  }, [trackerData, filterCategory, baseCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cancel in-progress edits when month or filter changes
   useEffect(() => {

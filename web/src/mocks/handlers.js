@@ -39,7 +39,7 @@ export const handlers = [
 
   // GET /monthly-tracker/:month — fetch grouped actuals for a month
   rest.get(`${BASE_URL}/monthly-tracker/:month`, (req, res, ctx) => {
-    const { month } = req.params;
+    const { month: _month } = req.params; // eslint-disable-line no-unused-vars
     return res(
       ctx.status(200),
       ctx.json({
