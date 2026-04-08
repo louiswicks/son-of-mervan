@@ -511,6 +511,70 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 
 ---
 
+## Phase 11: User Experience & Power Features
+
+### 11.1 Custom Expense Categories ← **CURRENT**
+**Goal:** Replace the 8 hardcoded category strings with user-defined categories that have names and display colours.  
+**Scope:** New `user_categories` DB table (name, color, is_default). `GET/POST/PUT/DELETE /categories` API. Lazy-seed 8 defaults on first call. Remove the `VALID_CATEGORIES` hard-gate from alerts.py. Frontend: `CategoriesPage.jsx` management UI; replace hardcoded arrays in SonOfMervan, MonthlyTracker, BudgetAlertsPage with dynamic `useCategories()` hook.
+
+**Acceptance Criteria:**
+- [ ] `GET /categories` seeds 8 defaults on first call and returns user's list
+- [ ] `POST /categories` creates a custom category (name + hex color)
+- [ ] `PUT /categories/{id}` updates name / color
+- [ ] `DELETE /categories/{id}` deletes custom categories; returns 400 for defaults
+- [ ] Duplicate name for same user → 409
+- [ ] Budget-alert create/update accepts any category string (VALID_CATEGORIES gate removed)
+- [ ] CategoriesPage reachable at `/categories`; shows colored pills, inline edit, add form
+- [ ] SonOfMervan, MonthlyTracker, BudgetAlertsPage dropdowns use dynamic categories
+- [ ] 8+ backend tests; all existing tests pass
+
+### 11.2 Bank Statement CSV Import
+**Goal:** Reduce manual data-entry by letting users import transactions from a bank's exported CSV.  
+**Scope:** `POST /import/csv` multipart endpoint: parse rows, auto-categorise via existing suggest-category logic, return preview payload. `POST /import/csv/confirm` persists confirmed rows. Frontend: ImportPage with file-upload, review table (editable category/amount per row), confirm button. Duplicate detection by name+date+amount within the same month.
+
+**Acceptance Criteria:**
+- [ ] Accepts common bank CSV formats (date, description, amount columns)
+- [ ] Returns preview with suggested category per row (not yet saved)
+- [ ] User can edit category before confirming
+- [ ] Duplicates (same name+amount+month) flagged as warnings, not auto-imported
+- [ ] Persists confirmed rows to monthly_expenses via existing upsert logic
+- [ ] 6+ backend tests; frontend renders review table
+
+### 11.3 Cashflow Forecasting
+**Goal:** Show users their projected account balance over the next 3–6 months based on income and recurring expenses.  
+**Scope:** `GET /forecast?months=3` endpoint: uses salary_planned and active recurring expenses to project a monthly balance. Frontend: ForecastPage with a Recharts area chart (months on X-axis, projected balance on Y-axis); colour band shows safe (green) / warning (amber) / deficit (red) zones.
+
+**Acceptance Criteria:**
+- [ ] Projection uses most recent planned salary or an explicit salary override param
+- [ ] Each recurring expense deducted at its effective monthly cost
+- [ ] Chart shows today's estimated balance + 3 projected months (default)
+- [ ] Deficit months highlighted red on chart
+- [ ] 5+ backend tests
+
+### 11.4 Debt Payoff Calculator
+**Goal:** Help users eliminate debt faster by modelling snowball and avalanche payoff strategies.  
+**Scope:** New `debts` table (name, balance, interest_rate, minimum_payment). `GET/POST/PUT/DELETE /debts`. `GET /debts/payoff-plan?strategy=snowball|avalanche` returns month-by-month payoff schedule. Frontend: DebtsPage with debt list + payoff plan toggle.
+
+**Acceptance Criteria:**
+- [ ] Snowball strategy: lowest balance first
+- [ ] Avalanche strategy: highest interest rate first
+- [ ] Payoff plan returns list of `{ month, debts: [{name, remaining_balance}] }` until all zero
+- [ ] Total interest paid shown for each strategy
+- [ ] 6+ backend tests; frontend renders payoff timeline
+
+### 11.5 Spending Streak & Habit Tracker
+**Goal:** Gamify budgeting to improve day-30 retention — reward users who stay on budget each month.  
+**Scope:** `GET /streaks` endpoint: computes current under-budget streak (consecutive months where actual ≤ planned) and longest streak ever. Frontend: streak badge on dashboard (🔥 N-month streak), animated milestone toasts at 3/6/12 months. Stored as a computed value, not a separate table.
+
+**Acceptance Criteria:**
+- [ ] Streak increments when a closed month's actual ≤ planned total
+- [ ] Streak resets to 0 on an over-budget month
+- [ ] Longest streak ever tracked separately
+- [ ] Milestone toasts at 3, 6, 12 months
+- [ ] 4+ backend tests
+
+---
+
 ## 9. Permanently Out of Scope
 
 - Mobile native app (iOS/Android) — web-first; PWA enhancements may be considered later
@@ -525,20 +589,15 @@ Phase 2 (DONE):  Core features
 Phase 3 (DONE):  Frontend UX overhaul
 Phase 4 (DONE):  Advanced features
 Phase 5 (DONE):  Production infrastructure
+Phase 6 (DONE):  Quality & polish
+Phase 7 (DONE):  Differentiating features
+Phase 8 (DONE):  Expanded scope
+Phase 9 (DONE):  Retention & engagement
+Phase 10 (DONE): Operational excellence
 
-Phase 6 (Next):  Quality & polish — complete before starting Phase 7
-  6.1 (Budget UI) → 6.2 (coverage to 80%) → 6.3 (docs refresh)
-
-Phase 7:         Differentiating features — mostly independent, suggested order:
-  7.4 (Pace indicator — lowest effort, highest immediate value)
-  → 7.6 (Smart categorisation)
-  → 7.5 (Health score)
-  → 7.3 (What-If planner)
-  → 7.1 (Envelope budgeting)
-  → 7.2 (Net worth dashboard)
-
-Phase 8:         Expanded scope — after Phase 7 is stable
-  8.1 (AI advice) → 8.3 (Investments) → 8.2 (Households) → 8.4 (Tax export) → 8.5 (Open banking)
+Phase 11 (Current): User experience & power features
+  11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
+  → 11.4 (Debt payoff) → 11.5 (Spending streaks)
 ```
 
 ---

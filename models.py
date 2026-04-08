@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -299,3 +299,25 @@ class HouseholdBudgetResponse(BaseModel):
     combined_expenses_actual: float
     combined_remaining_planned: float
     combined_remaining_actual: float
+
+
+# ---------- User Categories ----------
+
+class UserCategoryCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+    color: str = Field(default="#6b7280", max_length=7)
+
+
+class UserCategoryUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=50)
+    color: Optional[str] = Field(None, max_length=7)
+
+
+class UserCategoryResponse(BaseModel):
+    id: int
+    name: str
+    color: str
+    is_default: bool
+
+    class Config:
+        from_attributes = True

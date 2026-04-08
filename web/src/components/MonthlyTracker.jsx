@@ -16,8 +16,9 @@ import { useExpenseAudit } from "../hooks/useAudit";
 import { useProfile } from "../hooks/useProfile";
 import { currencySymbol, useCurrencies } from "../hooks/useCurrency";
 import { useSpendingPace, useCategorySuggestion } from "../hooks/useInsights";
+import { useCategories } from "../hooks/useCategories";
 
-const BASE_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
+const FALLBACK_CATEGORIES = ['Housing','Transportation','Food','Utilities','Insurance','Healthcare','Entertainment','Other'];
 const PIE_COLORS = ["#ef4444", "#10b981"]; // Spent, Saved
 
 const ExportMenu = ({ month }) => {
@@ -189,19 +190,19 @@ const CategorySuggestionChip = ({ name, onAccept }) => {
   );
 };
 
-const buildRowsFromExpenses = (items, defaultCurrency = 'GBP') => {
+const buildRowsFromExpenses = (items, defaultCurrency = 'GBP', categories = FALLBACK_CATEGORIES) => {
   const serverRows = items.map(e => ({
     id: e.id,
     category: e.category,
     projected: e.planned_amount !== undefined ? String(e.planned_amount) : '',
     actual: e.actual_amount !== undefined ? String(e.actual_amount) : '',
-    builtin: BASE_CATEGORIES.includes(e.category),
+    builtin: categories.includes(e.category),
     name: e.name || '',
     currency: e.currency || defaultCurrency,
   }));
 
   const presentCategories = new Set(serverRows.map(r => r.category));
-  const missingBuiltins = BASE_CATEGORIES
+  const missingBuiltins = categories
     .filter(cat => !presentCategories.has(cat))
     .map(cat => ({ id: null, category: cat, projected: '', actual: '', builtin: true, name: '', currency: defaultCurrency }));
 
@@ -215,10 +216,16 @@ const MonthlyTracker = () => {
   const baseCurrency = profile?.base_currency || 'GBP';
   const sym = currencySymbol(baseCurrency);
 
+  const { data: categoriesData } = useCategories();
+  const BASE_CATEGORIES = useMemo(
+    () => categoriesData?.map(c => c.name) ?? FALLBACK_CATEGORIES,
+    [categoriesData]
+  );
+
   const [selectedMonth, setSelectedMonth] = useState('2025-08');
   const [salary, setSalary] = useState('');
   const [rows, setRows] = useState(
-    BASE_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null, currency: 'GBP' }))
+    FALLBACK_CATEGORIES.map(cat => ({ category: cat, projected: '', actual: '', builtin: true, name: '', id: null, currency: 'GBP' }))
   );
   const [editingIndex, setEditingIndex] = useState(null);
   const [editDraft, setEditDraft] = useState({});
@@ -279,7 +286,7 @@ const MonthlyTracker = () => {
     });
 
     const allRows = filterCategory === 'All'
-      ? buildRowsFromExpenses(items, serverCurrency)
+      ? buildRowsFromExpenses(items, serverCurrency, BASE_CATEGORIES)
       : items.map(e => ({
           id: e.id,
           category: e.category,

@@ -714,6 +714,46 @@ class HouseholdInvite(Base):
     household = relationship("Household", back_populates="invites")
 
 
+class UserCategory(Base):
+    """
+    User-defined expense category with a display colour.
+    The 8 built-in categories are seeded on first GET for each user
+    (lazy seeding — no migration data backfill needed).
+
+    Names are stored *unencrypted* because:
+      - Category labels ("Housing", "Food") are not sensitive PII.
+      - Fernet is non-deterministic, which would make the per-user
+        UniqueConstraint unenforceable at the database level.
+    """
+    __tablename__ = "user_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(50), nullable=False)
+    color = Column(String(7), nullable=False, default="#6b7280")
+    is_default = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_category_name"),
+    )
+
+
+# Default categories seeded for every new user on their first GET /categories.
+DEFAULT_CATEGORIES = [
+    ("Housing",        "#ef4444"),
+    ("Transportation", "#f97316"),
+    ("Food",           "#eab308"),
+    ("Utilities",      "#22c55e"),
+    ("Insurance",      "#14b8a6"),
+    ("Healthcare",     "#3b82f6"),
+    ("Entertainment",  "#8b5cf6"),
+    ("Other",          "#6b7280"),
+]
+
+
 # ---------- Helpers ----------
 def init_db():
     Base.metadata.create_all(bind=engine)

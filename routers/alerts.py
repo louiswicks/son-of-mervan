@@ -38,7 +38,6 @@ from models import (
     BudgetAlertUpdate,
     NotificationListResponse,
     NotificationResponse,
-    VALID_CATEGORIES,
 )
 from security import verify_token
 
@@ -111,11 +110,8 @@ def create_alert(
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    if payload.category not in VALID_CATEGORIES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"category must be one of: {sorted(VALID_CATEGORIES)}",
-        )
+    if not payload.category or len(payload.category) > 50:
+        raise HTTPException(status_code=422, detail="category must be 1–50 characters")
     if not (1 <= payload.threshold_pct <= 100):
         raise HTTPException(status_code=422, detail="threshold_pct must be between 1 and 100")
 
@@ -157,11 +153,8 @@ def update_alert(
     alert = _get_owned_alert(alert_id, user, db)
 
     if payload.category is not None:
-        if payload.category not in VALID_CATEGORIES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"category must be one of: {sorted(VALID_CATEGORIES)}",
-            )
+        if len(payload.category) > 50:
+            raise HTTPException(status_code=422, detail="category must be 1–50 characters")
         alert.category = payload.category
     if payload.threshold_pct is not None:
         if not (1 <= payload.threshold_pct <= 100):

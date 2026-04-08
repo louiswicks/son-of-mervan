@@ -6,8 +6,9 @@ import {
   useUpdateAlert,
   useDeleteAlert,
 } from "../hooks/useAlerts";
+import { useCategories } from "../hooks/useCategories";
 
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   "Housing",
   "Transportation",
   "Food",
@@ -20,8 +21,8 @@ const CATEGORIES = [
 
 const THRESHOLD_PRESETS = [50, 75, 80, 90, 100];
 
-function AlertForm({ onSubmit, onCancel, initial = {} }) {
-  const [category, setCategory] = useState(initial.category || CATEGORIES[0]);
+function AlertForm({ onSubmit, onCancel, initial = {}, categories = FALLBACK_CATEGORIES }) {
+  const [category, setCategory] = useState(initial.category || categories[0]);
   const [threshold, setThreshold] = useState(initial.threshold_pct ?? 80);
 
   const handleSubmit = (e) => {
@@ -40,7 +41,7 @@ function AlertForm({ onSubmit, onCancel, initial = {} }) {
           onChange={(e) => setCategory(e.target.value)}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-h-[44px]"
         >
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
@@ -164,6 +165,9 @@ export default function BudgetAlertsPage() {
   const updateMutation = useUpdateAlert();
   const deleteMutation = useDeleteAlert();
 
+  const { data: categoriesData } = useCategories();
+  const categories = categoriesData?.map((c) => c.name) ?? FALLBACK_CATEGORIES;
+
   const [showForm, setShowForm] = useState(false);
   const [editingAlert, setEditingAlert] = useState(null);
 
@@ -213,6 +217,7 @@ export default function BudgetAlertsPage() {
           <AlertForm
             onSubmit={handleCreate}
             onCancel={() => setShowForm(false)}
+            categories={categories}
           />
         </div>
       )}
@@ -227,6 +232,7 @@ export default function BudgetAlertsPage() {
             initial={editingAlert}
             onSubmit={handleUpdate}
             onCancel={() => setEditingAlert(null)}
+            categories={categories}
           />
         </div>
       )}

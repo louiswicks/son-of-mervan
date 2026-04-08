@@ -83,8 +83,13 @@ class TestBudgetAlertsCreate:
         assert r.status_code == 201
         assert r.json()["threshold_pct"] == 80
 
-    def test_create_invalid_category(self, auth_client):
-        r = auth_client.post("/budget-alerts", json={"category": "InvalidCat", "threshold_pct": 80})
+    def test_create_any_category_now_accepted(self, auth_client):
+        """Categories are now user-defined — any string ≤50 chars is valid."""
+        r = auth_client.post("/budget-alerts", json={"category": "CustomCat", "threshold_pct": 80})
+        assert r.status_code == 201
+
+    def test_create_category_too_long_returns_422(self, auth_client):
+        r = auth_client.post("/budget-alerts", json={"category": "X" * 51, "threshold_pct": 80})
         assert r.status_code == 422
 
     def test_unauthenticated(self, client):

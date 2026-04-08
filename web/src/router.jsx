@@ -20,6 +20,7 @@ import InvestmentsPage from "./components/InvestmentsPage";
 import CalendarPage from "./components/CalendarPage";
 import TaxExportPage from "./components/TaxExportPage";
 import HouseholdPage from "./components/HouseholdPage";
+import CategoriesPage from "./components/CategoriesPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import OnboardingWizard from "./components/OnboardingWizard";
 
@@ -51,6 +52,7 @@ export const router = createHashRouter([
       { path: "calendar", element: withPageBoundary(<CalendarPage />) },
       { path: "tax", element: withPageBoundary(<TaxExportPage />) },
       { path: "household", element: withPageBoundary(<HouseholdPage />) },
+      { path: "categories", element: withPageBoundary(<CategoriesPage />) },
       { path: "settings", element: withPageBoundary(<AccountSettings />) },
     ],
   },

@@ -10,8 +10,9 @@ import {
 } from "recharts";
 import { useCalculateBudget } from "../hooks/useBudget";
 import { useTheme } from "../hooks/useTheme";
+import { useCategories } from "../hooks/useCategories";
 
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
   "Healthcare","Entertainment","Other"
 ];
@@ -88,6 +89,11 @@ export default function SonOfMervan() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const calculateMutation = useCalculateBudget();
+  const { data: categoriesData } = useCategories();
+  const CATEGORIES = useMemo(
+    () => categoriesData?.map((c) => c.name) ?? FALLBACK_CATEGORIES,
+    [categoriesData]
+  );
 
   const addExpense = () =>
     setExpenses((xs) => [...xs, { name: "", amount: "", category: "Housing" }]);
