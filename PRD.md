@@ -447,7 +447,7 @@ Previously out of scope items now included as future roadmap.
 
 Phase 10 tasks address the next tier of user value: proactive intelligence, power-user workflows, and deeper financial analysis. All tasks are independent and can be shipped in any order.
 
-### 10.1 Spending Anomaly Detection [IN PROGRESS]
+### 10.1 Spending Anomaly Detection [DONE 2026-04-08]
 **Goal:** Proactively surface unusual spending spikes so users don't miss overspends buried in monthly data.  
 **User story:** As a user, I want to be notified when a category's spending is unusually high compared to recent months, so I can take action before the month ends.  
 **Scope:**
