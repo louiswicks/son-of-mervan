@@ -739,7 +739,7 @@ Phase 13 targets measurable performance improvements, stronger account security,
 
 The app has accumulated 13+ phases of feature work. Each Ralph-loop iteration added UI with slightly different patterns. The result is a nav bar overflowing with 15+ items, a narrow budget card floating in empty space, and inconsistent styles across pages. This phase fixes the visual foundation before further features are added.
 
-### 14.1 Navigation Redesign
+### 14.1 Navigation Redesign ✅ DONE
 **Problem:** 15+ nav items (Budget, Tracker, Annual, Recurring, Savings, Alerts, Insights, What-If, Portfolio, Calendar, Tax, Household, Categories, Import, Forecast, Debt Payoff, Net Worth, Settings) are crammed into a single horizontal bar. At normal viewport widths items overflow or become illegible. On mobile it's unusable.
 **Solution:**
 - **Desktop:** Collapsible left sidebar. Primary section (always expanded): Budget, Tracker, Annual, Insights. Secondary section (collapsible): Recurring, Savings, Alerts, What-If, Portfolio, Calendar, Tax, Household, Categories, Import, Forecast, Debt Payoff, Net Worth. Settings + Logout in sidebar footer.
@@ -864,8 +864,8 @@ Phase 13 (DONE): Performance, security hardening & developer experience
   13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
   → 13.4 (Email preference center) → 13.5 (Active session manager)
 
-Phase 14 (Next): UI/UX Overhaul — fix visual quality before open banking
-  14.1 (Navigation redesign) → 14.2 (Budget page layout) → 14.3 (Global visual polish)
+Phase 14 (In Progress): UI/UX Overhaul — fix visual quality before open banking
+  14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) → 14.3 (Global visual polish)
 
 Phase 15: Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
   8.5 TrueLayer OAuth integration — sandbox first, then production credentials

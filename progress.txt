@@ -822,3 +822,27 @@
 - 6 new tests in `TestExpenseNotesTags` class in `tests/test_expenses.py`: note persist, tags persist, tags capped at 5, tracker response includes note/tags, search filters by tag, tag no-match returns empty.
 - Total: 459 tests, 88.54% coverage (target: 80%).
 - ruff: clean on all modified files.
+
+---
+
+## Phase 14.1 — Navigation Redesign (2026-04-08) ✅ DONE
+
+**Problem solved:** 18 nav items crammed into a horizontal top bar made the app unusable on normal viewport widths and broken on mobile.
+
+**What was built:**
+- Replaced the overflowing top header nav with a collapsible left sidebar (desktop) and a 4-tab bottom bar with "More" sheet (mobile).
+- `PRIMARY_NAV` (Budget, Tracker, Annual, Insights): always visible in sidebar primary section and mobile bottom tabs.
+- `SECONDARY_NAV` (Recurring, Savings, Alerts, What-If, Portfolio, Calendar, Tax, Household, Categories, Import, Forecast, Debt Payoff, Net Worth): shown in a collapsible sidebar section (auto-expands when a secondary route is active) and in the mobile "More" bottom sheet.
+- Settings, theme toggle, notification bell, and Logout moved to sidebar footer — no longer nav tabs.
+- Mobile "More" sheet renders all secondary nav items in a 2-column grid plus Settings, theme toggle, and Logout at the bottom.
+- Sidebar collapse state persisted to `localStorage` (`sidebarCollapsed` key).
+- Notification slide-over panel retained; bell button in sidebar footer (desktop) and "More" badge indicator (mobile).
+- Main content area offset via `sm:ml-60` / `sm:ml-16` matching sidebar width; mobile bottom padding clears the tab bar.
+- Auto-expands secondary nav section when a secondary route is the current page.
+
+**Files changed:**
+- `web/src/components/AuthGuard.jsx`: complete rewrite — `Sidebar`, `SidebarNavItem`, `MobileTabBar`, `MobileMoreSheet` components; `NotificationPanel` and `BellButton` retained.
+
+**Tests:**
+- All 51 frontend tests pass (no new tests needed — existing AuthGuard suite covers auth, routing, logout, and aria-current).
+- Commit: `70c15d9`
