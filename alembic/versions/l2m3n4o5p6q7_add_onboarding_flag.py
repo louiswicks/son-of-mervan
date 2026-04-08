@@ -29,12 +29,12 @@ def upgrade() -> None:
             'has_completed_onboarding',
             sa.Boolean(),
             nullable=False,
-            server_default='0',
+            server_default='false',
         ),
     )
     # Mark all existing users as having completed onboarding so they are
     # not sent to the wizard after this migration is applied to production.
-    op.execute("UPDATE users SET has_completed_onboarding = 1 WHERE has_completed_onboarding = 0")
+    op.execute("UPDATE users SET has_completed_onboarding = true WHERE has_completed_onboarding = false")
 
 
 def downgrade() -> None:
