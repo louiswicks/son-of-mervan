@@ -350,15 +350,16 @@ def check_budget_alerts(session_factory):
                 db.add(notif)
                 db.commit()
 
-                try:
-                    send_budget_alert_email(
-                        user.email, cat, pct_display, actual, planned, current_month
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to send budget alert email to %s for category %s",
-                        user.email, cat,
-                    )
+                if getattr(user, "notif_budget_alerts", True):
+                    try:
+                        send_budget_alert_email(
+                            user.email, cat, pct_display, actual, planned, current_month
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to send budget alert email to %s for category %s",
+                            user.email, cat,
+                        )
 
     except Exception:
         logger.exception("check_budget_alerts background job failed")

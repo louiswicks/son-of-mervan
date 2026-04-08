@@ -16,3 +16,9 @@ export const changePassword = (currentPassword, newPassword) =>
 
 export const deleteAccount = () =>
   client.delete('/users/me').then((r) => r.data);
+
+export const getNotificationPreferences = () =>
+  client.get('/users/me/notification-preferences').then((r) => r.data);
+
+export const updateNotificationPreferences = (payload) =>
+  client.put('/users/me/notification-preferences', payload).then((r) => r.data);

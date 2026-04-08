@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount } from "../hooks/useProfile";
+import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount, useNotificationPreferences, useUpdateNotificationPreferences } from "../hooks/useProfile";
 import { useCurrencies } from "../hooks/useCurrency";
 import { exportFullBackup } from "../api/export";
 import TwoFactorSetup from "./TwoFactorSetup";
@@ -26,12 +26,16 @@ export default function AccountSettings() {
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
   const deleteAccountMutation = useDeleteAccount();
+  const { data: notifPrefs } = useNotificationPreferences();
+  const updateNotifPrefsMutation = useUpdateNotificationPreferences();
 
   const { data: currencies = [] } = useCurrencies();
 
   const [usernameInput, setUsernameInput] = useState("");
   const [baseCurrencyInput, setBaseCurrencyInput] = useState("GBP");
   const [digestEnabled, setDigestEnabled] = useState(true);
+  const [notifBudgetAlerts, setNotifBudgetAlerts] = useState(true);
+  const [notifMilestones, setNotifMilestones] = useState(true);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -51,10 +55,35 @@ export default function AccountSettings() {
     }
   }, [profile]);
 
+  // Sync notification preferences when they load
+  useEffect(() => {
+    if (notifPrefs?.notif_budget_alerts !== undefined) {
+      setNotifBudgetAlerts(notifPrefs.notif_budget_alerts);
+    }
+    if (notifPrefs?.notif_milestones !== undefined) {
+      setNotifMilestones(notifPrefs.notif_milestones);
+    }
+    if (notifPrefs?.digest_enabled !== undefined) {
+      setDigestEnabled(notifPrefs.digest_enabled);
+    }
+  }, [notifPrefs]);
+
   function handleDigestToggle() {
     const next = !digestEnabled;
     setDigestEnabled(next);
-    updateProfileMutation.mutate({ digest_enabled: next });
+    updateNotifPrefsMutation.mutate({ digest_enabled: next });
+  }
+
+  function handleBudgetAlertsToggle() {
+    const next = !notifBudgetAlerts;
+    setNotifBudgetAlerts(next);
+    updateNotifPrefsMutation.mutate({ notif_budget_alerts: next });
+  }
+
+  function handleMilestonesToggle() {
+    const next = !notifMilestones;
+    setNotifMilestones(next);
+    updateNotifPrefsMutation.mutate({ notif_milestones: next });
   }
 
   async function handleDownloadBackup() {
@@ -225,32 +254,59 @@ export default function AccountSettings() {
         <TwoFactorSetup />
       </Section>
 
-      {/* Email Notifications */}
-      <Section title="Email Notifications">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-700">Monthly budget digest</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Receive a monthly email summarising your previous month's income, spending, and top
-              categories. Sent on the 1st of each month.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={digestEnabled}
-            onClick={handleDigestToggle}
-            disabled={profileLoading || updateProfileMutation.isPending}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
-              digestEnabled ? "bg-blue-600" : "bg-gray-200"
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                digestEnabled ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
+      {/* Email Preferences */}
+      <Section title="Email Preferences">
+        <div className="space-y-5">
+          {[
+            {
+              label: "Monthly budget digest",
+              description:
+                "Receive a monthly email summarising your previous month's income, spending, and top categories. Sent on the 1st of each month.",
+              checked: digestEnabled,
+              onToggle: handleDigestToggle,
+              id: "toggle-digest",
+            },
+            {
+              label: "Budget alert emails",
+              description:
+                "Get an email when a category's spending reaches your configured alert threshold. In-app notifications are always shown regardless of this setting.",
+              checked: notifBudgetAlerts,
+              onToggle: handleBudgetAlertsToggle,
+              id: "toggle-budget-alerts",
+            },
+            {
+              label: "Milestone emails",
+              description:
+                "Celebrate wins — receive emails for savings goal completions, debt payoff, and under-budget streaks (3, 6, 12 months).",
+              checked: notifMilestones,
+              onToggle: handleMilestonesToggle,
+              id: "toggle-milestones",
+            },
+          ].map(({ label, description, checked, onToggle, id }) => (
+            <div key={id} className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">{label}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-label={label}
+                onClick={onToggle}
+                disabled={updateNotifPrefsMutation.isPending}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                  checked ? "bg-blue-600" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    checked ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
         </div>
       </Section>
 

@@ -177,6 +177,9 @@ def check_milestones(session_factory) -> None:
         )
         logger.info("check_milestones: checking %d users", len(users))
         for user in users:
+            if not getattr(user, "notif_milestones", True):
+                logger.debug("check_milestones: skipping emails for user_id=%d (opted out)", user.id)
+                continue
             try:
                 _check_streak_milestones(db, user)
                 _check_savings_goal_milestones(db, user)

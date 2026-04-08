@@ -43,6 +43,16 @@ class ChangePasswordRequest(BaseModel):
         if not re.search(r"[^\w\s]", v): raise ValueError("Password must include a special character.")
         return v
 
+class NotificationPrefsResponse(BaseModel):
+    digest_enabled: bool
+    notif_budget_alerts: bool
+    notif_milestones: bool
+
+class NotificationPrefsRequest(BaseModel):
+    digest_enabled: bool | None = None
+    notif_budget_alerts: bool | None = None
+    notif_milestones: bool | None = None
+
 class MessageResponse(BaseModel):
     message: str
 
@@ -98,6 +108,38 @@ def update_profile(
         "digest_enabled": user.digest_enabled if user.digest_enabled is not None else True,
         "has_completed_onboarding": bool(user.has_completed_onboarding),
     }
+
+
+def _prefs_dict(user: User) -> dict:
+    return {
+        "digest_enabled": user.digest_enabled if user.digest_enabled is not None else True,
+        "notif_budget_alerts": user.notif_budget_alerts if user.notif_budget_alerts is not None else True,
+        "notif_milestones": user.notif_milestones if user.notif_milestones is not None else True,
+    }
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPrefsResponse)
+def get_notification_preferences(user: User = Depends(_get_current_user)):
+    """Return the authenticated user's email notification preferences."""
+    return _prefs_dict(user)
+
+
+@router.put("/me/notification-preferences", response_model=NotificationPrefsResponse)
+def update_notification_preferences(
+    payload: NotificationPrefsRequest,
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the authenticated user's email notification preferences."""
+    if payload.digest_enabled is not None:
+        user.digest_enabled = payload.digest_enabled
+    if payload.notif_budget_alerts is not None:
+        user.notif_budget_alerts = payload.notif_budget_alerts
+    if payload.notif_milestones is not None:
+        user.notif_milestones = payload.notif_milestones
+    db.commit()
+    db.refresh(user)
+    return _prefs_dict(user)
 
 
 @router.put("/me/password", response_model=MessageResponse)

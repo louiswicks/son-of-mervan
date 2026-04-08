@@ -93,6 +93,10 @@ class User(Base):
     # Onboarding wizard completion flag (default False — new users see the wizard)
     has_completed_onboarding = Column(Boolean, nullable=False, default=False, server_default="0")
 
+    # Email notification preferences (all default True — users receive all email types by default)
+    notif_budget_alerts = Column(Boolean, nullable=False, default=True, server_default="1")
+    notif_milestones = Column(Boolean, nullable=False, default=True, server_default="1")
+
     # TOTP 2FA — secret encrypted at rest; enabled flag is unencrypted for fast checks
     _totp_secret_encrypted = Column("totp_secret_encrypted", String(512), nullable=True)
     totp_enabled = Column(Boolean, nullable=False, default=False, server_default="0")

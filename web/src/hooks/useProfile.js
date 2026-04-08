@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProfile, updateProfile, changePassword, deleteAccount } from '../api/users';
+import { getProfile, updateProfile, changePassword, deleteAccount, getNotificationPreferences, updateNotificationPreferences } from '../api/users';
 import toast from 'react-hot-toast';
 
 export function useProfile(options = {}) {
@@ -47,6 +47,29 @@ export function useDeleteAccount() {
     mutationFn: deleteAccount,
     onError: (err) => {
       toast.error(err.response?.data?.detail || err.message || 'Deletion failed.');
+    },
+  });
+}
+
+export function useNotificationPreferences(options = {}) {
+  return useQuery({
+    queryKey: ['notificationPrefs'],
+    queryFn: getNotificationPreferences,
+    staleTime: 5 * 60 * 1000,
+    ...options,
+  });
+}
+
+export function useUpdateNotificationPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => updateNotificationPreferences(payload),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['notificationPrefs'], data);
+      toast.success('Email preferences saved.');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || err.message || 'Update failed.');
     },
   });
 }

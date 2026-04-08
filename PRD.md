@@ -771,6 +771,73 @@ The app has accumulated 13+ phases of feature work. Each Ralph-loop iteration ad
 
 ---
 
+## Phase 15: Open Banking Integration
+
+Builds on Smart Categorisation (7.6, DONE) to eliminate the biggest user friction point — manual expense entry. Uses TrueLayer's UK open banking API with sandbox-first development.
+
+**Prerequisite:** Phase 7.6 Smart Categorisation must be complete (DONE ✓). The `GET /insights/suggest-category` endpoint is called for each imported transaction.
+
+**New environment variables required:**
+| Variable | Purpose |
+|---|---|
+| `TRUELAYER_CLIENT_ID` | TrueLayer app client ID (sandbox and production) |
+| `TRUELAYER_CLIENT_SECRET` | TrueLayer app client secret |
+| `TRUELAYER_REDIRECT_URI` | OAuth callback URL (e.g. `https://son-of-mervan-production.up.railway.app/banking/callback`) |
+
+### 15.1 Backend — Database Models and Migration
+**Problem:** No DB schema exists to store bank connections or imported transaction drafts.
+**Solution:** Add two new encrypted models to `database.py`:
+- `BankConnection`: `id`, `user_id` (FK), `_provider_encrypted` (e.g. "truelayer"), `_access_token_encrypted`, `_refresh_token_encrypted`, `_account_id_encrypted`, `last_synced_at`, `created_at`, `disconnected_at` (soft-delete)
+- `BankTransaction`: `id`, `user_id` (FK), `bank_connection_id` (FK), `_external_id_encrypted` (dedup key), `_description_encrypted`, `_amount_encrypted`, `_currency_encrypted`, `transaction_date`, `suggested_category`, `status` (ENUM: `draft`/`confirmed`/`rejected`), `monthly_expense_id` (FK, nullable — set on confirm), `created_at`
+
+All financial and PII fields use Fernet hybrid properties (same pattern as `MonthlyExpense`).
+
+**Files:** `database.py`, new `alembic/versions/*_add_banking_tables.py`
+**Acceptance Criteria:** `alembic upgrade head` creates both tables. `alembic downgrade -1` drops them cleanly. No plaintext tokens visible in a `SELECT *` from either table.
+
+### 15.2 Backend — OAuth Flow (Connect & Callback)
+**Problem:** Users need a way to authorise read-only access to their bank account via TrueLayer's OAuth flow.
+**Solution:**
+- `GET /banking/connect` — generates a TrueLayer authorisation URL with scopes `accounts transactions balance` and a CSRF state token; returns `{ auth_url }` for the frontend to redirect to
+- `GET /banking/callback?code=…&state=…` — validates state, exchanges code for access + refresh tokens via TrueLayer token endpoint, fetches account list, stores encrypted `BankConnection` row, redirects to frontend `/banking` page with success flag
+- `POST /banking/refresh/{connection_id}` — internal helper to refresh expired access tokens using the stored refresh token; called automatically by the sync endpoint
+
+**Files:** `routers/banking.py` (new), `main.py` (register router), `.env.example`
+**Acceptance Criteria:** Visiting `/banking/connect` URL redirects to TrueLayer sandbox login. After mock bank login, callback creates a `BankConnection` row. `GET /banking/connections` returns the linked account. Token fields are encrypted in the DB.
+
+### 15.3 Backend — Transaction Sync
+**Problem:** Once connected, users need transactions fetched and presented as categorised drafts.
+**Solution:**
+- `POST /banking/sync` (auth required) — fetches transactions from TrueLayer `/data/v1/accounts/{account_id}/transactions` for the period since `last_synced_at` (or last 90 days on first sync). For each transaction: check `_external_id_encrypted` for deduplication; call `GET /insights/suggest-category?name=<description>` for category suggestion; create `BankTransaction` draft row. Updates `last_synced_at`. Rate-limited to 1 call/5 minutes per user.
+- `GET /banking/drafts?page=1&page_size=25` — returns paginated list of `status=draft` transactions with decrypted fields
+- `PATCH /banking/drafts/{id}` — confirm (creates `MonthlyExpense` from the draft, sets `status=confirmed`, sets `monthly_expense_id`) or reject (sets `status=rejected`). Returns 403 if draft belongs to another user.
+- `POST /banking/drafts/confirm-all` — bulk confirm all current drafts for the authenticated user
+
+**Files:** `routers/banking.py`, `database.py` (Pydantic schemas), `models.py`, `tests/test_banking.py` (new)
+**Acceptance Criteria:** After sync, `GET /banking/drafts` returns transactions with suggested categories. Confirming a draft creates a real `MonthlyExpense` row. Rejecting sets status to rejected and excludes from future `GET /banking/drafts`. Duplicate `external_id` on re-sync is silently skipped. Test coverage ≥80%.
+
+### 15.4 Backend — Disconnect
+**Problem:** Users must be able to revoke access and have all their banking data deleted.
+**Solution:**
+- `DELETE /banking/connections/{id}` — calls TrueLayer token revocation endpoint, sets `disconnected_at` on the `BankConnection` row, hard-deletes all `BankTransaction` rows in `draft` status for this connection, sets `bank_connection_id=null` on any `confirmed` rows (preserves confirmed expenses)
+
+**Files:** `routers/banking.py`, `tests/test_banking.py`
+**Acceptance Criteria:** After DELETE, `GET /banking/connections` returns empty list. All draft transactions are gone. Confirmed `MonthlyExpense` rows are preserved. TrueLayer revocation endpoint called (mock in tests).
+
+### 15.5 Frontend — Bank Connection Page
+**Problem:** No UI exists for any of the banking features.
+**Solution:** New `/banking` route and `BankConnectionPage.jsx`:
+- **Disconnected state:** "Connect your bank" card with TrueLayer logo, bullet points explaining what's shared (read-only, no payments), "Connect Bank" button that calls `GET /banking/connect` and redirects to the returned `auth_url`
+- **Connected state:** Shows linked bank name + account, last synced time, "Sync Now" button (`POST /banking/sync`), and "Disconnect" button with confirmation modal
+- **Drafts panel:** Table of pending draft transactions (description, amount, date, suggested category, action buttons: Confirm / Reject). Bulk "Confirm All" button. Empty state when no drafts.
+- Sandbox mode indicator: yellow banner "Using TrueLayer Sandbox — mock data only" when `TRUELAYER_CLIENT_ID` is the sandbox key
+- "Banking" nav item added to AuthGuard secondary nav (or sidebar in Phase 14)
+
+**Files:** new `web/src/components/BankConnectionPage.jsx`, new `web/src/api/banking.js`, new `web/src/hooks/useBanking.js`, `web/src/router.jsx`, `web/src/components/AuthGuard.jsx`
+**Acceptance Criteria:** Full connect → sync → review → confirm flow completable without leaving the app. Disconnecting shows confirmation modal before proceeding. Drafts panel updates after sync without page reload. Sandbox banner visible when using test credentials.
+
+---
+
 ## 10. Implementation Sequence
 
 ```
