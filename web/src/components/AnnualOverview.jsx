@@ -14,6 +14,8 @@ import {
 import { useAnnualSummary } from "../hooks/useAnnualSummary";
 import { SkeletonCard, SkeletonChart } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -97,7 +99,7 @@ const AnnualOverview = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Header + Year Picker */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
@@ -132,7 +134,7 @@ const AnnualOverview = () => {
         </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm">
+          <Card>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 dark:text-gray-400">Total Planned Spend</span>
               <BarChart3 className="text-blue-500" />
@@ -140,8 +142,8 @@ const AnnualOverview = () => {
             <div className="text-3xl font-bold mt-2">
               £{Number(resolved?.totals?.total_planned || 0).toLocaleString()}
             </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm">
+          </Card>
+          <Card>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 dark:text-gray-400">Total Actual Spend</span>
               <LineIcon className="text-purple-500" />
@@ -149,8 +151,8 @@ const AnnualOverview = () => {
             <div className="text-3xl font-bold mt-2">
               £{Number(resolved?.totals?.total_actual || 0).toLocaleString()}
             </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm">
+          </Card>
+          <Card>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 dark:text-gray-400">Total Remaining (Savings)</span>
               <PiggyBank className="text-green-600" />
@@ -158,7 +160,7 @@ const AnnualOverview = () => {
             <div className="text-3xl font-bold mt-2">
               £{Number(resolved?.totals?.remaining_actual || 0).toLocaleString()}
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -170,7 +172,7 @@ const AnnualOverview = () => {
         </>
       ) : (
         <>
-          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm">
+          <Card>
             <h3 className="text-lg font-semibold mb-4 dark:text-gray-100">Spending Trend</h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -188,9 +190,9 @@ const AnnualOverview = () => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm">
+          <Card>
             <h3 className="text-lg font-semibold mb-4 dark:text-gray-100">Savings Trend (Actual)</h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -218,13 +220,13 @@ const AnnualOverview = () => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </Card>
         </>
       )}
 
       {/* Month Table */}
       {isLoading ? (
-        <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-3">
+        <Card className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="flex gap-4">
               {[60, 80, 100, 100, 110, 70].map((w, j) => (
@@ -232,9 +234,9 @@ const AnnualOverview = () => {
               ))}
             </div>
           ))}
-        </div>
+        </Card>
       ) : (
-        <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm overflow-x-auto">
+        <Card className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 dark:bg-gray-700">
               <tr>
@@ -280,9 +282,9 @@ const AnnualOverview = () => {
               </tr>
             </tfoot>
           </table>
-        </div>
+        </Card>
       )}
-    </div>
+    </PageWrapper>
   );
 };
 

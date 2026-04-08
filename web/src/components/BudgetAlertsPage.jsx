@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Bell, BellOff, Plus, Trash2, Edit2, Check, X } from "lucide-react";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 import {
   useBudgetAlerts,
   useCreateAlert,
@@ -103,7 +105,7 @@ function AlertForm({ onSubmit, onCancel, initial = {}, categories = FALLBACK_CAT
 
 function AlertCard({ alert, onEdit, onDelete, onToggle }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+    <Card className="!p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -155,7 +157,7 @@ function AlertCard({ alert, onEdit, onDelete, onToggle }) {
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -190,7 +192,7 @@ export default function BudgetAlertsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <PageWrapper className="max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -212,19 +214,19 @@ export default function BudgetAlertsPage() {
 
       {/* Create form */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <Card>
           <h3 className="font-semibold text-gray-900 dark:text-white mb-4">New alert</h3>
           <AlertForm
             onSubmit={handleCreate}
             onCancel={() => setShowForm(false)}
             categories={categories}
           />
-        </div>
+        </Card>
       )}
 
       {/* Edit form */}
       {editingAlert && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-blue-300 dark:border-blue-600 p-5">
+        <Card className="border-blue-300 dark:border-blue-600">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
             Edit alert — {editingAlert.category}
           </h3>
@@ -234,7 +236,7 @@ export default function BudgetAlertsPage() {
             onCancel={() => setEditingAlert(null)}
             categories={categories}
           />
-        </div>
+        </Card>
       )}
 
       {/* Alert list */}
@@ -248,7 +250,7 @@ export default function BudgetAlertsPage() {
           ))}
         </div>
       ) : alerts.length === 0 && !showForm ? (
-        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+        <Card className="text-center py-16">
           <Bell size={40} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
           <p className="text-gray-500 dark:text-gray-400 font-medium">No alerts configured</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-6">
@@ -260,7 +262,7 @@ export default function BudgetAlertsPage() {
           >
             Create your first alert
           </button>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {alerts.map((alert) => (
@@ -284,6 +286,6 @@ export default function BudgetAlertsPage() {
           and an email. One alert per category per calendar month.
         </p>
       </div>
-    </div>
+    </PageWrapper>
   );
 }

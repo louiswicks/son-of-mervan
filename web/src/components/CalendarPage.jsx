@@ -3,6 +3,7 @@ import React, { useState, useMemo } from "react";
 import { CalendarDays, Target, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useRecurring } from "../hooks/useRecurring";
 import { useSavingsGoals } from "../hooks/useSavings";
+import PageWrapper from "./PageWrapper";
 
 const CATEGORY_COLORS = {
   Housing: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -154,7 +155,7 @@ export default function CalendarPage() {
   const goalsWithDeadlines = goals.filter((g) => g.target_date).length;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6">
+    <PageWrapper>
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -251,6 +252,6 @@ export default function CalendarPage() {
           )}
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

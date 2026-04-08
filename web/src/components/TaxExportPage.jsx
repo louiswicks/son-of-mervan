@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { FileText, Download, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { getTaxSummary, exportTaxPDF } from "../api/export";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 // Current UK tax year: if we're past April 5, the current tax year has started
 function currentUKTaxYear() {
@@ -81,7 +83,7 @@ export default function TaxExportPage() {
       : "—";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <PageWrapper className="max-w-4xl">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -106,7 +108,7 @@ export default function TaxExportPage() {
       </div>
 
       {/* Tax year selector */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+      <Card>
         <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Select Tax Year</h2>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
@@ -152,7 +154,7 @@ export default function TaxExportPage() {
         {error && (
           <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
         )}
-      </div>
+      </Card>
 
       {/* Loading skeleton */}
       {loading && (
@@ -216,7 +218,7 @@ export default function TaxExportPage() {
 
           {/* Category breakdown table */}
           {summary.category_breakdown.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <Card className="overflow-hidden !p-0">
               <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">
                   Expense Breakdown by Category
@@ -298,7 +300,7 @@ export default function TaxExportPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Footer note */}
@@ -309,6 +311,6 @@ export default function TaxExportPage() {
           </p>
         </>
       )}
-    </div>
+    </PageWrapper>
   );
 }

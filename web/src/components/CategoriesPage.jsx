@@ -9,6 +9,7 @@ import {
   useDeleteCategory,
 } from '../hooks/useCategories';
 import { SkeletonCard } from './Skeleton';
+import PageWrapper from './PageWrapper';
 
 const DEFAULT_COLOR = '#6b7280';
 
@@ -166,7 +167,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+    <PageWrapper className="max-w-xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -244,6 +245,6 @@ export default function CategoriesPage() {
           {categories.filter((c) => !c.is_default).length} custom
         </p>
       )}
-    </div>
+    </PageWrapper>
   );
 }

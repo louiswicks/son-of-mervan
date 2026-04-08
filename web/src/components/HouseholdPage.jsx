@@ -13,6 +13,8 @@ import {
 import { useProfile } from "../hooks/useProfile";
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonCard } from "./Skeleton";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
 
@@ -105,7 +107,7 @@ function InvitePanel({ pendingInvites }) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+    <Card>
       <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
         <UserPlus size={16} className="text-indigo-500" />
         Invite a member
@@ -140,7 +142,7 @@ function InvitePanel({ pendingInvites }) {
           </ul>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -152,7 +154,7 @@ function BudgetView({ householdId }) {
   const { data, isLoading } = useHouseholdBudget(open ? month : null);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <Card className="!p-0">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between p-5 text-left"
@@ -228,7 +230,7 @@ function BudgetView({ householdId }) {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -246,10 +248,10 @@ export default function HouseholdPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 max-w-2xl mx-auto space-y-4">
+      <PageWrapper className="max-w-2xl">
         <SkeletonCard />
         <SkeletonCard />
-      </div>
+      </PageWrapper>
     );
   }
 
@@ -259,9 +261,9 @@ export default function HouseholdPage() {
 
   if (error) {
     return (
-      <div className="p-4 max-w-2xl mx-auto">
+      <PageWrapper className="max-w-2xl">
         <p className="text-red-500">Failed to load household. Please refresh.</p>
-      </div>
+      </PageWrapper>
     );
   }
 
@@ -282,7 +284,7 @@ export default function HouseholdPage() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-5">
+    <PageWrapper className="max-w-2xl">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
           <Users size={20} className="text-indigo-600 dark:text-indigo-400" />
@@ -296,7 +298,7 @@ export default function HouseholdPage() {
       </div>
 
       {/* Members list */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+      <Card>
         <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Members</h3>
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {household.members.map((m) => (
@@ -329,7 +331,7 @@ export default function HouseholdPage() {
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
 
       {/* Invite — owner only */}
       {isOwner && <InvitePanel pendingInvites={household.pending_invites} />}
@@ -339,7 +341,7 @@ export default function HouseholdPage() {
 
       {/* Danger zone — owner only */}
       {isOwner && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-900/40 p-5">
+        <Card className="border-red-200 dark:border-red-900/40">
           <h3 className="font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-2">
             <Trash2 size={16} />
             Danger zone
@@ -354,7 +356,7 @@ export default function HouseholdPage() {
           >
             Dissolve household
           </button>
-        </div>
+        </Card>
       )}
 
       {/* Confirm dissolve */}
@@ -378,6 +380,6 @@ export default function HouseholdPage() {
           onCancel={() => setRemoveTarget(null)}
         />
       )}
-    </div>
+    </PageWrapper>
   );
 }

@@ -21,6 +21,8 @@ import {
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
 import toast from "react-hot-toast";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 const EMPTY_FORM = {
   name: "",
@@ -230,7 +232,7 @@ export default function DebtPayoffPage() {
   const totalMinimum = debts.reduce((s, d) => s + d.minimum_payment, 0);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <PageWrapper className="max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -254,31 +256,31 @@ export default function DebtPayoffPage() {
       {/* Summary KPIs */}
       {debts.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          <Card className="!p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total owed</p>
             <p className="text-xl font-bold text-red-600 dark:text-red-400">£{fmt(totalBalance)}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          </Card>
+          <Card className="!p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Monthly minimums</p>
             <p className="text-xl font-bold text-gray-900 dark:text-gray-100">£{fmt(totalMinimum)}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          </Card>
+          <Card className="!p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Months to freedom</p>
             <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {planLoading ? "…" : plan?.payoff_months ?? "—"}
             </p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          </Card>
+          <Card className="!p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total interest ({strategy})</p>
             <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
               {planLoading ? "…" : plan ? `£${fmt(plan.total_interest_paid)}` : "—"}
             </p>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Debt list */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <Card className="overflow-hidden !p-0">
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Your debts</h2>
         </div>
@@ -337,11 +339,11 @@ export default function DebtPayoffPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Payoff plan chart */}
       {debts.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
+        <Card className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">Payoff timeline</h2>
             <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 text-sm">
@@ -404,7 +406,7 @@ export default function DebtPayoffPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Modals */}
@@ -427,6 +429,6 @@ export default function DebtPayoffPage() {
           danger
         />
       )}
-    </div>
+    </PageWrapper>
   );
 }

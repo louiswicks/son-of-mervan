@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import {
   TrendingUp, TrendingDown, Plus, Pencil, Trash2, RefreshCw, X,
 } from "lucide-react";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 import {
   useInvestments,
   usePortfolioSummary,
@@ -48,25 +50,25 @@ function SummaryCards({ summary }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+      <Card className="!p-4">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Holdings</p>
         <p className="text-2xl font-bold text-gray-900 dark:text-white">
           {summary?.holdings_count ?? 0}
         </p>
-      </div>
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+      </Card>
+      <Card className="!p-4">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Cost</p>
         <p className="text-2xl font-bold text-gray-900 dark:text-white">
           {formatCurrency(summary?.total_cost ?? 0)}
         </p>
-      </div>
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+      </Card>
+      <Card className="!p-4">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Portfolio Value</p>
         <p className="text-2xl font-bold text-gray-900 dark:text-white">
           {hasValue ? formatCurrency(summary.total_value) : "—"}
         </p>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Live prices</p>
-      </div>
+      </Card>
       <div className={`rounded-xl p-4 shadow-sm border ${
         hasValue
           ? gainPositive
@@ -341,7 +343,7 @@ export default function InvestmentsPage() {
   const isSaving = createMut.isPending || updateMut.isPending;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <PageWrapper>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
@@ -375,11 +377,11 @@ export default function InvestmentsPage() {
 
       {/* Holdings table */}
       {isLoading ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+        <Card className="!p-8 text-center">
           <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading portfolio…</div>
-        </div>
+        </Card>
       ) : holdings.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+        <Card className="!p-12 text-center">
           <TrendingUp size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-gray-500 dark:text-gray-400 font-medium">No holdings yet</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-4">
@@ -391,9 +393,9 @@ export default function InvestmentsPage() {
           >
             Add Holding
           </button>
-        </div>
+        </Card>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <Card className="overflow-hidden !p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -427,7 +429,7 @@ export default function InvestmentsPage() {
               Prices synced daily at 16:30 UTC via Yahoo Finance. Add a ticker symbol to enable auto-sync.
             </p>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Add/Edit modal */}
@@ -478,6 +480,6 @@ export default function InvestmentsPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

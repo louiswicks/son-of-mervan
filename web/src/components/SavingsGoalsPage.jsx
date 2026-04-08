@@ -1,6 +1,9 @@
 // src/components/SavingsGoalsPage.jsx
 import React, { useState } from "react";
 import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, PiggyBank } from "lucide-react";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
+import EmptyState from "./EmptyState";
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
 import {
   useSavingsGoals,
@@ -69,7 +72,7 @@ function ProgressRing({ pct, status }) {
 
 function GoalForm({ value, onChange, onSubmit, onCancel, submitLabel, isPending }) {
   return (
-    <div className="bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded-xl p-4 mb-4 shadow-sm">
+    <Card className="border-blue-300 dark:border-blue-600 mb-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Goal name</label>
@@ -118,7 +121,7 @@ function GoalForm({ value, onChange, onSubmit, onCancel, submitLabel, isPending 
           <Check size={14} /> {submitLabel}
         </button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -220,7 +223,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
   const cfg = STATUS_CONFIG[goal.status] ?? STATUS_CONFIG.no_deadline;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+    <Card className="!p-4">
       <div className="flex gap-4 items-start">
         <ProgressRing pct={pct} status={goal.status} />
 
@@ -287,7 +290,7 @@ function GoalCard({ goal, onEdit, onDelete }) {
       </div>
 
       {expanded && <ContributionsPanel goal={goal} />}
-    </div>
+    </Card>
   );
 }
 
@@ -346,7 +349,7 @@ export default function SavingsGoalsPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <PageWrapper>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -395,13 +398,21 @@ export default function SavingsGoalsPage() {
       {/* Goal list */}
       {isLoading ? (
         <SkeletonTable rows={3} />
-      ) : goals.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
-          <PiggyBank size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-          <p className="font-medium text-gray-700 dark:text-gray-300">No savings goals yet</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Create your first goal to start tracking progress.</p>
-        </div>
-      ) : (
+      ) : goals.length === 0 && !showCreate ? (
+        <EmptyState
+          icon={<PiggyBank size={48} />}
+          title="No savings goals yet"
+          description="Start tracking your savings progress by creating your first goal."
+          action={
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 min-h-[44px]"
+            >
+              <Plus size={16} /> Add your first goal
+            </button>
+          }
+        />
+      ) : goals.length > 0 ? (
         <div className="space-y-3">
           {goals.map((g) => (
             <GoalCard
@@ -412,7 +423,7 @@ export default function SavingsGoalsPage() {
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Delete confirmation */}
       {deleteTarget !== null && (
@@ -425,6 +436,6 @@ export default function SavingsGoalsPage() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </PageWrapper>
   );
 }

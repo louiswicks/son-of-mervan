@@ -6,15 +6,17 @@ import { useProfile, useUpdateProfile, useChangePassword, useDeleteAccount, useN
 import { useCurrencies } from "../hooks/useCurrency";
 import { exportFullBackup } from "../api/export";
 import TwoFactorSetup from "./TwoFactorSetup";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+    <Card className="overflow-hidden !p-0 mb-6">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
       </div>
       <div className="px-6 py-5">{children}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -142,8 +144,8 @@ export default function AccountSettings() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Account Settings</h1>
+    <PageWrapper className="max-w-2xl">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account Settings</h1>
 
       {/* Profile */}
       <Section title="Profile">
@@ -417,6 +419,6 @@ export default function AccountSettings() {
           </button>
         </div>
       </Section>
-    </div>
+    </PageWrapper>
   );
 }

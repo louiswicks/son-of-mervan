@@ -12,6 +12,8 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, AlertTriangle, DollarSign } from "lucide-react";
 import { useForecast } from "../hooks/useForecast";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 // -------------------- helpers --------------------
 
@@ -122,7 +124,7 @@ export default function ForecastPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Cashflow Forecast</h2>
@@ -132,7 +134,7 @@ export default function ForecastPage() {
       </div>
 
       {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <Card className="!p-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
           {/* Months selector */}
           <div>
@@ -187,7 +189,7 @@ export default function ForecastPage() {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Summary cards */}
       {data && (
@@ -220,7 +222,7 @@ export default function ForecastPage() {
       )}
 
       {/* Chart */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <Card>
         <h3 className="text-base font-semibold text-gray-800 dark:text-white mb-4">
           Running balance forecast
         </h3>
@@ -294,11 +296,11 @@ export default function ForecastPage() {
             </AreaChart>
           </ResponsiveContainer>
         )}
-      </div>
+      </Card>
 
       {/* Monthly breakdown table */}
       {!isLoading && !isError && projection.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <Card className="overflow-hidden !p-0">
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-base font-semibold text-gray-800 dark:text-white">Monthly breakdown</h3>
           </div>
@@ -350,19 +352,19 @@ export default function ForecastPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Empty state */}
       {!isLoading && !isError && projection.length === 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+        <Card className="!p-12 text-center">
           <TrendingUp size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-gray-500 dark:text-gray-400 font-medium">No forecast data yet</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             Add a budget plan or recurring expenses to see your cashflow projection.
           </p>
-        </div>
+        </Card>
       )}
-    </div>
+    </PageWrapper>
   );
 }

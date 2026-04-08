@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PageWrapper from './PageWrapper';
+import Card from './Card';
 import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download, Clock, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import ConfirmModal from "./ConfirmModal";
@@ -433,7 +435,7 @@ const MonthlyTracker = () => {
   const totalOver = totalDiff > 0;
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
@@ -1232,7 +1234,7 @@ const MonthlyTracker = () => {
       )}
 
       {lastSaved && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border dark:border-gray-700 p-5 sm:p-6">
+        <Card>
           <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4">
             {selectedMonth} — Salary vs Spent/Saved
           </h3>
@@ -1276,9 +1278,9 @@ const MonthlyTracker = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
       )}
-    </div>
+    </PageWrapper>
   );
 };
 

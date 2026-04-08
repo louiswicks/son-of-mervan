@@ -1,5 +1,7 @@
 // src/components/ScenarioPlannerPage.jsx
 import React, { useState, useMemo } from "react";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 import {
   AreaChart,
   Area,
@@ -40,13 +42,13 @@ function monthsLabel(n) {
 
 function SummaryCard({ label, value, sub, color }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+    <Card className="!p-4">
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
         {label}
       </p>
       <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -281,7 +283,7 @@ export default function ScenarioPlannerPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -295,7 +297,7 @@ export default function ScenarioPlannerPage() {
 
       {!hasCategories ? (
         /* Empty state */
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-10 text-center">
+        <Card className="!p-10 text-center">
           <Sliders
             size={40}
             className="mx-auto text-gray-300 dark:text-gray-600 mb-3"
@@ -307,7 +309,7 @@ export default function ScenarioPlannerPage() {
             Add planned expenses on the Budget page first, then come back to
             explore scenarios.
           </p>
-        </div>
+        </Card>
       ) : (
         <>
           {/* Summary cards */}
@@ -349,7 +351,7 @@ export default function ScenarioPlannerPage() {
           </div>
 
           {/* Category sliders */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <Card>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 Adjust spending
@@ -375,10 +377,10 @@ export default function ScenarioPlannerPage() {
                 />
               ))}
             </div>
-          </div>
+          </Card>
 
           {/* 24-month projection chart */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <Card>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
               24-month savings projection
             </h3>
@@ -471,11 +473,11 @@ export default function ScenarioPlannerPage() {
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
 
           {/* Goal impact */}
           {goalProjections.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <Card>
               <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <Target size={16} className="text-blue-500" />
                 Impact on savings goals
@@ -493,10 +495,10 @@ export default function ScenarioPlannerPage() {
                   />
                 ))}
               </div>
-            </div>
+            </Card>
           )}
         </>
       )}
-    </div>
+    </PageWrapper>
   );
 }

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Upload, AlertTriangle, CheckCircle, X, FileText } from 'lucide-react';
 import { useCSVPreview, useCSVConfirm } from '../hooks/useImport';
 import { useCategories } from '../hooks/useCategories';
+import PageWrapper from './PageWrapper';
 
 const FALLBACK_CATEGORIES = [
   'Housing', 'Transportation', 'Food', 'Utilities',
@@ -136,7 +137,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+    <PageWrapper className="max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Import Bank Statement</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -351,6 +352,6 @@ export default function ImportPage() {
           )}
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

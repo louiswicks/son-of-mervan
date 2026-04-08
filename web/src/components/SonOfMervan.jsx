@@ -14,6 +14,8 @@ import { useTheme } from "../hooks/useTheme";
 import { useCategories } from "../hooks/useCategories";
 import { useStreaks } from "../hooks/useInsights";
 import { getMonthlyTracker } from "../api/expenses";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 
 const FALLBACK_CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -241,8 +243,7 @@ export default function SonOfMervan() {
   };
 
   return (
-    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 p-3 sm:p-6">
-      <div className="mx-auto w-full max-w-6xl">
+    <PageWrapper>
 
         {/* Page Header */}
         <div className="mb-5 sm:mb-6">
@@ -279,7 +280,7 @@ export default function SonOfMervan() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
           {/* Left column: Form (60%) */}
-          <section className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-7">
+          <Card className="lg:col-span-3">
             <div className="flex items-center gap-2 mb-5">
               <DollarSign className="text-blue-500 shrink-0" size={20} />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -429,7 +430,7 @@ export default function SonOfMervan() {
                 {loading ? "Calculating…" : "Calculate Budget"}
               </button>
             </div>
-          </section>
+          </Card>
 
           {/* Right column: Live stats + charts after Calculate (40%) */}
           <div className="lg:col-span-2 space-y-4">
@@ -551,7 +552,6 @@ export default function SonOfMervan() {
             )}
           </div>
         </div>
-      </div>
 
       {/* Template Modal */}
       {showTemplateModal && (
@@ -624,6 +624,6 @@ export default function SonOfMervan() {
           </div>
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

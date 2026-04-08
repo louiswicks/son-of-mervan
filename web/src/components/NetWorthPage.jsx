@@ -13,6 +13,9 @@ import { PlusCircle, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNetWorthSnapshots, useCreateSnapshot, useDeleteSnapshot } from "../hooks/useNetWorth";
 import { useTheme } from "../hooks/useTheme";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
+import EmptyState from "./EmptyState";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -25,13 +28,13 @@ function fmt(n) {
 function KpiCard({ label, value, positive }) {
   const colour =
     positive === undefined
-      ? "text-[var(--color-text)]"
+      ? "text-gray-900 dark:text-white"
       : positive
       ? "text-green-500"
       : "text-red-500";
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 flex flex-col gap-1">
-      <span className="text-xs text-[var(--color-muted)] uppercase tracking-wide">{label}</span>
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 flex flex-col gap-1">
+      <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
       <span className={`text-2xl font-bold ${colour}`}>{fmt(value)}</span>
     </div>
   );
@@ -43,13 +46,13 @@ function ItemRow({ item, onChange, onRemove }) {
   return (
     <div className="flex gap-2 items-center">
       <input
-        className="flex-1 input-base"
+        className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         placeholder="Name"
         value={item.name}
         onChange={(e) => onChange({ ...item, name: e.target.value })}
       />
       <input
-        className="w-36 input-base"
+        className="w-36 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         type="number"
         placeholder="Value"
         min="0"
@@ -116,20 +119,20 @@ function AddSnapshotForm({ onClose }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-6"
+      className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 space-y-6"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--color-text)]">Add Snapshot</h2>
-        <button type="button" onClick={onClose} className="text-[var(--color-muted)] hover:text-[var(--color-text)]">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Add Snapshot</h2>
+        <button type="button" onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white">
           ✕
         </button>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Date</label>
+        <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">Date</label>
         <input
           type="date"
-          className="input-base w-48"
+          className="w-48 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
@@ -138,7 +141,7 @@ function AddSnapshotForm({ onClose }) {
 
       {/* Assets */}
       <section>
-        <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2">Assets</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Assets</h3>
         <div className="space-y-2">
           {assets.map((a, i) => (
             <ItemRow
@@ -160,7 +163,7 @@ function AddSnapshotForm({ onClose }) {
 
       {/* Liabilities */}
       <section>
-        <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2">Liabilities</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Liabilities</h3>
         <div className="space-y-2">
           {liabilities.map((l, i) => (
             <ItemRow
@@ -181,10 +184,18 @@ function AddSnapshotForm({ onClose }) {
       </section>
 
       <div className="flex gap-3 justify-end">
-        <button type="button" onClick={onClose} className="btn-secondary">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
           Cancel
         </button>
-        <button type="submit" className="btn-primary" disabled={createMut.isPending}>
+        <button
+          type="submit"
+          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          disabled={createMut.isPending}
+        >
           {createMut.isPending ? "Saving…" : "Save Snapshot"}
         </button>
       </div>
@@ -200,13 +211,13 @@ function SnapshotRow({ snap, onDelete }) {
   const positive = nw >= 0;
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
       <button
-        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-[var(--color-hover)] transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span className="font-medium text-[var(--color-text)]">{snap.snapshot_date}</span>
+        <span className="font-medium text-gray-900 dark:text-white">{snap.snapshot_date}</span>
         <div className="flex items-center gap-4">
           <span className={positive ? "text-green-500 font-semibold" : "text-red-500 font-semibold"}>
             {fmt(nw)}
@@ -216,13 +227,13 @@ function SnapshotRow({ snap, onDelete }) {
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-[var(--color-border)]">
+        <div className="px-4 pb-4 space-y-3 border-t border-gray-200 dark:border-gray-700">
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <p className="text-xs text-[var(--color-muted)] mb-1">Assets ({fmt(snap.total_assets)})</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assets ({fmt(snap.total_assets)})</p>
               <ul className="space-y-1">
                 {snap.assets.map((a, i) => (
-                  <li key={i} className="flex justify-between text-sm text-[var(--color-text)]">
+                  <li key={i} className="flex justify-between text-sm text-gray-900 dark:text-white">
                     <span>{a.name}</span>
                     <span>{fmt(a.value)}</span>
                   </li>
@@ -230,10 +241,10 @@ function SnapshotRow({ snap, onDelete }) {
               </ul>
             </div>
             <div>
-              <p className="text-xs text-[var(--color-muted)] mb-1">Liabilities ({fmt(snap.total_liabilities)})</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Liabilities ({fmt(snap.total_liabilities)})</p>
               <ul className="space-y-1">
                 {snap.liabilities.map((l, i) => (
-                  <li key={i} className="flex justify-between text-sm text-[var(--color-text)]">
+                  <li key={i} className="flex justify-between text-sm text-gray-900 dark:text-white">
                     <span>{l.name}</span>
                     <span>{fmt(l.value)}</span>
                   </li>
@@ -290,18 +301,18 @@ export default function NetWorthPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <PageWrapper className="max-w-4xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">Net Worth</h1>
-          <p className="text-sm text-[var(--color-muted)] mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Net Worth</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Track assets and liabilities over time.
           </p>
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="btn-primary flex items-center gap-2"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           aria-label="Add snapshot"
         >
           <PlusCircle size={16} />
@@ -323,8 +334,8 @@ export default function NetWorthPage() {
 
       {/* Area Chart */}
       {chartData.length > 1 && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          <h2 className="text-sm font-semibold text-[var(--color-text)] mb-4">Net Worth Trend</h2>
+        <Card>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Net Worth Trend</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -343,10 +354,10 @@ export default function NetWorthPage() {
                 <Tooltip
                   formatter={(v) => fmt(v)}
                   contentStyle={{
-                    backgroundColor: "var(--color-surface)",
-                    border: "1px solid var(--color-border)",
+                    backgroundColor: "var(--color-surface, #fff)",
+                    border: "1px solid var(--color-border, #e5e7eb)",
                     borderRadius: 8,
-                    color: "var(--color-text)",
+                    color: "var(--color-text, #111827)",
                   }}
                 />
                 <Area
@@ -360,25 +371,33 @@ export default function NetWorthPage() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Snapshot list */}
       {isLoading ? (
-        <p className="text-sm text-[var(--color-muted)]">Loading…</p>
-      ) : snapshots.length === 0 ? (
-        <div className="text-center py-16 text-[var(--color-muted)]">
-          <p className="text-base">No snapshots yet.</p>
-          <p className="text-sm mt-1">Click "Add Snapshot" to record your net worth today.</p>
-        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+      ) : snapshots.length === 0 && !showForm ? (
+        <EmptyState
+          title="No snapshots yet"
+          description='Click "Add Snapshot" to record your net worth today.'
+          action={
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium"
+            >
+              Add Snapshot
+            </button>
+          }
+        />
       ) : (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-[var(--color-text)]">History</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">History</h2>
           {[...snapshots].reverse().map((snap) => (
             <SnapshotRow key={snap.id} snap={snap} onDelete={handleDelete} />
           ))}
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

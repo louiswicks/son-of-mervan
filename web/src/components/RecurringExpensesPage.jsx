@@ -1,5 +1,7 @@
 // src/components/RecurringExpensesPage.jsx
 import React, { useState, useEffect } from "react";
+import PageWrapper from "./PageWrapper";
+import Card from "./Card";
 import { Plus, Pencil, Trash2, RefreshCw, X, Check } from "lucide-react";
 import {
   useRecurring,
@@ -49,7 +51,7 @@ function FormRow({ value, onChange, onSubmit, onCancel, submitLabel, isPending }
   const { data: categorySuggestion } = useCategorySuggestion(debouncedName);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded-xl p-4 mb-4 shadow-sm">
+    <Card className="border-blue-300 dark:border-blue-600 mb-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
@@ -139,7 +141,7 @@ function FormRow({ value, onChange, onSubmit, onCancel, submitLabel, isPending }
           <Check size={16} /> {isPending ? "Saving…" : submitLabel}
         </button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -199,7 +201,7 @@ export default function RecurringExpensesPage() {
   };
 
   return (
-    <div>
+    <PageWrapper>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -262,9 +264,9 @@ export default function RecurringExpensesPage() {
                 isPending={updateMutation.isPending}
               />
             ) : (
-              <div
+              <Card
                 key={item.id}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4 shadow-sm"
+                className="!p-4 flex items-center gap-4"
               >
                 {/* Frequency badge */}
                 <span className="hidden sm:inline-flex shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase tracking-wide">
@@ -310,7 +312,7 @@ export default function RecurringExpensesPage() {
                     <Trash2 size={16} />
                   </button>
                 </div>
-              </div>
+              </Card>
             )
           )}
         </div>
@@ -323,6 +325,6 @@ export default function RecurringExpensesPage() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </PageWrapper>
   );
 }

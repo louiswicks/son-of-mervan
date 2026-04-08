@@ -12,6 +12,7 @@ import { useMonthlySummary, useSpendingTrends, useSpendingHeatmap, useHealthScor
 import { requestAIReview } from "../api/insights";
 import { SkeletonCard } from "./Skeleton";
 import { useTheme } from "../hooks/useTheme";
+import PageWrapper from "./PageWrapper";
 
 // -------------------- helpers --------------------
 
@@ -344,7 +345,7 @@ function HealthScoreCard({ month }) {
 
   if (isLoading) {
     return (
-      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
         <div className="animate-pulse space-y-3">
           <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48" />
           <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded" />
@@ -454,7 +455,7 @@ function AnomalyAlertsSection({ month }) {
 
   return (
     <section
-      className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5"
+      className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7"
       data-testid="anomaly-section"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -570,7 +571,7 @@ function AIReviewSection({ month }) {
   };
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+    <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Sparkles size={20} className="text-indigo-500 dark:text-indigo-400" />
@@ -665,7 +666,7 @@ export default function InsightsPage() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Page header */}
       <div className="flex items-center gap-3">
         <BarChart2 size={24} className="text-indigo-600 dark:text-indigo-400" />
@@ -687,7 +688,7 @@ export default function InsightsPage() {
       <AIReviewSection month={selectedMonth} />
 
       {/* ---- Section 1: Monthly Summary ---- */}
-      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Monthly Summary
@@ -761,7 +762,7 @@ export default function InsightsPage() {
       </section>
 
       {/* ---- Section 2: 6-month trend ---- */}
-      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Income vs Spending Trend
@@ -784,7 +785,7 @@ export default function InsightsPage() {
       </section>
 
       {/* ---- Section 3: per-category trend ---- */}
-      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Category Trends
         </h2>
@@ -800,7 +801,7 @@ export default function InsightsPage() {
       </section>
 
       {/* ---- Section 4: annual heatmap ---- */}
-      <section className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+      <section className="rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -831,6 +832,6 @@ export default function InsightsPage() {
           <Heatmap data={heatmap} />
         )}
       </section>
-    </div>
+    </PageWrapper>
   );
 }
