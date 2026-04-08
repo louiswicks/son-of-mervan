@@ -103,9 +103,14 @@ describe('SonOfMervan', () => {
     expect(screen.getByPlaceholderText(/e\.g\. rent/i)).toBeInTheDocument();
   });
 
-  test('no results shown initially (no "Monthly Salary" result card)', () => {
+  test('live stat cards shown initially; charts not shown until after Calculate', () => {
     renderSonOfMervan();
-    expect(screen.queryByText('Monthly Salary')).not.toBeInTheDocument();
+    // Live stats panel is always visible (greyed out until salary entered)
+    expect(screen.getByText('Monthly Salary')).toBeInTheDocument();
+    expect(screen.getByText('Total Expenses')).toBeInTheDocument();
+    // Charts only appear after Calculate
+    expect(screen.queryByText('Savings Projection')).not.toBeInTheDocument();
+    expect(screen.queryByText('Expense Breakdown')).not.toBeInTheDocument();
   });
 
   test('"Add row" button adds a new expense row', () => {
@@ -144,7 +149,7 @@ describe('SonOfMervan', () => {
     });
   });
 
-  test('after mutateAsync resolves with results, shows result cards', async () => {
+  test('after mutateAsync resolves with results, shows Expense Breakdown chart', async () => {
     renderSonOfMervan();
 
     const allInputs = screen.getAllByPlaceholderText(/0\.00/i);
@@ -157,8 +162,8 @@ describe('SonOfMervan', () => {
     fireEvent.click(screen.getByRole('button', { name: /calculate budget/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Monthly Salary')).toBeInTheDocument();
-      expect(screen.getByText('Total Expenses')).toBeInTheDocument();
+      expect(screen.getByText('Savings Projection')).toBeInTheDocument();
+      expect(screen.getByText('Expense Breakdown')).toBeInTheDocument();
     });
   });
 

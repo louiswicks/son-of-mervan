@@ -112,10 +112,20 @@ export default function SonOfMervan() {
       }
     }
   }, [streakData]);
+
   const CATEGORIES = useMemo(
     () => categoriesData?.map((c) => c.name) ?? FALLBACK_CATEGORIES,
     [categoriesData]
   );
+
+  // Live preview values — update as user types, no API call needed
+  const salaryNum = parseFloat(salary) || 0;
+  const liveTotalExpenses = useMemo(
+    () => expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0),
+    [expenses]
+  );
+  const liveRemaining = salaryNum - liveTotalExpenses;
+  const hasLiveSalary = salaryNum > 0;
 
   const addExpense = () =>
     setExpenses((xs) => [...xs, { name: "", amount: "", category: "Housing" }]);
@@ -127,12 +137,12 @@ export default function SonOfMervan() {
     setExpenses((xs) => xs.map((x, j) => (j === i ? { ...x, [field]: value } : x)));
 
   const applyTemplate = (template) => {
-    const salaryNum = parseFloat(salary) || 0;
+    const salaryN = parseFloat(salary) || 0;
     setExpenses(
       template.expenses.map((e) => ({
         name: e.name,
         category: e.category,
-        amount: salaryNum > 0 ? String(Math.round((salaryNum * e.pct) / 100)) : "",
+        amount: salaryN > 0 ? String(Math.round((salaryN * e.pct) / 100)) : "",
       }))
     );
     setShowTemplateModal(false);
@@ -232,12 +242,22 @@ export default function SonOfMervan() {
 
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 p-3 sm:p-6">
-      <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-6">
+      <div className="mx-auto w-full max-w-6xl">
+
+        {/* Page Header */}
+        <div className="mb-5 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Budget Planner
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">
+            Plan your month
+          </p>
+        </div>
 
         {/* Streak Badge */}
         {streakData && streakData.current_streak > 0 && (
           <div
-            className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl px-4 py-3"
+            className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl px-4 py-3 mb-5 sm:mb-6"
             data-testid="streak-badge"
           >
             <Flame className="text-orange-500 shrink-0" size={20} />
@@ -255,336 +275,355 @@ export default function SonOfMervan() {
           </div>
         )}
 
-        {/* Inputs Card */}
-        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-7">
-          <div className="flex items-center gap-2 mb-5">
-            <DollarSign className="text-blue-500 shrink-0" size={20} />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Son Of Mervan
-            </h2>
-          </div>
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
-          {/* Salary */}
-          <div className="mb-5">
-            <label htmlFor="budget-salary" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-              Monthly take-home salary (£)
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-medium select-none" aria-hidden="true">£</span>
-              <input
-                id="budget-salary"
-                inputMode="decimal"
-                pattern="[0-9]*[.]?[0-9]*"
-                value={salary}
-                onChange={(e) => setSalary(e.target.value.replace(/[^\d.]/g, ""))}
-                className="w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400"
-                placeholder="0.00"
-              />
+          {/* Left column: Form (60%) */}
+          <section className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-7">
+            <div className="flex items-center gap-2 mb-5">
+              <DollarSign className="text-blue-500 shrink-0" size={20} />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Son Of Mervan
+              </h2>
             </div>
-          </div>
 
-          {/* Expenses */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Monthly expenses
+            {/* Salary */}
+            <div className="mb-5">
+              <label htmlFor="budget-salary" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                Monthly take-home salary (£)
               </label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={loadPrevMonth}
-                  disabled={loadingPrevMonth}
-                  aria-label={`Load ${prevMonthLabel.display} budget`}
-                  data-testid="load-prev-month-btn"
-                  className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
-                >
-                  {loadingPrevMonth ? "Loading…" : `Load ${prevMonthLabel.display}`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTemplateModal(true)}
-                  className="inline-flex items-center gap-1.5 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 transition"
-                >
-                  <LayoutTemplate size={15} />
-                  Use Template
-                </button>
-                <button
-                  type="button"
-                  onClick={addExpense}
-                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
-                >
-                  <PlusCircle size={15} />
-                  Add row
-                </button>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-medium select-none" aria-hidden="true">£</span>
+                <input
+                  id="budget-salary"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.]?[0-9]*"
+                  value={salary}
+                  onChange={(e) => setSalary(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400"
+                  placeholder="0.00"
+                />
               </div>
             </div>
 
-            {/* Column headers — desktop only */}
-            <div className="hidden sm:grid grid-cols-12 gap-2 px-1 mb-1">
-              <span className="col-span-5 text-xs text-gray-400 dark:text-gray-500 font-medium">Name</span>
-              <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Amount</span>
-              <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Category</span>
-              <span className="col-span-1" aria-hidden="true" />
-            </div>
+            {/* Expenses */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Monthly expenses
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={loadPrevMonth}
+                    disabled={loadingPrevMonth}
+                    aria-label={`Load ${prevMonthLabel.display} budget`}
+                    data-testid="load-prev-month-btn"
+                    className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                  >
+                    {loadingPrevMonth ? "Loading…" : `Load ${prevMonthLabel.display}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplateModal(true)}
+                    className="inline-flex items-center gap-1.5 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 transition"
+                  >
+                    <LayoutTemplate size={15} />
+                    Use Template
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addExpense}
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
+                  >
+                    <PlusCircle size={15} />
+                    Add row
+                  </button>
+                </div>
+              </div>
 
-            <div className="space-y-3 sm:space-y-2">
-              {expenses.map((exp, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:border-0 sm:rounded-none sm:p-0 grid grid-cols-1 sm:grid-cols-12 gap-y-2 sm:gap-2 items-start sm:items-center"
-                >
-                  {/* Name */}
-                  <div className="sm:col-span-5">
-                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Name</label>
-                    <input
-                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
-                      placeholder="e.g. Rent"
-                      aria-label={`Expense ${i + 1} name`}
-                      value={exp.name}
-                      onChange={(e) => updateExpense(i, "name", e.target.value)}
-                    />
-                  </div>
+              {/* Column headers — desktop only */}
+              <div className="hidden sm:grid grid-cols-12 gap-2 px-1 mb-1">
+                <span className="col-span-5 text-xs text-gray-400 dark:text-gray-500 font-medium">Name</span>
+                <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Amount</span>
+                <span className="col-span-3 text-xs text-gray-400 dark:text-gray-500 font-medium">Category</span>
+                <span className="col-span-1" aria-hidden="true" />
+              </div>
 
-                  {/* Amount */}
-                  <div className="sm:col-span-3">
-                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Amount</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none" aria-hidden="true">£</span>
+              <div className="space-y-3 sm:space-y-2">
+                {expenses.map((exp, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:border-0 sm:rounded-none sm:p-0 grid grid-cols-1 sm:grid-cols-12 gap-y-2 sm:gap-2 items-start sm:items-center"
+                  >
+                    {/* Name */}
+                    <div className="sm:col-span-5">
+                      <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Name</label>
                       <input
-                        inputMode="decimal"
-                        pattern="[0-9]*[.]?[0-9]*"
-                        aria-label={`Expense ${i + 1} amount`}
-                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
-                        placeholder="0.00"
-                        value={exp.amount}
-                        onChange={(e) => updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))}
+                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
+                        placeholder="e.g. Rent"
+                        aria-label={`Expense ${i + 1} name`}
+                        value={exp.name}
+                        onChange={(e) => updateExpense(i, "name", e.target.value)}
                       />
                     </div>
-                  </div>
 
-                  {/* Category */}
-                  <div className="sm:col-span-3">
-                    <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Category</label>
-                    <select
-                      aria-label={`Expense ${i + 1} category`}
-                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm min-h-[44px] sm:min-h-0"
-                      value={exp.category}
-                      onChange={(e) => updateExpense(i, "category", e.target.value)}
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Delete */}
-                  <div className="sm:col-span-1 flex sm:justify-center">
-                    {expenses.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeExpense(i)}
-                        className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
-                        aria-label="Remove row"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    ) : <div className="hidden sm:block w-8" />}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Calculate button */}
-          <div className="mt-6">
-            <button
-              onClick={doCalculate}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              <Calculator size={17} />
-              {loading ? "Calculating…" : "Calculate Budget"}
-            </button>
-          </div>
-        </section>
-
-        {/* Template Modal */}
-        {showTemplateModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Budget template selector"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowTemplateModal(false); }}
-          >
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2">
-                  <LayoutTemplate className="text-purple-500" size={20} />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    Choose a Budget Template
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowTemplateModal(false)}
-                  aria-label="Close template selector"
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {BUDGET_TEMPLATES.map((template) => (
-                  <div
-                    key={template.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-purple-400 dark:hover:border-purple-500 transition"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                          {template.name}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                          {template.description}
-                        </p>
+                    {/* Amount */}
+                    <div className="sm:col-span-3">
+                      <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Amount</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm select-none" aria-hidden="true">£</span>
+                        <input
+                          inputMode="decimal"
+                          pattern="[0-9]*[.]?[0-9]*"
+                          aria-label={`Expense ${i + 1} amount`}
+                          className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder-gray-400 dark:placeholder-gray-500 text-sm min-h-[44px] sm:min-h-0"
+                          placeholder="0.00"
+                          value={exp.amount}
+                          onChange={(e) => updateExpense(i, "amount", e.target.value.replace(/[^\d.]/g, ""))}
+                        />
                       </div>
-                      <span className="shrink-0 text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-1 rounded-full">
-                        {template.savings_pct}% savings
-                      </span>
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {template.expenses.map((e) => (
-                        <span
-                          key={e.name}
-                          className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full"
+                    {/* Category */}
+                    <div className="sm:col-span-3">
+                      <label className="block sm:hidden text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">Category</label>
+                      <select
+                        aria-label={`Expense ${i + 1} category`}
+                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm min-h-[44px] sm:min-h-0"
+                        value={exp.category}
+                        onChange={(e) => updateExpense(i, "category", e.target.value)}
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Delete */}
+                    <div className="sm:col-span-1 flex sm:justify-center">
+                      {expenses.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeExpense(i)}
+                          className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                          aria-label="Remove row"
                         >
-                          {e.name} · {e.pct}%
-                        </span>
-                      ))}
+                          <Trash2 size={15} />
+                        </button>
+                      ) : <div className="hidden sm:block w-8" />}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => applyTemplate(template)}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 rounded-lg transition"
-                    >
-                      Use this template
-                    </button>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Results */}
-        {results && (
-          <section className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 sm:p-6 rounded-2xl shadow-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-blue-100 text-sm">Monthly Salary</span>
-                  <DollarSign size={20} className="text-blue-200" />
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold">
-                  £{(results.monthly_salary || 0).toLocaleString()}
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-4 sm:p-6 rounded-2xl shadow-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-red-100 text-sm">Total Expenses</span>
-                  <PieChart size={20} className="text-red-200" />
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold">
-                  £{(results.total_expenses || 0).toLocaleString()}
-                </div>
-              </div>
-
-              <div
-                className={`text-white p-4 sm:p-6 rounded-2xl shadow-xl ${
-                  results.remaining_budget >= 0
-                    ? "bg-gradient-to-br from-green-500 to-green-600"
-                    : "bg-gradient-to-br from-red-500 to-red-600"
-                }`}
+            {/* Calculate button */}
+            <div className="mt-6">
+              <button
+                onClick={doCalculate}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm">
-                    {results.remaining_budget >= 0 ? "Monthly Savings" : "Budget Deficit"}
-                  </span>
-                  <TrendingUp size={20} />
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold">
-                  £{Math.abs(results.remaining_budget || 0).toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {results.remaining_budget > 0 && (
-                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 mb-3 sm:mb-4 flex items-center">
-                    <TrendingUp className="mr-2 text-green-500" size={20} />
-                    Savings Projection
-                  </h3>
-                  <div className="h-60 sm:h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={savingsData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                        <XAxis dataKey="month" tick={{ fill: chartColors.axis }} />
-                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis }} />
-                        <Tooltip
-                          formatter={(v) => [`£${Number(v).toLocaleString()}`, "Savings"]}
-                          contentStyle={tooltipStyle}
-                        />
-                        <Line type="monotone" dataKey="savings" stroke={chartColors.success} strokeWidth={3} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 mb-3 sm:mb-4 flex items-center">
-                  <PieChart className="mr-2 text-blue-500" size={20} />
-                  Expense Breakdown
-                </h3>
-
-                {categoryData.length > 0 && (
-                  <div className="h-60 sm:h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={categoryData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                        <XAxis dataKey="category" interval={0} angle={-30} textAnchor="end" height={60} tick={{ fill: chartColors.axis }} />
-                        <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis }} />
-                        <Tooltip
-                          formatter={(v) => [`£${Number(v).toLocaleString()}`, "Amount"]}
-                          contentStyle={tooltipStyle}
-                        />
-                        <Bar dataKey="amount" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {results?.expenses_by_category && (
-                  <ul className="mt-3 sm:mt-4 space-y-2">
-                    {Object.entries(results.expenses_by_category).map(([cat, amt]) => (
-                      <li key={cat} className="flex justify-between bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-lg">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">{cat}</span>
-                        <span className="font-semibold">£{Number(amt).toLocaleString()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                <Calculator size={17} />
+                {loading ? "Calculating…" : "Calculate Budget"}
+              </button>
             </div>
           </section>
-        )}
+
+          {/* Right column: Live stats + charts after Calculate (40%) */}
+          <div className="lg:col-span-2 space-y-4">
+
+            {/* Live stat cards — always visible, greyed out until salary is entered */}
+            <div
+              className={`grid grid-cols-1 gap-3 transition-opacity ${hasLiveSalary ? "opacity-100" : "opacity-50"}`}
+              aria-live="polite"
+              aria-label="Budget summary"
+            >
+              {/* Salary */}
+              <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border ${hasLiveSalary ? "bg-gradient-to-br from-blue-500 to-blue-600 border-blue-400 text-white" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500"}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-sm ${hasLiveSalary ? "text-blue-100" : ""}`}>Monthly Salary</span>
+                  <DollarSign size={18} className={hasLiveSalary ? "text-blue-200" : ""} />
+                </div>
+                <div className={`text-2xl font-bold ${hasLiveSalary ? "" : "text-gray-300 dark:text-gray-600"}`}>
+                  £{salaryNum.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Total Expenses */}
+              <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border ${hasLiveSalary ? "bg-gradient-to-br from-red-500 to-red-600 border-red-400 text-white" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500"}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-sm ${hasLiveSalary ? "text-red-100" : ""}`}>Total Expenses</span>
+                  <PieChart size={18} className={hasLiveSalary ? "text-red-200" : ""} />
+                </div>
+                <div className={`text-2xl font-bold ${hasLiveSalary ? "" : "text-gray-300 dark:text-gray-600"}`}>
+                  £{liveTotalExpenses.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Remaining / Deficit */}
+              <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border ${
+                hasLiveSalary
+                  ? liveRemaining >= 0
+                    ? "bg-gradient-to-br from-green-500 to-green-600 border-green-400 text-white"
+                    : "bg-gradient-to-br from-red-500 to-red-600 border-red-400 text-white"
+                  : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500"
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-sm ${hasLiveSalary ? "opacity-90" : ""}`}>
+                    {hasLiveSalary && liveRemaining < 0 ? "Budget Deficit" : "Monthly Savings"}
+                  </span>
+                  <TrendingUp size={18} className={hasLiveSalary ? "opacity-80" : ""} />
+                </div>
+                <div className={`text-2xl font-bold ${hasLiveSalary ? "" : "text-gray-300 dark:text-gray-600"}`}>
+                  £{Math.abs(liveRemaining).toLocaleString()}
+                </div>
+                {hasLiveSalary && salaryNum > 0 && (
+                  <div className={`text-xs mt-1 ${liveRemaining >= 0 ? "text-green-100" : "text-red-100"}`}>
+                    {Math.round((Math.abs(liveRemaining) / salaryNum) * 100)}% of salary
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Charts — only after Calculate */}
+            {results && (
+              <div className="space-y-4">
+                {results.remaining_budget > 0 && (
+                  <div className="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                      <TrendingUp className="text-green-500" size={18} />
+                      Savings Projection
+                    </h3>
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={savingsData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                          <XAxis dataKey="month" tick={{ fill: chartColors.axis, fontSize: 11 }} />
+                          <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis, fontSize: 11 }} width={60} />
+                          <Tooltip
+                            formatter={(v) => [`£${Number(v).toLocaleString()}`, "Savings"]}
+                            contentStyle={tooltipStyle}
+                          />
+                          <Line type="monotone" dataKey="savings" stroke={chartColors.success} strokeWidth={3} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                    <PieChart className="text-blue-500" size={18} />
+                    Expense Breakdown
+                  </h3>
+
+                  {categoryData.length > 0 && (
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                          <XAxis dataKey="category" interval={0} angle={-30} textAnchor="end" height={55} tick={{ fill: chartColors.axis, fontSize: 10 }} />
+                          <YAxis tickFormatter={(v) => `£${v.toLocaleString()}`} tick={{ fill: chartColors.axis, fontSize: 11 }} width={60} />
+                          <Tooltip
+                            formatter={(v) => [`£${Number(v).toLocaleString()}`, "Amount"]}
+                            contentStyle={tooltipStyle}
+                          />
+                          <Bar dataKey="amount" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {results?.expenses_by_category && (
+                    <ul className="mt-3 space-y-1.5">
+                      {Object.entries(results.expenses_by_category).map(([cat, amt]) => (
+                        <li key={cat} className="flex justify-between bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-lg text-sm">
+                          <span className="font-medium text-gray-700 dark:text-gray-200">{cat}</span>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">£{Number(amt).toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Template Modal */}
+      {showTemplateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Budget template selector"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowTemplateModal(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <LayoutTemplate className="text-purple-500" size={20} />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Choose a Budget Template
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(false)}
+                aria-label="Close template selector"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {BUDGET_TEMPLATES.map((template) => (
+                <div
+                  key={template.id}
+                  className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-purple-400 dark:hover:border-purple-500 transition"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                        {template.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {template.description}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-1 rounded-full">
+                      {template.savings_pct}% savings
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {template.expenses.map((e) => (
+                      <span
+                        key={e.name}
+                        className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full"
+                      >
+                        {e.name} · {e.pct}%
+                      </span>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => applyTemplate(template)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 rounded-lg transition"
+                  >
+                    Use this template
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
