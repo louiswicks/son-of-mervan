@@ -1011,3 +1011,15 @@
 - `tests/test_insights.py`: Added `TestMonthCloseSummary` class — 7 tests: empty data, unspent computed correctly, overspend clamped to zero, sorted descending, data isolation, unauthenticated 401, invalid month format 422.
 
 **Tests:** 566 backend tests pass; 91.6% coverage; ruff clean; commit: `b04cedf`.
+
+## Phase 17.3 — Spending Velocity Warnings [DONE] 2026-04-09
+
+**Task:** Alert users intra-month when spending pace will exceed the plan before it's too late to adjust.
+
+**Files modified:**
+- `email_utils.py`: Added `send_velocity_warning_email()` — sends a plain-text email showing actual YTD, planned total, projected total and overage % when pace exceeds plan. Console logs in dev (no SendGrid key).
+- `routers/insights.py`: Added `GET /insights/spending-velocity?month=YYYY-MM` endpoint returning `{ month, actual_ytd, planned_total, projected_total, days_elapsed, days_in_month, on_track }`. Added `check_spending_velocity(session_factory)` background job that projects `(actual_ytd / days_elapsed) * days_in_month`; fires `velocity_warning` in-app notification + email (if `notif_budget_alerts` set) when projection exceeds 110% of plan. Dedup key `velocity:{user_id}:{YYYY-MM}:{date}` prevents re-firing within 24 h. Also hardened `_normalize_month()` to catch non-integer parts with a 422.
+- `main.py`: Registered `check_spending_velocity` scheduler job every 6 hours (`hour="0,6,12,18"`, `minute=20`).
+- `tests/test_insights.py`: Added `TestSpendingVelocity` class — 8 tests: unauthenticated 401, no-data zeroed structure, on-track month returns `on_track=True`, overspend pace returns `on_track=False`, invalid month 422, job fires notification, job dedup prevents duplicate, job does not fire when on track.
+
+**Tests:** 612 backend tests pass; 91.83% coverage; ruff clean; commit: `db58b02`.

@@ -952,7 +952,7 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Returns 404 for unknown template id
 - [x] 4+ backend tests
 
-### 17.3 Spending Velocity Warnings
+### 17.3 Spending Velocity Warnings [DONE]
 **Goal:** Alert users intra-month when spending pace will exceed the plan — before it's too late to adjust.
 **Scope:**
 - APScheduler job `check_spending_velocity` runs every 6 hours.
@@ -962,12 +962,12 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - `GET /insights/spending-velocity?month=YYYY-MM` — returns projection data for the frontend.
 
 **Acceptance Criteria:**
-- [ ] Scheduler job runs every 6 hours and evaluates all active users
-- [ ] Notification fires only when projected overage exceeds 10%
-- [ ] Dedup key (`velocity_{user_id}_{YYYY-MM}_{date}`) prevents duplicate notifications within 24 hours
-- [ ] `GET /insights/spending-velocity` returns `{ month, actual_ytd, planned_total, projected_total, days_elapsed, days_in_month, on_track: bool }`
-- [ ] Unauthenticated request returns 401
-- [ ] 5+ backend tests covering: projection logic, dedup, no-data-month, on-track month (no notification)
+- [x] Scheduler job runs every 6 hours and evaluates all active users
+- [x] Notification fires only when projected overage exceeds 10%
+- [x] Dedup key (`velocity:{user_id}:{YYYY-MM}:{date}`) prevents duplicate notifications within 24 hours
+- [x] `GET /insights/spending-velocity` returns `{ month, actual_ytd, planned_total, projected_total, days_elapsed, days_in_month, on_track: bool }`
+- [x] Unauthenticated request returns 401
+- [x] 5+ backend tests covering: projection logic, dedup, no-data-month, on-track month (no notification)
 
 ### 17.4 Monthly Budget Performance Endpoint
 **Goal:** Power a glanceable "This Month" KPI card on the dashboard.
@@ -1036,7 +1036,7 @@ Phase 16 (DONE): Reliability, developer experience & user onboarding
   → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
 
 Phase 17: Engagement, insight & polish
-  17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings)
+  17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
   → 17.4 (Month performance endpoint) → 17.5 (Onboarding wizard)
 ```
 
