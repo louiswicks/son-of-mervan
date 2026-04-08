@@ -1,44 +1,94 @@
 // src/router.jsx
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { createHashRouter, Navigate } from "react-router-dom";
 import AuthGuard from "./components/AuthGuard";
-import LoginPage from "./components/LoginPage";
-import SignUpPage from "./components/SignUpPage";
-import ForgotPasswordPage from "./components/ForgotPasswordPage";
-import VerifyEmailPage from "./components/VerifyEmailPage";
-import ResetPasswordPage from "./components/ResetPasswordPage";
-import SonOfMervan from "./components/SonOfMervan";
-import MonthlyTracker from "./components/MonthlyTracker";
-import AnnualOverview from "./components/AnnualOverview";
-import AccountSettings from "./components/AccountSettings";
-import RecurringExpensesPage from "./components/RecurringExpensesPage";
-import SavingsGoalsPage from "./components/SavingsGoalsPage";
-import BudgetAlertsPage from "./components/BudgetAlertsPage";
-import InsightsPage from "./components/InsightsPage";
-import ScenarioPlannerPage from "./components/ScenarioPlannerPage";
-import InvestmentsPage from "./components/InvestmentsPage";
-import CalendarPage from "./components/CalendarPage";
-import TaxExportPage from "./components/TaxExportPage";
-import HouseholdPage from "./components/HouseholdPage";
-import CategoriesPage from "./components/CategoriesPage";
-import ImportPage from "./components/ImportPage";
-import ForecastPage from "./components/ForecastPage";
-import DebtPayoffPage from "./components/DebtPayoffPage";
-import NetWorthPage from "./components/NetWorthPage";
+import AsyncBoundary from "./components/AsyncBoundary";
 import ErrorBoundary from "./components/ErrorBoundary";
-import OnboardingWizard from "./components/OnboardingWizard";
 
+// Eagerly-loaded infrastructure (needed before any lazy chunk resolves)
+// AuthGuard, AsyncBoundary, ErrorBoundary are intentionally NOT lazy.
+
+// Public routes — lazy loaded
+const LoginPage = lazy(() => import("./components/LoginPage"));
+const SignUpPage = lazy(() => import("./components/SignUpPage"));
+const ForgotPasswordPage = lazy(() => import("./components/ForgotPasswordPage"));
+const VerifyEmailPage = lazy(() => import("./components/VerifyEmailPage"));
+const ResetPasswordPage = lazy(() => import("./components/ResetPasswordPage"));
+const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+
+// Protected routes — lazy loaded
+const SonOfMervan = lazy(() => import("./components/SonOfMervan"));
+const MonthlyTracker = lazy(() => import("./components/MonthlyTracker"));
+const AnnualOverview = lazy(() => import("./components/AnnualOverview"));
+const AccountSettings = lazy(() => import("./components/AccountSettings"));
+const RecurringExpensesPage = lazy(() => import("./components/RecurringExpensesPage"));
+const SavingsGoalsPage = lazy(() => import("./components/SavingsGoalsPage"));
+const BudgetAlertsPage = lazy(() => import("./components/BudgetAlertsPage"));
+const InsightsPage = lazy(() => import("./components/InsightsPage"));
+const ScenarioPlannerPage = lazy(() => import("./components/ScenarioPlannerPage"));
+const InvestmentsPage = lazy(() => import("./components/InvestmentsPage"));
+const CalendarPage = lazy(() => import("./components/CalendarPage"));
+const TaxExportPage = lazy(() => import("./components/TaxExportPage"));
+const HouseholdPage = lazy(() => import("./components/HouseholdPage"));
+const CategoriesPage = lazy(() => import("./components/CategoriesPage"));
+const ImportPage = lazy(() => import("./components/ImportPage"));
+const ForecastPage = lazy(() => import("./components/ForecastPage"));
+const DebtPayoffPage = lazy(() => import("./components/DebtPayoffPage"));
+const NetWorthPage = lazy(() => import("./components/NetWorthPage"));
+
+// Minimal spinner for public-route Suspense fallbacks (no auth context available)
+function PageSpinner() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh",
+      }}
+      role="status"
+      aria-label="Loading page"
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          border: "4px solid #e5e7eb",
+          borderTopColor: "#6366f1",
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// Protected routes: ErrorBoundary + Suspense (AsyncBoundary) per page
 function withPageBoundary(element) {
-  return <ErrorBoundary key={element.type?.name}>{element}</ErrorBoundary>;
+  return (
+    <AsyncBoundary key={element.type?.displayName || element.type?._payload?.value?.name}>
+      {element}
+    </AsyncBoundary>
+  );
+}
+
+// Public lazy routes: simple Suspense spinner (no ErrorBoundary — keep public pages resilient)
+function withPublicSuspense(element) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageSpinner />}>{element}</Suspense>
+    </ErrorBoundary>
+  );
 }
 
 export const router = createHashRouter([
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <SignUpPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/verify-email", element: <VerifyEmailPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
-  { path: "/onboarding", element: <OnboardingWizard /> },
+  { path: "/login", element: withPublicSuspense(<LoginPage />) },
+  { path: "/register", element: withPublicSuspense(<SignUpPage />) },
+  { path: "/forgot-password", element: withPublicSuspense(<ForgotPasswordPage />) },
+  { path: "/verify-email", element: withPublicSuspense(<VerifyEmailPage />) },
+  { path: "/reset-password", element: withPublicSuspense(<ResetPasswordPage />) },
+  { path: "/onboarding", element: withPublicSuspense(<OnboardingWizard />) },
   {
     path: "/",
     element: <AuthGuard />,

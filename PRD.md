@@ -632,7 +632,7 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - [x] `Content-Disposition: attachment; filename="backup-YYYY-MM-DD.json"` header set
 - [x] 3+ backend tests; button visible in AccountSettings (5 tests written)
 
-### 12.5 Milestone Email Notifications
+### 12.5 Milestone Email Notifications ✅ DONE
 **Goal:** Celebrate user wins via email to reinforce positive habits and improve retention.  
 **Scope:** APScheduler job runs monthly to check for streak milestones (3/6/12 months), completed savings goals, and paid-off debts since last run. Sends congratulatory emails via SendGrid. New `milestone_notifications_sent` table to prevent duplicate sends.
 
@@ -643,6 +643,74 @@ Phase 12 addresses quality-of-life gaps identified after full feature coverage: 
 - [x] Duplicate-send prevention: each milestone type + user fires at most once
 - [x] All emails are no-ops when `SENDGRID_API_KEY` is not set
 - [x] 4+ backend tests (18 written)
+
+---
+
+## Phase 13: Performance, Security Hardening & Developer Experience
+
+Phase 13 targets measurable performance improvements, stronger account security, and richer expense metadata — all without adding feature complexity.
+
+### 13.1 Frontend Route-Based Code Splitting ✅ DONE
+**Goal:** Reduce initial JS bundle size so first-load time drops significantly.  
+**Scope:** Replace eager imports in `router.jsx` with `React.lazy()` for every route-level component. Wrap lazy routes with `Suspense` (via the existing `AsyncBoundary`) so a skeleton fallback shows during chunk fetch. Non-route components (AuthGuard, ErrorBoundary, AsyncBoundary) remain eagerly loaded.
+
+**Acceptance Criteria:**
+- [x] All 24 page components are lazy-loaded via `React.lazy()`
+- [x] `Suspense` fallback renders during chunk load (uses `AsyncBoundary` / `SkeletonCard`)
+- [x] Public routes (login, signup, etc.) also lazy-loaded with a simple centered spinner fallback
+- [x] `npm run build` produces multiple JS chunks (one per lazy import)
+- [x] All existing frontend tests continue to pass
+
+### 13.2 TOTP Two-Factor Authentication (2FA)
+**Goal:** Provide users with optional TOTP-based 2FA (Google Authenticator / Authy compatible) to protect their accounts.  
+**Scope:** Backend generates TOTP secret + QR code URI; user scans QR code and confirms with a one-time code to enable 2FA. On login, if 2FA is enabled, a second challenge step is required. Backup codes (8 single-use codes) generated at setup. Users can disable 2FA from Account Settings.
+
+**Acceptance Criteria:**
+- [ ] `POST /auth/2fa/setup` → returns TOTP secret + `otpauth://` URI + 8 backup codes
+- [ ] `POST /auth/2fa/verify` → confirms setup with a valid TOTP code, stores hashed secret + backup codes on User model
+- [ ] `POST /auth/2fa/disable` → requires current TOTP code; removes 2FA from account
+- [ ] `POST /login` → if 2FA enabled, returns `{ mfa_required: true, mfa_token: ... }` instead of access token
+- [ ] `POST /auth/2fa/challenge` → validates TOTP or backup code, issues access + refresh tokens
+- [ ] Backup codes: each is single-use; hashed in DB; status shown in settings
+- [ ] UI: QR code display in Account Settings, enable/disable flow, backup codes download
+- [ ] 6+ backend tests
+
+### 13.3 Expense Notes & Tags
+**Goal:** Let users add context to individual expenses (a free-text note and up to 5 short tags) for richer filtering and personal reference.  
+**Scope:** Add `note` (text, optional, max 500 chars) and `tags` (JSON array of strings, max 5 tags, each max 30 chars) to `MonthlyExpense`. Expose in PUT `/expenses/{id}`. Show note/tag UI in MonthlyTracker row expand or edit modal.
+
+**Acceptance Criteria:**
+- [ ] `note` and `tags` columns added to `MonthlyExpense` via Alembic migration
+- [ ] `PUT /expenses/{id}` accepts and validates `note` and `tags`
+- [ ] `GET /monthly-tracker/{month}` includes `note` and `tags` in response
+- [ ] UI: edit expense modal shows note textarea and tag chip input (max 5 tags)
+- [ ] Tags support add/remove chip interaction; note is a multiline textarea
+- [ ] Advanced search endpoint (`GET /expenses/search`) filters by tag
+- [ ] 4+ backend tests
+
+### 13.4 Email Notification Preference Center
+**Goal:** Give users granular control over which emails they receive to reduce notification fatigue and improve retention.  
+**Scope:** Replace the single `digest_opt_in` flag with a `notification_preferences` JSON column (or individual boolean columns) on User covering: monthly digest, milestone emails, budget alert emails. Expose via `GET/PUT /users/me/notification-preferences`. Show toggles in Account Settings.
+
+**Acceptance Criteria:**
+- [ ] `notification_preferences` stored per-user (digest, milestones, budget_alerts — all default `true`)
+- [ ] `GET /users/me/notification-preferences` returns current preferences
+- [ ] `PUT /users/me/notification-preferences` updates preferences
+- [ ] Monthly digest job, milestone job, and budget alert job all respect the per-user preference
+- [ ] Account Settings: "Email Preferences" section with three labelled toggles
+- [ ] 3+ backend tests
+
+### 13.5 Active Session Manager
+**Goal:** Give users visibility and control over where their account is logged in, improving security transparency.  
+**Scope:** Expose all non-revoked refresh tokens for the current user with metadata (created_at, last_used_at, user_agent snippet). Allow revoking any token individually or all except current. Store `user_agent` and `last_used_at` on `RefreshToken` model.
+
+**Acceptance Criteria:**
+- [ ] `user_agent` (text) and `last_used_at` (timestamp, updated on each `/auth/refresh` call) added to `RefreshToken` via migration
+- [ ] `GET /auth/sessions` → returns list of active sessions (id, created_at, last_used_at, user_agent snippet, is_current)
+- [ ] `DELETE /auth/sessions/{id}` → revokes a single session (ownership enforced)
+- [ ] `DELETE /auth/sessions` → revokes all sessions except current
+- [ ] Account Settings: "Active Sessions" card lists sessions, "Sign out" button per row, "Sign out all other devices" button
+- [ ] 4+ backend tests
 
 ---
 
@@ -670,9 +738,13 @@ Phase 11 (DONE): User experience & power features
   11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
   → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks) [DONE]
 
-Phase 12 (Current): Usability, retention & production hardening
+Phase 12 (DONE): Usability, retention & production hardening
   12.1 (Budget copy forward) → 12.2 (Net worth tracker) → 12.3 (Accessibility)
   → 12.4 (Full data export) → 12.5 (Milestone email notifications)
+
+Phase 13 (Current): Performance, security hardening & developer experience
+  13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
+  → 13.4 (Email preference center) → 13.5 (Active session manager)
 ```
 
 ---

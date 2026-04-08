@@ -1,3 +1,11 @@
+## Phase 13.1 — Frontend Route-Based Code Splitting [DONE] 2026-04-08
+- `web/src/router.jsx`: Replaced all 24 eager `import` statements for route-level page components with `React.lazy()` calls; added `lazy` to the React import; split wrapping into two helpers: `withPageBoundary` (uses existing `AsyncBoundary` = ErrorBoundary + Suspense) for protected routes, and `withPublicSuspense` (ErrorBoundary + `<Suspense fallback={<PageSpinner />}`) for public routes
+- `PageSpinner` inline component: minimal centered CSS spinner (no dependency) used as Suspense fallback on public routes while the auth context is not yet available; uses `@keyframes spin` injected via `<style>` tag to avoid Tailwind dependency
+- `AsyncBoundary` (existing): already contains `ErrorBoundary + <Suspense fallback={<SkeletonCard />}>`; reused for all protected (authenticated) routes without modification
+- Non-route infrastructure components (`AuthGuard`, `ErrorBoundary`, `AsyncBoundary`, `Skeleton`) remain eagerly loaded since they are needed before any lazy chunk resolves
+- `npm run build`: produces 35 JS chunks (vs 1 monolithic bundle); main.js is 509 kB; heavy library chunk (Recharts + dependencies) is 240 kB per-chunk loaded only when needed
+- 51 frontend tests pass; ruff/eslint clean; no backend changes
+
 ## Phase 12.5 — Milestone Email Notifications [DONE] 2026-04-08
 - `database.py`: Added `MilestoneNotificationSent` model — tracks sent milestone emails per user with a UNIQUE constraint on (user_id, milestone_type) to guarantee at-most-once delivery; milestone_type examples: "streak_3", "streak_6", "streak_12", "savings_goal_{id}", "debt_free"
 - `email_utils.py`: Added three new email functions: `send_streak_milestone_email(to_email, streak_months)`, `send_savings_goal_complete_email(to_email, goal_name, target_amount, currency)`, `send_debt_payoff_email(to_email)` — all no-op with INFO log when SENDGRID_API_KEY is unset
