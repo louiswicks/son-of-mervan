@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  TrendingUp, TrendingDown, Plus, Pencil, Trash2, RefreshCw, X, ChevronDown,
+  TrendingUp, TrendingDown, Plus, Pencil, Trash2, RefreshCw, X,
 } from "lucide-react";
 import {
   useInvestments,

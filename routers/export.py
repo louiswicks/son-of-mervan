@@ -210,7 +210,7 @@ def export_pdf(
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_fill_color(59, 130, 246)  # blue-500
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 12, f"Monthly Budget Report — {month_norm}", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 12, f"Monthly Budget Report - {month_norm}", fill=True, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -452,7 +452,7 @@ def export_tax_pdf(
     pdf.set_text_color(255, 255, 255)
     pdf.cell(
         0, 12,
-        f"Tax Year Summary — {tax_year}/{tax_year + 1}",
+        f"Tax Year Summary - {tax_year}/{tax_year + 1}",
         fill=True, new_x="LMARGIN", new_y="NEXT",
     )
     pdf.ln(2)

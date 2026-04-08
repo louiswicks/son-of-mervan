@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InstallBanner from '../components/InstallBanner';
 
 beforeEach(() => {
@@ -57,20 +57,18 @@ describe('InstallBanner', () => {
   test('"Install" button calls prompt() on the deferred event', async () => {
     render(<InstallBanner />);
     const promptEvent = fireInstallPrompt();
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /^install$/i }));
-      await promptEvent.userChoice;
-    });
+    fireEvent.click(screen.getByRole('button', { name: /^install$/i }));
+    await promptEvent.userChoice;
     expect(promptEvent.prompt).toHaveBeenCalledTimes(1);
   });
 
   test('"Install" button hides banner after accepted outcome', async () => {
     render(<InstallBanner />);
     const promptEvent = fireInstallPrompt({ outcome: 'accepted' });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /^install$/i }));
-      await promptEvent.userChoice;
+    fireEvent.click(screen.getByRole('button', { name: /^install$/i }));
+    await promptEvent.userChoice;
+    await waitFor(() => {
+      expect(screen.queryByRole('banner', { name: /install app banner/i })).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole('banner', { name: /install app banner/i })).not.toBeInTheDocument();
   });
 });
