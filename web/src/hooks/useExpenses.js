@@ -4,6 +4,7 @@ import {
   saveMonthlyTracker,
   updateExpense,
   deleteExpense,
+  searchExpenses,
 } from '../api/expenses';
 import { calculateBudget } from '../api/budget';
 import toast from 'react-hot-toast';
@@ -94,5 +95,15 @@ export function useDeleteExpense(month) {
     onError: () => {
       toast.error("Couldn't delete the expense. Please try again.");
     },
+  });
+}
+
+export function useExpenseSearch({ q, category, from, to, page = 1, perPage = 20 } = {}) {
+  const isActive = Boolean(q || (from && to) || from || to);
+  return useQuery({
+    queryKey: ['expense-search', q, category, from, to, page, perPage],
+    queryFn: () => searchExpenses({ q, category, from, to, page, per_page: perPage }),
+    enabled: isActive,
+    staleTime: 30 * 1000,
   });
 }

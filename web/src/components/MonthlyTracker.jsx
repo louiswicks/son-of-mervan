@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download, Clock } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, PlusCircle, Trash2, Pencil, Check, X, Download, Clock, Search } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import ConfirmModal from "./ConfirmModal";
 import { SkeletonTable } from "./Skeleton";
@@ -9,6 +9,7 @@ import {
   useSaveMonthlyTracker,
   useUpdateExpense,
   useDeleteExpense,
+  useExpenseSearch,
 } from "../hooks/useExpenses";
 import { exportCSV, exportPDF } from "../api/export";
 import { useExpenseAudit } from "../hooks/useAudit";
@@ -227,6 +228,33 @@ const MonthlyTracker = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 0, page_size: 25 });
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState('All');
+  const [searchFrom, setSearchFrom] = useState('');
+  const [searchTo, setSearchTo] = useState('');
+  const [searchPage, setSearchPage] = useState(1);
+  const isSearchMode = Boolean(debouncedQuery || searchFrom || searchTo);
+
+  // Debounce search query 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setSearchPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data: searchData, isLoading: searchLoading } = useExpenseSearch({
+    q: debouncedQuery || undefined,
+    category: searchCategory !== 'All' ? searchCategory : undefined,
+    from: searchFrom || undefined,
+    to: searchTo || undefined,
+    page: searchPage,
+    perPage: 20,
+  });
+
   const { data: trackerData, isLoading } = useMonthlyTracker(selectedMonth, {
     category: filterCategory,
     page: currentPage,
@@ -403,6 +431,118 @@ const MonthlyTracker = () => {
           />
           <ExportMenu month={selectedMonth} />
         </div>
+      </div>
+
+      {/* Cross-month search bar */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+          <Search size={13} /> Search across all months
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+          <div className="flex-1 min-w-0 relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search expense names…"
+              className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
+            />
+          </div>
+          <select
+            value={searchCategory}
+            onChange={(e) => { setSearchCategory(e.target.value); setSearchPage(1); }}
+            className="border rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px] sm:w-40"
+          >
+            <option value="All">All categories</option>
+            {BASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              value={searchFrom}
+              onChange={(e) => { setSearchFrom(e.target.value); setSearchPage(1); }}
+              className="border rounded-lg px-2 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
+              title="From month"
+            />
+            <span className="text-gray-400 text-sm">–</span>
+            <input
+              type="month"
+              value={searchTo}
+              onChange={(e) => { setSearchTo(e.target.value); setSearchPage(1); }}
+              className="border rounded-lg px-2 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 min-h-[40px]"
+              title="To month"
+            />
+          </div>
+          {isSearchMode && (
+            <button
+              onClick={() => { setSearchQuery(''); setDebouncedQuery(''); setSearchCategory('All'); setSearchFrom(''); setSearchTo(''); setSearchPage(1); }}
+              className="text-sm text-blue-600 hover:underline whitespace-nowrap min-h-[40px]"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+
+        {/* Search results */}
+        {isSearchMode && (
+          <div className="mt-2">
+            {searchLoading ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 py-2">Searching…</p>
+            ) : !searchData || searchData.total === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No expenses found.</p>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {searchData.total} result{searchData.total !== 1 ? 's' : ''}
+                </p>
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Month</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Category</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Planned</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Actual</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {searchData.items.map((item) => (
+                        <tr key={item.id} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750">
+                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.month}</td>
+                          <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{item.name || <span className="italic text-gray-400">—</span>}</td>
+                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{item.category}</td>
+                          <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-300">{item.planned_amount.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-medium text-gray-800 dark:text-gray-200">{item.actual_amount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {searchData.pages > 1 && (
+                  <div className="flex items-center justify-between mt-3">
+                    <button
+                      onClick={() => setSearchPage(p => Math.max(1, p - 1))}
+                      disabled={searchPage <= 1}
+                      className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-gray-500">Page {searchPage} of {searchData.pages}</span>
+                    <button
+                      onClick={() => setSearchPage(p => Math.min(searchData.pages, p + 1))}
+                      disabled={searchPage >= searchData.pages}
+                      className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filter bar */}

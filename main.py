@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import uvicorn
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -10,6 +11,7 @@ from fastapi import Query
 import hashlib
 import secrets
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -547,6 +549,88 @@ async def get_monthly_tracker(
             "page_size": page_size,
         },
     }
+
+@app.get("/expenses/search")
+async def search_expenses(
+    q: Optional[str] = Query(None, max_length=200, description="Partial match on expense name (case-insensitive)"),
+    category: Optional[str] = Query(None, max_length=100, description="Exact category filter"),
+    from_month: Optional[str] = Query(None, alias="from", description="Start month YYYY-MM (inclusive)"),
+    to_month: Optional[str] = Query(None, alias="to", description="End month YYYY-MM (inclusive)"),
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Search expenses across all months with optional name, category, and date-range filters."""
+    _month_re = re.compile(r"^\d{4}-\d{2}$")
+    if from_month and not _month_re.match(from_month):
+        raise HTTPException(status_code=422, detail="'from' must be in YYYY-MM format")
+    if to_month and not _month_re.match(to_month):
+        raise HTTPException(status_code=422, detail="'to' must be in YYYY-MM format")
+
+    user = get_user_by_email(db, current_user)
+    if not user:
+        return {"items": [], "total": 0, "page": page, "per_page": per_page, "pages": 0}
+
+    # Fetch all month records for this user (decrypt month in Python — Fernet non-deterministic)
+    all_months = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # Filter months by date range
+    matching_months = []
+    for md in all_months:
+        m = md.month
+        if not m:
+            continue
+        if from_month and m < from_month:
+            continue
+        if to_month and m > to_month:
+            continue
+        matching_months.append((md, m))
+
+    # Collect matching expenses from those months
+    results = []
+    q_lower = q.lower() if q else None
+    for md, month_str in matching_months:
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == md.id,
+                MonthlyExpense.deleted_at == None,
+            )
+            .all()
+        )
+        for e in expenses:
+            name_dec = e.name or ""
+            cat_dec = e.category or ""
+            if q_lower and q_lower not in name_dec.lower():
+                continue
+            if category and cat_dec != category:
+                continue
+            results.append({
+                "id": e.id,
+                "name": name_dec,
+                "category": cat_dec,
+                "planned_amount": float(e.planned_amount or 0.0),
+                "actual_amount": float(e.actual_amount or 0.0),
+                "currency": e.currency or user.base_currency or "GBP",
+                "month": month_str,
+            })
+
+    # Sort most-recent month first, then by name
+    results.sort(key=lambda x: (-ord(x["month"][0]) * 1000000 + sum(ord(c) for c in x["month"]), x["name"]))
+    results.sort(key=lambda x: x["month"], reverse=True)
+
+    # Paginate
+    total = len(results)
+    pages = max(1, (total + per_page - 1) // per_page) if total > 0 else 0
+    offset = (page - 1) * per_page
+    items = results[offset: offset + per_page]
+
+    return JSONResponse(
+        content={"items": items, "total": total, "page": page, "per_page": per_page, "pages": pages},
+        headers={"X-Total-Count": str(total), "X-Page": str(page)},
+    )
+
 
 def _invalidate_expense_year_cache(db: Session, user_id: int, monthly_data_id: int) -> None:
     """Look up the month for an expense and invalidate its annual cache entry."""

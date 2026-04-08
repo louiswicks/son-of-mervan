@@ -14,3 +14,15 @@ export const deleteExpense = (id) =>
 
 export const getAnnualOverview = (year) =>
   client.get('/overview/annual', { params: { year } }).then((r) => r.data);
+
+export const searchExpenses = ({ q, category, from: fromMonth, to: toMonth, page = 1, per_page = 20 } = {}) => {
+  const params = { page, per_page };
+  if (q) params.q = q;
+  if (category && category !== 'All') params.category = category;
+  if (fromMonth) params.from = fromMonth;
+  if (toMonth) params.to = toMonth;
+  return client.get('/expenses/search', { params }).then((r) => ({
+    ...r.data,
+    totalCount: parseInt(r.headers['x-total-count'] || '0', 10),
+  }));
+};

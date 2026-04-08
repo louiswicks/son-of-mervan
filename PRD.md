@@ -468,17 +468,17 @@ Phase 10 tasks address the next tier of user value: proactive intelligence, powe
 - [ ] 8+ backend tests; all existing tests still pass; coverage ≥ 80%
 - [ ] InsightsPage renders AnomalyAlerts section with severity colour-coding and message text
 
-### 10.2 Advanced Expense Search & Filtering
+### 10.2 Advanced Expense Search & Filtering [DONE 2026-04-08]
 **Goal:** Let power users find specific expenses across months without scrolling.  
 **Scope:** `GET /expenses/search?q=&category=&from=YYYY-MM&to=YYYY-MM&page=1&per_page=20` endpoint. Frontend: search bar + category dropdown + date range filter above MonthlyTracker expense list; debounced (300ms). Returns paginated results with month context.
 
 **Acceptance Criteria:**
-- [ ] Search matches expense name (case-insensitive, partial match on decrypted values)
-- [ ] Category filter correctly narrows results
-- [ ] Date range restricts to months in range
-- [ ] Pagination headers returned (`X-Total-Count`, `X-Page`)
-- [ ] Only own expenses returned; soft-deleted excluded
-- [ ] 6+ backend tests; frontend renders filtered results
+- [x] Search matches expense name (case-insensitive, partial match on decrypted values)
+- [x] Category filter correctly narrows results
+- [x] Date range restricts to months in range
+- [x] Pagination headers returned (`X-Total-Count`, `X-Page`)
+- [x] Only own expenses returned; soft-deleted excluded
+- [x] 6+ backend tests; frontend renders filtered results
 
 ### 10.3 Database Index Audit
 **Goal:** Ensure all high-traffic query patterns use index scans, not full-table scans.  
