@@ -748,7 +748,7 @@ The app has accumulated 13+ phases of feature work. Each Ralph-loop iteration ad
 **Files:** `web/src/components/AuthGuard.jsx` (all nav logic lives here)
 **Acceptance Criteria:** All nav items accessible at 375px viewport width. Exactly 4 items visible in the primary nav at all times. No overflow or text truncation. Sidebar collapse state persists in localStorage. WCAG 2.1 AA keyboard navigation.
 
-### 14.2 Budget Page Layout Overhaul
+### 14.2 Budget Page Layout Overhaul ✅ DONE
 **Problem:** `max-w-3xl` (768px) card centred on a wide screen leaves vast empty dark space either side. No visual hierarchy — the form and results are not visually differentiated. Results only appear after clicking Calculate.
 **Solution:**
 - **Two-column desktop layout:** Left column (60%) = salary + expense rows + Calculate button. Right column (40%) = live stats panel showing salary, total expenses, and remaining budget updating as user types (no Calculate click needed for the preview).

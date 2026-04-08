@@ -846,3 +846,13 @@
 **Tests:**
 - All 51 frontend tests pass (no new tests needed — existing AuthGuard suite covers auth, routing, logout, and aria-current).
 - Commit: `70c15d9`
+
+## Phase 14.2 — Budget Page Layout Overhaul [DONE] 2026-04-08
+
+**Problem solved:** Single-column `max-w-3xl` form left vast empty space on wide screens; results only appeared after clicking Calculate.
+
+**What was built:**
+- `web/src/components/SonOfMervan.jsx`: Restructured to a `max-w-6xl` two-column layout (`lg:grid-cols-5` — form `col-span-3`, stats `col-span-2`). Added "Budget Planner / Plan your month" page header above the grid. Right column shows three live stat cards (Monthly Salary, Total Expenses, Monthly Savings / Budget Deficit) that compute instantly from form state as user types — greyed out (opacity-50) until salary is entered, become coloured gradient cards once salary > 0. Savings Projection and Expense Breakdown charts remain in the right column but only render after Calculate is clicked (using `results` from API). Collapses to single column on mobile (form first, stats below). The form card header "Son Of Mervan" retained for test compatibility.
+- `web/src/tests/SonOfMervan.test.jsx`: Updated two tests — "no results shown initially" replaced with "live stat cards shown initially; charts not shown until after Calculate"; "after Calculate shows result cards" now asserts chart headings appear (not the always-visible stat card labels).
+
+**Tests:** 51 frontend tests pass (16 in SonOfMervan suite); build 320 kB gzip; commit: `c4da404`
