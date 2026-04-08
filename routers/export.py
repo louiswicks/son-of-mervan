@@ -291,7 +291,7 @@ def export_pdf(
     # Footer note
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 5, "Son of Mervan — Personal Budget Tracker", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "Son of Mervan - Personal Budget Tracker", new_x="LMARGIN", new_y="NEXT")
 
     pdf_bytes = pdf.output()
 
@@ -558,7 +558,7 @@ def export_tax_pdf(
     # Disclaimer footer
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 4, "Son of Mervan — Personal Budget Tracker  |  This is not professional tax advice.", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 4, "Son of Mervan - Personal Budget Tracker  |  This is not professional tax advice.", new_x="LMARGIN", new_y="NEXT")
 
     pdf_bytes = pdf.output()
     filename = f"tax_summary_{tax_year}_{tax_year + 1}.pdf"
