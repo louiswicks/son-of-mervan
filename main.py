@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import time
 import uvicorn
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -50,6 +51,8 @@ from routers import income_sources as income_sources_router
 from routers import rollover as rollover_router
 import email_utils
 from collections import defaultdict
+
+_APP_START_TIME = time.monotonic()
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -107,6 +110,27 @@ with _engine.connect() as _conn:
 alembic_command.upgrade(_alembic_cfg, "head")
 
 # -------------------- Schemas --------------------
+class HealthLiveResponse(BaseModel):
+    status: str
+
+class HealthCheckDetail(BaseModel):
+    name: str
+    ok: bool
+    error: Optional[str] = None
+
+class HealthReadyResponse(BaseModel):
+    status: str
+    checks: List[HealthCheckDetail]
+
+class HealthDetailedResponse(BaseModel):
+    status: str
+    version: str
+    uptime_seconds: float
+    memory_mb: Optional[float]
+    db_ok: bool
+    redis_ok: Optional[bool]
+    scheduler_running: bool
+
 class LoginRequest(BaseModel):
     identifier: str  # email or username
     password: str
@@ -194,10 +218,125 @@ def find_expense_by_values(expenses: list[MonthlyExpense], name: str, category: 
 async def root():
     return {"message": "Son of Mervan Budget API is running", "status": "healthy"}
 
-@app.get("/health")
+@app.get("/health/live", response_model=HealthLiveResponse, tags=["health"])
+async def health_live():
+    """Liveness probe — returns 200 if the process is running.
+
+    Container orchestrators (Kubernetes, Railway) use this to decide whether
+    to restart the container. No dependency checks are performed here — if the
+    process can respond, it's alive.
+    """
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", response_model=HealthReadyResponse, tags=["health"])
+async def health_ready():
+    """Readiness probe — returns 200 only when all critical dependencies are healthy.
+
+    Checks:
+    - Database: executes ``SELECT 1`` via SQLAlchemy.
+    - Redis: pings the Redis client (skipped when REDIS_URL is not configured).
+
+    Returns HTTP 503 with a JSON body identifying the failing check when any
+    required dependency is unavailable, so load balancers can stop routing
+    traffic to the instance.
+    """
+    from sqlalchemy import text as sql_text
+    from database import engine as _db_engine
+    from fastapi.responses import JSONResponse
+
+    checks: List[HealthCheckDetail] = []
+    all_ok = True
+
+    # --- DB check ---
+    try:
+        with _db_engine.connect() as conn:
+            conn.execute(sql_text("SELECT 1"))
+        checks.append(HealthCheckDetail(name="database", ok=True))
+    except Exception as exc:
+        checks.append(HealthCheckDetail(name="database", ok=False, error=str(exc)))
+        all_ok = False
+
+    # --- Redis check (optional) ---
+    if settings.REDIS_URL:
+        try:
+            import redis as _redis_lib
+            _r = _redis_lib.Redis.from_url(
+                settings.REDIS_URL,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            _r.ping()
+            checks.append(HealthCheckDetail(name="redis", ok=True))
+        except Exception as exc:
+            checks.append(HealthCheckDetail(name="redis", ok=False, error=str(exc)))
+            all_ok = False
+
+    body = HealthReadyResponse(
+        status="ready" if all_ok else "degraded",
+        checks=checks,
+    )
+    if not all_ok:
+        return JSONResponse(content=body.model_dump(), status_code=503)
+    return body
+
+
+def _memory_rss_mb() -> Optional[float]:
+    """Return process RSS memory in MB, or None if unavailable."""
+    try:
+        import resource
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        # ru_maxrss is in bytes on Linux, kilobytes on macOS
+        import platform
+        if platform.system() == "Darwin":
+            return round(usage.ru_maxrss / 1024 / 1024, 2)
+        return round(usage.ru_maxrss / 1024, 2)
+    except Exception:
+        return None
+
+
+@app.get("/health", response_model=HealthDetailedResponse, tags=["health"])
 async def health():
-    """Health check endpoint used by Docker and Railway."""
-    return {"status": "ok", "version": VERSION}
+    """Detailed health check including uptime, memory, and dependency status.
+
+    Used by Docker and Railway health checks. Returns scheduler status,
+    database and Redis connectivity, process uptime, and memory consumption.
+    """
+    from sqlalchemy import text as sql_text
+    from database import engine as _db_engine
+
+    # DB check
+    db_ok = True
+    try:
+        with _db_engine.connect() as conn:
+            conn.execute(sql_text("SELECT 1"))
+    except Exception:
+        db_ok = False
+
+    # Redis check
+    redis_ok: Optional[bool] = None
+    if settings.REDIS_URL:
+        try:
+            import redis as _redis_lib
+            _r = _redis_lib.Redis.from_url(
+                settings.REDIS_URL,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            _r.ping()
+            redis_ok = True
+        except Exception:
+            redis_ok = False
+
+    return HealthDetailedResponse(
+        status="ok" if db_ok else "degraded",
+        version=VERSION,
+        uptime_seconds=round(time.monotonic() - _APP_START_TIME, 2),
+        memory_mb=_memory_rss_mb(),
+        db_ok=db_ok,
+        redis_ok=redis_ok,
+        scheduler_running=_scheduler.running if hasattr(_scheduler, "running") else False,
+    )
 
 
 @app.get("/version")

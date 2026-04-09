@@ -1418,6 +1418,104 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
+## Phase 22 — Infrastructure Maturity & Developer Experience
+
+### 22.1 Kubernetes-Compatible Health Probes [IN PROGRESS]
+**Goal:** Replace the bare `/health` stub with production-grade liveness and readiness probes that container orchestration platforms (Railway, Kubernetes) can use to make intelligent routing decisions.
+
+**Background:** The current `/health` returns `{"status": "ok", "version": "..."}` regardless of whether the database is reachable or the app is in a degraded state. Railway's zero-downtime deploys and Kubernetes liveness/readiness probes need richer signals.
+
+**Implementation:**
+- Add `GET /health/live` — liveness probe: returns 200 if the process is running (no dependency checks). Used by k8s to decide if the container should be restarted.
+- Add `GET /health/ready` — readiness probe: checks DB connectivity (execute a simple `SELECT 1`), Redis connectivity (if `REDIS_URL` set), and whether Alembic migrations are current. Returns 200 only if all critical checks pass; returns 503 if any fail, with a JSON body identifying which check failed.
+- Enhance existing `GET /health` to include: DB status, Redis status, scheduler status (running/stopped), app uptime in seconds, and memory usage (RSS in MB).
+- Exclude all three health endpoints from authentication and rate limiting.
+- Add response model schemas so FastAPI docs are accurate.
+
+**Acceptance Criteria:**
+- [ ] `GET /health/live` always returns `{"status": "alive"}` with HTTP 200
+- [ ] `GET /health/ready` returns 200 + full check results when all healthy; 503 + failed check name when DB unreachable
+- [ ] `GET /health` returns uptime, memory_mb, db_ok, redis_ok, scheduler_running, version
+- [ ] All three endpoints excluded from rate limiting
+- [ ] Unit tests cover: ready-pass, ready-fail-db, ready-fail-redis scenarios
+- [ ] `railway.toml` health check path updated to `/health/ready`
+
+---
+
+### 22.2 Redis-Backed Per-User Rate Limiting [PENDING]
+**Goal:** Upgrade slowapi from in-memory storage to Redis so rate limit state is shared across multiple Railway replicas, and add per-authenticated-user limits in addition to IP-based limits.
+
+**Background:** `core/limiter.py` uses `get_remote_address` with in-memory storage — limits reset on every deploy/restart and don't work correctly behind a load balancer. The comment in the file already flags this.
+
+**Implementation:**
+- Update `core/limiter.py` to use `storage_uri=settings.REDIS_URL` when `REDIS_URL` is set; fall back to in-memory if not (dev mode).
+- Add a second limiter key function `get_user_or_ip` that returns the authenticated user's ID when a valid JWT is present in the `Authorization` header, falling back to remote IP.
+- Apply `get_user_or_ip` to high-risk endpoints: `/calculate-budget`, `/monthly-tracker`, `/expenses`.
+- Add `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` headers to all limited responses.
+
+**Acceptance Criteria:**
+- [ ] `core/limiter.py` uses Redis storage when `REDIS_URL` is configured
+- [ ] Authenticated endpoints use user ID as the rate-limit key
+- [ ] Rate limit headers present on all limited endpoints
+- [ ] Existing rate-limited endpoints (`/login`) continue to work
+- [ ] Tests pass with in-memory fallback
+
+---
+
+### 22.3 Google OAuth Social Login [PENDING]
+**Goal:** Allow users to register and sign in using their Google account, reducing signup friction and eliminating the email-verification step for OAuth users.
+
+**Implementation:**
+- Add `google_sub` column to `User` model (nullable, unique); Alembic migration.
+- Add `POST /auth/google` endpoint that accepts a Google `id_token`, verifies it via Google's public keys (`google-auth` library), extracts `sub`/`email`, upserts the user.
+- For new OAuth users: skip email verification, generate a random password hash.
+- Return the same JWT access token + refresh cookie as normal login.
+- Frontend: add "Sign in with Google" button on login/signup pages.
+
+**Acceptance Criteria:**
+- [ ] `POST /auth/google` accepts `{"id_token": "..."}`, returns access token
+- [ ] New Google users created with `email_verified=True`
+- [ ] Existing users with matching email linked to their Google sub
+- [ ] `GOOGLE_CLIENT_ID` env var documented in `.env.example`
+- [ ] Frontend has Google sign-in button on `/login` and `/signup`
+
+---
+
+### 22.4 Progressive Web App (PWA) Support [PENDING]
+**Goal:** Make the web app installable on mobile and desktop, and enable offline access to the most recently viewed budget month.
+
+**Implementation:**
+- Add `web/public/manifest.json` with app name, icons, `display: standalone`, theme colour.
+- Create a service worker using Workbox: pre-cache app shell, serve last-fetched monthly tracker from cache when offline, queue expense posts for retry.
+- Register the service worker in `web/src/index.js`.
+- Show an offline indicator in the app header when `navigator.onLine` is false.
+
+**Acceptance Criteria:**
+- [ ] Lighthouse PWA audit score ≥ 90
+- [ ] App installable via Chrome "Add to Home Screen"
+- [ ] Last-viewed budget month visible offline
+- [ ] Offline indicator shown when network unavailable
+
+---
+
+### 22.5 Admin Observability API [PENDING]
+**Goal:** Add a read-only admin API exposing aggregate usage metrics and error log entries without requiring direct database access.
+
+**Implementation:**
+- Add `is_admin` boolean column to `User` model (default False); Alembic migration.
+- Add `GET /admin/stats` (requires `is_admin=True`): total users, active-30d, total expenses, top 5 categories, scheduler last-run times.
+- Add `GET /admin/errors` — last 100 ERROR-level structured log entries from an `ErrorLog` DB table.
+- Add `scripts/make_admin.py` to promote a user by email.
+
+**Acceptance Criteria:**
+- [ ] `GET /admin/stats` returns aggregate metrics; 403 for non-admin
+- [ ] `GET /admin/errors` returns last 100 errors; 403 for non-admin
+- [ ] `is_admin` column added via Alembic migration
+- [ ] `scripts/make_admin.py` promotes a user by email
+- [ ] Unit tests cover admin access and non-admin 403
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -1474,6 +1572,10 @@ Phase 20 (DONE): Financial wellness, data quality & power-user productivity
 Phase 21 (DONE): Production hardening & API resilience
   21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts) [DONE]
   → 21.4 (X-Request-ID tracing) [DONE] → 21.5 (Playwright E2E tests) [DONE]
+
+Phase 22 (IN PROGRESS): Infrastructure maturity & developer experience
+  22.1 (Health probes) [IN PROGRESS] → 22.2 (Redis rate limiting) → 22.3 (Google OAuth)
+  → 22.4 (PWA support) → 22.5 (Admin observability API)
 ```
 
 ---
