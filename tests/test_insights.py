@@ -1514,3 +1514,119 @@ class TestTagBreakdown:
         assert "grand_total" in body
         assert "grand_count" in body
         assert "monthly" in body
+
+
+class TestYearOverYear:
+    """Tests for GET /insights/year-over-year?month=MM&years=N"""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        """Unauthenticated request is rejected."""
+        r = client.get("/insights/year-over-year?month=3")
+        assert r.status_code in (401, 403)
+
+    def test_month_below_range_returns_422(self, auth_client):
+        """month=0 is outside 1–12 → 422."""
+        r = auth_client.get("/insights/year-over-year?month=0")
+        assert r.status_code == 422
+
+    def test_month_above_range_returns_422(self, auth_client):
+        """month=13 is outside 1–12 → 422."""
+        r = auth_client.get("/insights/year-over-year?month=13")
+        assert r.status_code == 422
+
+    def test_missing_month_param_returns_422(self, auth_client):
+        """Missing month query param returns 422."""
+        r = auth_client.get("/insights/year-over-year")
+        assert r.status_code == 422
+
+    def test_no_data_returns_empty(self, auth_client):
+        """No data for any year → years_analyzed=[], categories=[]."""
+        r = auth_client.get("/insights/year-over-year?month=1&years=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month_number"] == 1
+        assert body["years_analyzed"] == []
+        assert body["categories"] == []
+
+    def test_only_years_with_data_included(self, auth_client, db, verified_user):
+        """years_analyzed lists only years that have data for the given month."""
+        m = make_month(db, verified_user, month="2024-03", salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/year-over-year?month=3&years=5")
+        assert r.status_code == 200
+        body = r.json()
+        assert 2024 in body["years_analyzed"]
+        # 2025 has no March data — should not appear
+        assert 2025 not in body["years_analyzed"]
+
+    def test_correct_actuals_per_year(self, auth_client, db, verified_user):
+        """Each category's by_year list contains correct actual amounts."""
+        m2024 = make_month(db, verified_user, month="2024-06", salary_planned=3000.0)
+        make_expense(db, m2024, name="Rent", category="Housing", planned=800.0, actual=900.0)
+
+        m2025 = make_month(db, verified_user, month="2025-06", salary_planned=3000.0)
+        make_expense(db, m2025, name="Rent", category="Housing", planned=800.0, actual=1000.0)
+
+        r = auth_client.get("/insights/year-over-year?month=6&years=3")
+        assert r.status_code == 200
+        body = r.json()
+        cats = {c["category"]: c for c in body["categories"]}
+        assert "Housing" in cats
+        by_year = {entry["year"]: entry["actual"] for entry in cats["Housing"]["by_year"]}
+        assert by_year[2024] == pytest.approx(900.0)
+        assert by_year[2025] == pytest.approx(1000.0)
+
+    def test_missing_year_shown_as_zero(self, auth_client, db, verified_user):
+        """A category present in year A but not year B shows 0 for year B."""
+        m2024 = make_month(db, verified_user, month="2024-01", salary_planned=3000.0)
+        make_expense(db, m2024, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        m2025 = make_month(db, verified_user, month="2025-01", salary_planned=3000.0)
+        make_expense(db, m2025, name="Gym", category="Health", planned=50.0, actual=50.0)
+
+        r = auth_client.get("/insights/year-over-year?month=1&years=3")
+        assert r.status_code == 200
+        body = r.json()
+        cats = {c["category"]: c for c in body["categories"]}
+
+        # Housing only in 2024 → 0 for 2025
+        housing_by_year = {e["year"]: e["actual"] for e in cats["Housing"]["by_year"]}
+        assert housing_by_year.get(2025) == 0.0
+
+        # Health only in 2025 → 0 for 2024
+        health_by_year = {e["year"]: e["actual"] for e in cats["Health"]["by_year"]}
+        assert health_by_year.get(2024) == 0.0
+
+    def test_categories_sorted_alphabetically(self, auth_client, db, verified_user):
+        """Categories are returned in alphabetical order."""
+        m = make_month(db, verified_user, month="2024-04", salary_planned=4000.0)
+        make_expense(db, m, name="Zebra", category="Zzz", planned=10.0, actual=10.0)
+        make_expense(db, m, name="Apple", category="Aaa", planned=20.0, actual=20.0)
+
+        r = auth_client.get("/insights/year-over-year?month=4&years=3")
+        assert r.status_code == 200
+        body = r.json()
+        category_names = [c["category"] for c in body["categories"]]
+        assert category_names == sorted(category_names)
+
+    def test_data_isolation(self, auth_client, db, verified_user, second_user):
+        """Another user's data does not appear in the response."""
+        m = make_month(db, second_user, month="2024-05", salary_planned=9000.0)
+        make_expense(db, m, name="SecretExpense", category="Secret", planned=5000.0, actual=5000.0)
+
+        r = auth_client.get("/insights/year-over-year?month=5&years=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["years_analyzed"] == []
+        assert body["categories"] == []
+
+    def test_response_structure(self, auth_client):
+        """Response always has month_number, years_analyzed, and categories keys."""
+        r = auth_client.get("/insights/year-over-year?month=7&years=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert "month_number" in body
+        assert "years_analyzed" in body
+        assert "categories" in body
+        assert body["month_number"] == 7

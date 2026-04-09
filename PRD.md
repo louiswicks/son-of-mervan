@@ -1140,17 +1140,17 @@ Lets users see how each spending category changed between two months.
 - [x] Total of income sources is surfaced as `total_income` in the monthly summary
 - [x] 10+ backend tests (15 written)
 
-### 19.4 Year-over-Year Monthly Comparison [TODO]
+### 19.4 Year-over-Year Monthly Comparison [DONE]
 **Goal:** Let users see how a given calendar month compares across multiple years (e.g., "How did I spend in January 2024 vs January 2025?").
 **Scope:**
 - `GET /insights/year-over-year?month=MM&years=3` — for the given calendar month (1–12), returns per-category totals for each of the past N years.
 - Response: `{ month_number, years_analyzed, categories: [{category, by_year: [{year, actual}]}, ...] }`
 
 **Acceptance Criteria:**
-- [ ] Returns 422 if `month` is outside 1–12
-- [ ] Only includes years where data exists for that month
-- [ ] Each category entry covers all years (missing years show 0)
-- [ ] 8+ backend tests
+- [x] Returns 422 if `month` is outside 1–12
+- [x] Only includes years where data exists for that month
+- [x] Each category entry covers all years (missing years show 0)
+- [x] 8+ backend tests (11 written)
 
 ### 19.5 Budget Reallocation Suggestions [TODO]
 **Goal:** Automatically identify budget slack (under-used categories) and stress (consistently over-budget categories) and suggest moving budget between them.
@@ -1216,7 +1216,7 @@ Phase 18 (DONE): Smart forecasting & user productivity
 
 Phase 19 (IN PROGRESS): Expense intelligence & custom analytics
   19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources) [DONE]
-  → 19.4 (Year-over-year comparison) → 19.5 (Budget reallocation suggestions)
+  → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions)
 ```
 
 ---

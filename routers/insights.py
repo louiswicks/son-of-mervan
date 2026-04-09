@@ -1460,6 +1460,65 @@ def subscription_tracker(
     }
 
 
+@router.get("/year-over-year")
+def year_over_year(
+    month: int = Query(..., ge=1, le=12, description="Calendar month number (1–12)"),
+    years: int = Query(3, ge=1, le=10, description="Number of past years to analyse"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Compare per-category actual spend for a given calendar month across multiple years.
+
+    Response:
+      { month_number, years_analyzed, categories: [{category, by_year: [{year, actual}]}, ...] }
+
+    Only years where data exists for the month are included in years_analyzed.
+    Each category entry covers all analyzed years; missing years are shown as 0.
+    """
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    now = datetime.utcnow()
+    candidate_years = list(range(now.year - years + 1, now.year + 1))
+
+    month_str = f"{month:02d}"  # zero-padded, e.g. "03"
+
+    # Collect per-year per-category totals
+    year_data: Dict[int, Dict[str, float]] = {}
+    for yr in candidate_years:
+        yr_month_str = f"{yr:04d}-{month_str}"
+        row = _find_month(all_rows, yr_month_str)
+        if row is None:
+            continue
+        cats = _category_totals(db, row)
+        if not cats:
+            continue
+        year_data[yr] = {cat: round(vals["actual"], 2) for cat, vals in cats.items()}
+
+    years_analyzed = sorted(year_data.keys())
+
+    # Build per-category matrix covering all analyzed years
+    all_categories: set[str] = set()
+    for cats in year_data.values():
+        all_categories.update(cats.keys())
+
+    categories: List[Dict[str, Any]] = []
+    for cat in sorted(all_categories):
+        by_year = [
+            {"year": yr, "actual": year_data[yr].get(cat, 0.0)}
+            for yr in years_analyzed
+        ]
+        categories.append({"category": cat, "by_year": by_year})
+
+    return {
+        "month_number": month,
+        "years_analyzed": years_analyzed,
+        "categories": categories,
+    }
+
+
 @router.get("/month-comparison")
 def month_comparison(
     month_a: str = Query(..., description="First month in YYYY-MM format"),
