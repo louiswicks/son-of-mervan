@@ -1221,4 +1221,157 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
+## Phase 20 — Financial Wellness, Data Quality & Power-User Productivity
+
+### 20.1 Financial Health Score [TODO]
+**Goal:** Give users a single monthly metric (0–100) that distils their financial behaviour into an actionable score — making it easy to see improvement over time.
+**Scope:**
+- `GET /insights/health-score?month=YYYY-MM` — returns a composite score built from four equally-weighted sub-scores:
+  - **Budget adherence** (25 pts): 1 − (|total_actual − total_planned| / total_planned), floored at 0
+  - **Savings rate** (25 pts): savings contributions in the month / salary_planned, scaled to 25 pts (cap at 20% savings rate = 25 pts)
+  - **Overspend categories** (25 pts): 25 × (1 − (n_over_budget / n_categories)); n_over_budget = categories where actual > planned
+  - **Spending trend** (25 pts): 25 if last-3-month average actual spending is ≤ current actual; deduct proportionally if trending up
+- Each sub-score is rounded to 1 decimal place. The composite `score` is their sum (0–100).
+- Response: `{ month, score, sub_scores: { budget_adherence, savings_rate, overspend_categories, spending_trend } }`
+
+**Acceptance Criteria:**
+- [ ] Returns 0 score gracefully when no data exists for the month
+- [ ] `month` param validates to YYYY-MM format (422 on bad input)
+- [ ] Each sub-score is in range 0–25
+- [ ] Composite score is sum of sub-scores, in range 0–100
+- [ ] Savings rate sub-score caps at 25 when savings rate ≥ 20%
+- [ ] Data isolation: only the authenticated user's data is used
+- [ ] 8+ backend tests
+
+---
+
+### 20.2 Bulk Expense Operations [TODO]
+**Goal:** Let power users action many expenses at once — reducing friction for data cleanup and re-categorisation.
+**Scope:**
+- `POST /expenses/bulk-delete` — body `{ ids: [int, ...] }` — soft-deletes all owned expenses in the list; unknown/unowned IDs silently skipped; returns `{ deleted: int }`
+- `POST /expenses/bulk-categorise` — body `{ ids: [int, ...], category: str }` — updates the decrypted `category` field of all owned expenses; returns `{ updated: int }`
+- Both endpoints: max 100 IDs per request (422 if exceeded); auth required; IDs belonging to another user are silently ignored (no information leak).
+
+**Acceptance Criteria:**
+- [ ] Deleting 0 owned IDs returns `{ deleted: 0 }`
+- [ ] IDs from another user are silently ignored
+- [ ] More than 100 IDs returns 422
+- [ ] Empty `ids` list returns 422
+- [ ] Bulk-categorise updates encrypted category field correctly
+- [ ] Soft-deleted expenses are not re-deleted (no-op)
+- [ ] 8+ backend tests
+
+---
+
+### 20.3 Budget Rollover [TODO]
+**Goal:** Allow users to carry unspent planned budget from one month into the next, supporting envelope-style budgeting.
+**Scope:**
+- `POST /monthly-tracker/{month}/rollover` — for each non-deleted expense in `month` where `actual_amount < planned_amount`, adds the difference (`planned_amount − actual_amount`) to the matching category's `planned_amount` in the next month. Creates the next month's `MonthlyData` record if it doesn't exist (copying salary_planned). Returns `{ rolled_over_categories: [{ category, amount }], total_rolled_over: float }`.
+- A category is matched by name in the next month (case-insensitive); if no matching expense exists, a new planned expense is inserted.
+- Idempotent: re-rolling over the same month does not double-count (checks a `rolled_over_from` marker stored in the `MonthlyData` JSON metadata field or a DB flag).
+
+**Acceptance Criteria:**
+- [ ] Returns empty lists when no unspent budget exists
+- [ ] Correctly calculates rollover amount per category
+- [ ] Does not carry over categories where actual ≥ planned
+- [ ] Next month MonthlyData is created if absent
+- [ ] Operation is idempotent (second call returns same amounts, does not double-add)
+- [ ] Data isolation enforced
+- [ ] 8+ backend tests
+
+---
+
+### 20.4 Duplicate Expense Detection [TODO]
+**Goal:** Automatically surface potential duplicate expense entries so users can clean up their data.
+**Scope:**
+- `GET /insights/duplicate-candidates?month=YYYY-MM` — within the given month, finds pairs of non-deleted expenses that share the same category AND have amounts within 1% of each other AND were created within 3 days of each other. Returns `{ duplicates: [{ expense_a: {id, name, amount, created_at}, expense_b: {id, name, amount, created_at}, reason: str }] }`.
+- Comparison is done in Python (Fernet-decrypted). The `reason` field is human-readable (e.g., "Same category 'Housing', amounts £800 and £800, entered 0 days apart").
+- If no duplicates, `duplicates` is an empty list.
+
+**Acceptance Criteria:**
+- [ ] Returns empty list when no duplicates exist
+- [ ] Detects expenses with identical amount + category
+- [ ] Detects expenses with amounts within 1% of each other in the same category
+- [ ] Does NOT flag pairs more than 3 days apart
+- [ ] Does NOT flag expenses from different categories
+- [ ] Reason string is human-readable and references both expenses
+- [ ] Data isolation enforced
+- [ ] 8+ backend tests
+
+---
+
+### 20.5 Expense List Pagination [TODO]
+**Goal:** Make the expense list endpoint production-ready for users with years of data by adding cursor-based pagination.
+**Scope:**
+- `GET /monthly-tracker/{month}` currently returns all expenses. Add optional query params `limit` (default 50, max 200) and `cursor` (opaque string encoding `last_seen_id`). Response gains `{ next_cursor: str | null, total: int }` wrapper alongside existing `expenses` list.
+- Backward-compatible: existing callers without `limit`/`cursor` get the first page (up to 50 results) and a `next_cursor` to fetch more.
+- Cursor is a base64-encoded expense ID (integer); server decodes it, filters `id < cursor_id` (newest-first ordering), returns next batch.
+
+**Acceptance Criteria:**
+- [ ] Default limit of 50 is applied when no params given
+- [ ] `limit` above 200 returns 422
+- [ ] `next_cursor` is null when no more results
+- [ ] Sequential pages return non-overlapping, correctly ordered results
+- [ ] `total` count reflects all non-deleted expenses for the month
+- [ ] Existing response shape is preserved (expenses array still present)
+- [ ] 8+ backend tests
+
+---
+
+## 10. Implementation Sequence
+
+```
+Phase 1 (DONE):  Security fixes
+Phase 2 (DONE):  Core features
+Phase 3 (DONE):  Frontend UX overhaul
+Phase 4 (DONE):  Advanced features
+Phase 5 (DONE):  Production infrastructure
+Phase 6 (DONE):  Quality & polish
+Phase 7 (DONE):  Differentiating features
+Phase 8 (DONE):  Expanded scope
+Phase 9 (DONE):  Retention & engagement
+Phase 10 (DONE): Operational excellence
+
+Phase 11 (DONE): User experience & power features
+  11.1 (Custom categories) → 11.2 (CSV import) → 11.3 (Cashflow forecast)
+  → 11.4 (Debt payoff) [DONE] → 11.5 (Spending streaks) [DONE]
+
+Phase 12 (DONE): Usability, retention & production hardening
+  12.1 (Budget copy forward) → 12.2 (Net worth tracker) → 12.3 (Accessibility)
+  → 12.4 (Full data export) → 12.5 (Milestone email notifications)
+
+Phase 13 (DONE): Performance, security hardening & developer experience
+  13.1 (Route-based code splitting) → 13.2 (TOTP 2FA) → 13.3 (Expense notes/tags)
+  → 13.4 (Email preference center) → 13.5 (Active session manager)
+
+Phase 14 (DONE): UI/UX Overhaul — fix visual quality before open banking
+  14.1 (Navigation redesign) [DONE] → 14.2 (Budget page layout) [DONE] → 14.3 (Global visual polish) [DONE]
+
+Phase 15 (DONE): Open banking (8.5) — requires 7.6 Smart Categorisation (DONE) as prereq
+  15.1 (DB models) [DONE] → 15.2 (OAuth flow) [DONE] → 15.3 (Transaction sync) [DONE]
+  → 15.4 (Disconnect) [DONE] → 15.5 (Frontend) [DONE]
+
+Phase 16 (DONE): Reliability, developer experience & user onboarding
+  16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
+  → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
+
+Phase 17 (DONE): Engagement, insight & polish
+  17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
+  → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
+
+Phase 18 (DONE): Smart forecasting & user productivity
+  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
+  → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
+
+Phase 19 (DONE): Expense intelligence & custom analytics
+  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources) [DONE]
+  → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions) [DONE]
+
+Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
+  20.1 (Financial health score) → 20.2 (Bulk expense operations) → 20.3 (Budget rollover)
+  → 20.4 (Duplicate expense detection) → 20.5 (Expense list pagination)
+```
+
+---
+
 *This document will be updated as requirements evolve. All feature decisions should reference back to the product vision: give individuals the tools to understand, control, and improve their financial health — without complexity.*

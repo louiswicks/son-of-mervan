@@ -415,3 +415,132 @@ class TestExpenseNotesTags:
         assert r.status_code == 200
         items = r.json()["items"]
         assert not any(e["name"] == "Dinner" for e in items)
+
+
+class TestBulkDeleteExpenses:
+    """Tests for POST /expenses/bulk-delete."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.post("/expenses/bulk-delete", json={"ids": [1, 2, 3]})
+        assert r.status_code in (401, 403)
+
+    def test_empty_ids_returns_422(self, auth_client):
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": []})
+        assert r.status_code == 422
+
+    def test_more_than_100_ids_returns_422(self, auth_client):
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": list(range(101))})
+        assert r.status_code == 422
+
+    def test_deletes_owned_expenses(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2025-01")
+        e1 = make_expense(db, month, name="Rent", category="Housing", planned=1000.0)
+        e2 = make_expense(db, month, name="Food", category="Food", planned=200.0)
+
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": [e1.id, e2.id]})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 2
+
+        # Verify soft-deleted
+        db.refresh(e1)
+        db.refresh(e2)
+        assert e1.deleted_at is not None
+        assert e2.deleted_at is not None
+
+    def test_no_owned_ids_returns_zero(self, auth_client, db, verified_user, second_user):
+        month = make_month(db, second_user, month="2025-02")
+        e = make_expense(db, month, name="OtherRent", category="Housing", planned=800.0)
+
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": [e.id]})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 0
+
+    def test_already_deleted_expenses_are_skipped(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2025-03")
+        e = make_expense(db, month, name="Gym", category="Health", planned=50.0)
+        e.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": [e.id]})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 0
+
+    def test_mixed_owned_and_unowned_ids(self, auth_client, db, verified_user, second_user):
+        own_month = make_month(db, verified_user, month="2025-04")
+        other_month = make_month(db, second_user, month="2025-04")
+        owned = make_expense(db, own_month, name="OwnRent", category="Housing", planned=900.0)
+        other = make_expense(db, other_month, name="OtherRent", category="Housing", planned=900.0)
+
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": [owned.id, other.id]})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 1
+
+    def test_unknown_ids_silently_ignored(self, auth_client):
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": [999999, 888888]})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 0
+
+    def test_returns_deleted_count(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2025-05")
+        expenses = [make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0) for i in range(5)]
+        ids = [e.id for e in expenses]
+
+        r = auth_client.post("/expenses/bulk-delete", json={"ids": ids})
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 5
+
+
+class TestBulkCategoriseExpenses:
+    """Tests for POST /expenses/bulk-categorise."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.post("/expenses/bulk-categorise", json={"ids": [1], "category": "Food"})
+        assert r.status_code in (401, 403)
+
+    def test_empty_ids_returns_422(self, auth_client):
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": [], "category": "Food"})
+        assert r.status_code == 422
+
+    def test_more_than_100_ids_returns_422(self, auth_client):
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": list(range(101)), "category": "Food"})
+        assert r.status_code == 422
+
+    def test_updates_category_of_owned_expenses(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2025-06")
+        e1 = make_expense(db, month, name="Rent", category="Housing", planned=1000.0)
+        e2 = make_expense(db, month, name="Gas", category="Utilities", planned=100.0)
+
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": [e1.id, e2.id], "category": "Living"})
+        assert r.status_code == 200
+        assert r.json()["updated"] == 2
+
+        db.refresh(e1)
+        db.refresh(e2)
+        assert e1.category == "Living"
+        assert e2.category == "Living"
+
+    def test_unowned_expenses_silently_skipped(self, auth_client, db, verified_user, second_user):
+        month = make_month(db, second_user, month="2025-07")
+        e = make_expense(db, month, name="OtherFood", category="Food", planned=50.0)
+
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": [e.id], "category": "Groceries"})
+        assert r.status_code == 200
+        assert r.json()["updated"] == 0
+
+        db.refresh(e)
+        assert e.category == "Food"  # Unchanged
+
+    def test_deleted_expenses_skipped(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2025-08")
+        e = make_expense(db, month, name="Gym", category="Health", planned=50.0)
+        e.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": [e.id], "category": "Fitness"})
+        assert r.status_code == 200
+        assert r.json()["updated"] == 0
+
+    def test_unknown_ids_silently_ignored(self, auth_client):
+        r = auth_client.post("/expenses/bulk-categorise", json={"ids": [999999], "category": "Food"})
+        assert r.status_code == 200
+        assert r.json()["updated"] == 0

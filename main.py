@@ -828,6 +828,81 @@ async def delete_expense(
     # 204 No Content — no response body
 
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+class BulkCategoriseRequest(BaseModel):
+    ids: List[int]
+    category: str
+
+
+@app.post("/expenses/bulk-delete")
+async def bulk_delete_expenses(
+    data: BulkDeleteRequest,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if not data.ids:
+        raise HTTPException(status_code=422, detail="ids must be a non-empty list")
+    if len(data.ids) > 100:
+        raise HTTPException(status_code=422, detail="ids must not exceed 100 items")
+    user = get_user_by_email(db, current_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    all_expenses = db.query(MonthlyExpense).filter(
+        MonthlyExpense.id.in_(data.ids)
+    ).all()
+
+    now = datetime.utcnow()
+    deleted_count = 0
+    for expense in all_expenses:
+        # Ownership check via the MonthlyData relationship
+        md = db.query(MonthlyData).filter(MonthlyData.id == expense.monthly_data_id).first()
+        if md is None or md.user_id != user.id:
+            continue  # Silently skip unowned
+        if expense.deleted_at is not None:
+            continue  # Already deleted — no-op
+        expense.deleted_at = now
+        deleted_count += 1
+
+    db.commit()
+    return {"deleted": deleted_count}
+
+
+@app.post("/expenses/bulk-categorise")
+async def bulk_categorise_expenses(
+    data: BulkCategoriseRequest,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if not data.ids:
+        raise HTTPException(status_code=422, detail="ids must be a non-empty list")
+    if len(data.ids) > 100:
+        raise HTTPException(status_code=422, detail="ids must not exceed 100 items")
+    user = get_user_by_email(db, current_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    all_expenses = db.query(MonthlyExpense).filter(
+        MonthlyExpense.id.in_(data.ids)
+    ).all()
+
+    updated_count = 0
+    for expense in all_expenses:
+        md = db.query(MonthlyData).filter(MonthlyData.id == expense.monthly_data_id).first()
+        if md is None or md.user_id != user.id:
+            continue  # Silently skip unowned
+        if expense.deleted_at is not None:
+            continue  # Skip soft-deleted
+        expense.category = data.category
+        updated_count += 1
+
+    db.commit()
+    return {"updated": updated_count}
+
+
 @app.get("/verify-token")
 async def verify_user_token(current_user: str = Depends(verify_token)):
     return {"user": current_user, "authenticated": True, "expires_in_hours": 24}
