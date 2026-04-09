@@ -24,11 +24,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from core.config import VERSION
 from core.limiter import limiter
 from database import (
     get_db, User, MonthlyData, MonthlyExpense,
     RecurringExpense, SavingsGoal, SavingsContribution,
     Debt, UserCategory, NetWorthSnapshot,
+    BudgetAlert, BankConnection, CategoryRule, IncomeSource,
+    HouseholdMembership,
 )
 from models import TaxSummaryResponse, TaxCategoryBreakdown
 from security import verify_token
@@ -895,4 +898,228 @@ def export_calendar(
         iter([ical_text.encode("utf-8")]),
         media_type="text/calendar",
         headers={"Content-Disposition": 'attachment; filename="recurring-expenses.ics"'},
+    )
+
+
+# -------------------- GDPR data export --------------------
+
+
+@router.get("/gdpr")
+@limiter.limit("1/hour")
+def export_gdpr(
+    request: Request,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    GDPR Article 20 — right to data portability.
+
+    Returns a complete JSON export of all data held for the authenticated
+    user, with every Fernet-encrypted field decrypted.  Includes
+    soft-deleted records so the user receives their full history.
+    Rate-limited to 1 request/hour.
+    """
+    user = _require_user(db, current_user)
+    exported_at = datetime.utcnow().isoformat() + "Z"
+
+    # ---- Profile ----
+    profile = {
+        "id": user.id,
+        "email": user.email,
+        "username": user.username if hasattr(user, "username") else None,
+        "base_currency": user.base_currency,
+        "email_verified": user.email_verified,
+        "digest_enabled": getattr(user, "digest_enabled", True),
+        "created_at": getattr(user, "created_at", None),
+        "deleted_at": user.deleted_at,
+    }
+
+    # ---- Monthly budgets + expenses (including soft-deleted expenses) ----
+    all_months = (
+        db.query(MonthlyData)
+        .filter(MonthlyData.user_id == user.id)
+        .all()
+    )
+    monthly_budgets = []
+    all_expenses = []
+    for m in all_months:
+        monthly_budgets.append({
+            "id": m.id,
+            "month": m.month,
+            "salary_planned": m.salary_planned,
+            "salary_actual": m.salary_actual,
+            "total_planned": m.total_planned,
+            "total_actual": m.total_actual,
+            "remaining_planned": m.remaining_planned,
+            "remaining_actual": m.remaining_actual,
+        })
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(MonthlyExpense.monthly_data_id == m.id)
+            .all()
+        )
+        for e in expenses:
+            all_expenses.append({
+                "id": e.id,
+                "monthly_data_id": m.id,
+                "month": m.month,
+                "name": e.name,
+                "category": e.category,
+                "planned_amount": e.planned_amount,
+                "actual_amount": e.actual_amount,
+                "currency": e.currency,
+                "note": e.note,
+                "tags": e.tags,
+                "deleted_at": e.deleted_at,
+                "created_at": getattr(e, "created_at", None),
+            })
+
+    # ---- Savings goals + contributions (including soft-deleted goals) ----
+    goals = (
+        db.query(SavingsGoal)
+        .filter(SavingsGoal.user_id == user.id)
+        .all()
+    )
+    savings_goals = []
+    for g in goals:
+        contribs = (
+            db.query(SavingsContribution)
+            .filter(SavingsContribution.goal_id == g.id)
+            .all()
+        )
+        savings_goals.append({
+            "id": g.id,
+            "name": g.name,
+            "target_amount": g.target_amount,
+            "current_amount": getattr(g, "current_amount", None),
+            "target_date": g.target_date.isoformat() if g.target_date else None,
+            "deleted_at": g.deleted_at,
+            "contributions": [
+                {
+                    "id": c.id,
+                    "amount": c.amount,
+                    "note": c.note,
+                    "contributed_at": c.contributed_at.isoformat(),
+                }
+                for c in contribs
+            ],
+        })
+
+    # ---- Recurring expenses (including soft-deleted) ----
+    recurring_expenses = [
+        {
+            "id": r.id,
+            "name": r.name,
+            "category": r.category,
+            "planned_amount": r.planned_amount,
+            "frequency": r.frequency,
+            "start_date": r.start_date.isoformat() if r.start_date else None,
+            "end_date": r.end_date.isoformat() if r.end_date else None,
+            "deleted_at": r.deleted_at,
+        }
+        for r in db.query(RecurringExpense)
+        .filter(RecurringExpense.user_id == user.id)
+        .all()
+    ]
+
+    # ---- Income sources (including soft-deleted) ----
+    income_sources = [
+        {
+            "id": s.id,
+            "monthly_data_id": s.monthly_data_id,
+            "name": s.name,
+            "amount": s.amount,
+            "source_type": s.source_type,
+            "created_at": s.created_at,
+            "deleted_at": s.deleted_at,
+        }
+        for s in db.query(IncomeSource)
+        .filter(IncomeSource.user_id == user.id)
+        .all()
+    ]
+
+    # ---- Budget alerts (including soft-deleted) ----
+    budget_alerts = [
+        {
+            "id": a.id,
+            "category": a.category,
+            "threshold_pct": a.threshold_pct,
+            "active": a.active,
+            "created_at": a.created_at,
+            "deleted_at": a.deleted_at,
+        }
+        for a in db.query(BudgetAlert)
+        .filter(BudgetAlert.user_id == user.id)
+        .all()
+    ]
+
+    # ---- Category rules (including soft-deleted) ----
+    category_rules = [
+        {
+            "id": r.id,
+            "pattern": r.pattern,
+            "category": r.category,
+            "priority": r.priority,
+            "created_at": r.created_at,
+            "deleted_at": r.deleted_at,
+        }
+        for r in db.query(CategoryRule)
+        .filter(CategoryRule.user_id == user.id)
+        .all()
+    ]
+
+    # ---- Bank connections — metadata only, no tokens ----
+    bank_connections = [
+        {
+            "id": bc.id,
+            "provider": bc.provider,
+            "account_id": bc.account_id,
+            "last_synced_at": bc.last_synced_at,
+            "created_at": bc.created_at,
+            "disconnected_at": bc.disconnected_at,
+        }
+        for bc in db.query(BankConnection)
+        .filter(BankConnection.user_id == user.id)
+        .all()
+    ]
+
+    # ---- Household memberships ----
+    memberships = (
+        db.query(HouseholdMembership)
+        .filter(HouseholdMembership.user_id == user.id)
+        .all()
+    )
+    households = [
+        {
+            "household_id": mem.household_id,
+            "household_name": mem.household.name if mem.household else None,
+            "role": mem.role,
+            "joined_at": mem.joined_at.isoformat(),
+        }
+        for mem in memberships
+    ]
+
+    payload = {
+        "exported_at": exported_at,
+        "app_version": VERSION,
+        "profile": profile,
+        "monthly_budgets": monthly_budgets,
+        "expenses": all_expenses,
+        "savings_goals": savings_goals,
+        "recurring_expenses": recurring_expenses,
+        "income_sources": income_sources,
+        "budget_alerts": budget_alerts,
+        "category_rules": category_rules,
+        "bank_connections": bank_connections,
+        "households": households,
+    }
+
+    json_bytes = json.dumps(payload, indent=2, default=str).encode("utf-8")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    filename = f"gdpr-export-{user.id}-{today}.json"
+
+    return StreamingResponse(
+        iter([json_bytes]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

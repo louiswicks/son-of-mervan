@@ -1348,7 +1348,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 21.2 GDPR Full Data Export (JSON)
+### 21.2 GDPR Full Data Export (JSON) [DONE]
 **Goal:** Give users a complete, portable export of all their data in a machine-readable format, satisfying GDPR "right to portability" requirements.
 **Scope:**
 - `GET /export/gdpr` — returns a JSON object containing all of the user's data across every table, with all Fernet-encrypted fields decrypted.
@@ -1357,12 +1357,12 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Includes `exported_at` and `app_version` metadata fields at the top level.
 
 **Acceptance Criteria:**
-- [ ] Returns 200 with JSON download for authenticated user
-- [ ] All Fernet-encrypted fields are decrypted in the output
-- [ ] `exported_at` and `app_version` present in response
-- [ ] Contains `profile`, `monthly_budgets`, `expenses`, `savings_goals`, `recurring_expenses` top-level keys
-- [ ] Data isolation enforced (only caller's data)
-- [ ] 5+ backend tests
+- [x] Returns 200 with JSON download for authenticated user
+- [x] All Fernet-encrypted fields are decrypted in the output
+- [x] `exported_at` and `app_version` present in response
+- [x] Contains `profile`, `monthly_budgets`, `expenses`, `savings_goals`, `recurring_expenses` top-level keys
+- [x] Data isolation enforced (only caller's data)
+- [x] 5+ backend tests (9 tests added)
 
 ---
 
@@ -1472,7 +1472,7 @@ Phase 20 (DONE): Financial wellness, data quality & power-user productivity
   → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination) [DONE]
 
 Phase 21 (IN PROGRESS): Production hardening & API resilience
-  21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) → 21.3 (Spending anomaly alerts)
+  21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts)
   → 21.4 (X-Request-ID tracing) → 21.5 (Playwright E2E tests)
 ```
 

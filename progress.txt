@@ -1170,3 +1170,13 @@ Generated 5 new tasks (21.1–21.5) after completing all 20 prior phases. Tasks:
 - `main.py`: `POST /calculate-budget?commit=true` and `POST /monthly-tracker/{month}` both accept optional `X-Idempotency-Key` header (1–256 chars; 422 if longer). On commit path: checks cache before processing; saves response after commit. Read-only path (commit=False) is excluded — no DB writes to protect.
 - `tests/test_idempotency.py`: 17 new tests across `TestIdempotencyCalculateBudget` and `TestIdempotencyMonthlyTracker`: no header processes normally, 403 when unauthenticated, key > 256 → 422, max-length key accepted, first request saves record, second request returns cached response, second request does not create duplicate DB record, read-only path (commit=False) does not save record, expired key (> 24 h) treated as new request, same key different users have different hashes (user-scoped), cached response not visible to another user's hash.
 - 834 backend tests pass; ruff clean on new/modified files.
+
+## Phase 21.2 — GDPR Full Data Export [DONE] 2026-04-09
+
+**Task:** Add `GET /export/gdpr` to give users a complete, portable JSON export of all their data (GDPR Article 20 right to data portability), with every Fernet-encrypted field decrypted.
+
+**Files modified:**
+- `routers/export.py`: Added imports for `VERSION` from `core.config` and new DB models (`BudgetAlert`, `BankConnection`, `CategoryRule`, `IncomeSource`, `HouseholdMembership`). Added `GET /export/gdpr` endpoint (rate-limited 1/hour). Fetches and decrypts all user data including soft-deleted expenses. Returns JSON with top-level keys: `exported_at`, `app_version`, `profile`, `monthly_budgets`, `expenses` (flat list including soft-deleted), `savings_goals` (with contributions), `recurring_expenses`, `income_sources`, `budget_alerts`, `category_rules`, `bank_connections` (provider + account_id only — tokens excluded), `households` (membership role/join date). Filename: `gdpr-export-{user_id}-{date}.json`.
+- `tests/test_export.py`: Added `TestGdprExport` class — 9 tests: 200 with JSON, unauthenticated 401/403, all required top-level keys present, Content-Disposition contains user_id and date, expense data decrypted correctly, soft-deleted expenses included, data isolation (other user's data excluded), app_version is non-empty string, exported_at parses as ISO datetime.
+
+**Tests:** 843 total backend tests pass; ruff clean.

@@ -314,3 +314,82 @@ class TestCalendarExport:
         r = auth_client.get("/export/calendar.ics")
         assert r.status_code == 200
         assert "DeletedRecurring" not in r.content.decode("utf-8")
+
+
+class TestGdprExport:
+    """Tests for GET /export/gdpr."""
+
+    def test_gdpr_returns_200_with_json(self, auth_client):
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        assert "application/json" in r.headers.get("content-type", "")
+
+    def test_gdpr_unauthenticated(self, client):
+        r = client.get("/export/gdpr")
+        assert r.status_code in (401, 403)
+
+    def test_gdpr_top_level_keys_present(self, auth_client):
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        body = r.json()
+        for key in ("exported_at", "app_version", "profile",
+                    "monthly_budgets", "expenses", "savings_goals",
+                    "recurring_expenses"):
+            assert key in body, f"Missing key: {key}"
+
+    def test_gdpr_content_disposition_header(self, auth_client, verified_user):
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert f"gdpr-export-{verified_user.id}-" in cd
+        assert ".json" in cd
+
+    def test_gdpr_includes_expense_data_decrypted(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-05", salary_planned=5000.0)
+        make_expense(db, month, name="GDPRGroceries", category="Food",
+                     planned=200.0, actual=180.0)
+
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        body = r.json()
+        expense_names = [e["name"] for e in body["expenses"]]
+        assert "GDPRGroceries" in expense_names
+
+    def test_gdpr_includes_soft_deleted_expenses(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, month="2026-06", salary_planned=3000.0)
+        exp = make_expense(db, month, name="DeletedItem", category="Other",
+                           planned=50.0, actual=50.0)
+        exp.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        body = r.json()
+        expense_names = [e["name"] for e in body["expenses"]]
+        assert "DeletedItem" in expense_names
+
+    def test_gdpr_data_isolation(self, auth_client, db, second_user):
+        month = make_month(db, second_user, month="2026-07")
+        make_expense(db, month, name="OtherUserSecret", category="Other")
+
+        r = auth_client.get("/export/gdpr")
+        assert r.status_code == 200
+        body = r.json()
+        expense_names = [e["name"] for e in body["expenses"]]
+        assert "OtherUserSecret" not in expense_names
+
+    def test_gdpr_app_version_is_string(self, auth_client):
+        r = auth_client.get("/export/gdpr")
+        body = r.json()
+        assert isinstance(body["app_version"], str)
+        assert len(body["app_version"]) > 0
+
+    def test_gdpr_exported_at_is_iso_string(self, auth_client):
+        r = auth_client.get("/export/gdpr")
+        body = r.json()
+        exported_at = body["exported_at"]
+        assert isinstance(exported_at, str)
+        # Should parse as a datetime without error
+        from datetime import datetime as dt
+        dt.fromisoformat(exported_at.replace("Z", "+00:00"))
