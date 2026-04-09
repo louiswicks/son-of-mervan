@@ -274,6 +274,9 @@ class MonthlyExpense(Base):
     # Soft-delete timestamp — NULL means not deleted
     deleted_at = Column(DateTime, nullable=True, default=None)
 
+    # Creation timestamp — used for duplicate-candidate detection
+    created_at = Column(DateTime, nullable=True, default=datetime.utcnow)
+
     monthly = relationship("MonthlyData", back_populates="expenses")
     
     # Hybrid properties

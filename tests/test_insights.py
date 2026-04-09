@@ -1816,3 +1816,153 @@ class TestReallocationSuggestions:
         body = r.json()
         slack_amounts = [c["avg_slack_amount"] for c in body["slack_categories"]]
         assert slack_amounts == sorted(slack_amounts, reverse=True)
+
+
+class TestDuplicateCandidates:
+    """Tests for GET /insights/duplicate-candidates?month=YYYY-MM"""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/duplicate-candidates?month=2026-01")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_param_returns_422(self, auth_client):
+        r = auth_client.get("/insights/duplicate-candidates")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        r = auth_client.get("/insights/duplicate-candidates?month=January")
+        assert r.status_code == 422
+
+    def test_empty_month_returns_empty_list(self, auth_client):
+        """No expenses → empty duplicates list."""
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["duplicates"] == []
+
+    def test_month_with_no_matching_expenses_returns_empty_list(self, auth_client, db, verified_user):
+        """Single expense → nothing to pair → empty list."""
+        m = make_month(db, verified_user, month="2026-03", salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-03")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []
+
+    def test_detects_identical_amount_same_category(self, auth_client, db, verified_user):
+        """Two expenses: same category, identical amount → flagged as duplicate."""
+        from datetime import datetime
+        m = make_month(db, verified_user, month="2026-03", salary_planned=3000.0)
+        e1 = make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
+        e2 = make_expense(db, m, name="Rent B", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-03")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["duplicates"]) == 1
+        pair = body["duplicates"][0]
+        ids = {pair["expense_a"]["id"], pair["expense_b"]["id"]}
+        assert ids == {e1.id, e2.id}
+
+    def test_detects_amounts_within_1_percent(self, auth_client, db, verified_user):
+        """Two expenses: same category, amounts 1000 and 1005 (0.5% diff) → flagged."""
+        m = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        make_expense(db, m, name="Groceries A", category="Food", planned=1000.0, actual=1000.0)
+        make_expense(db, m, name="Groceries B", category="Food", planned=1005.0, actual=1005.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-04")
+        assert r.status_code == 200
+        assert len(r.json()["duplicates"]) == 1
+
+    def test_no_flag_for_amounts_over_1_percent_different(self, auth_client, db, verified_user):
+        """Two expenses: same category, amounts 1000 and 1020 (2% diff) → NOT flagged."""
+        m = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        make_expense(db, m, name="Groceries A", category="Food", planned=1000.0, actual=1000.0)
+        make_expense(db, m, name="Groceries B", category="Food", planned=1020.0, actual=1020.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-04")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []
+
+    def test_no_flag_for_different_categories(self, auth_client, db, verified_user):
+        """Two expenses: same amount but different categories → NOT flagged."""
+        m = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+        make_expense(db, m, name="Insurance", category="Insurance", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-04")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []
+
+    def test_no_flag_for_expenses_more_than_3_days_apart(self, auth_client, db, verified_user):
+        """Two expenses: same category + amount, but 10 days apart → NOT flagged."""
+        from datetime import datetime, timedelta
+        m = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        e1 = make_expense(db, m, name="Groceries A", category="Food", planned=500.0, actual=500.0)
+        e2 = make_expense(db, m, name="Groceries B", category="Food", planned=500.0, actual=500.0)
+
+        # Override created_at to be 10 days apart
+        now = datetime.utcnow()
+        e1.created_at = now - timedelta(days=10)
+        e2.created_at = now
+        db.commit()
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-04")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []
+
+    def test_flags_expenses_exactly_3_days_apart(self, auth_client, db, verified_user):
+        """Boundary: exactly 3 days apart → still flagged (≤ 3 is the cutoff)."""
+        from datetime import datetime, timedelta
+        m = make_month(db, verified_user, month="2026-04", salary_planned=5000.0)
+        e1 = make_expense(db, m, name="Rent A", category="Housing", planned=900.0, actual=900.0)
+        e2 = make_expense(db, m, name="Rent B", category="Housing", planned=900.0, actual=900.0)
+
+        now = datetime.utcnow()
+        e1.created_at = now - timedelta(days=3)
+        e2.created_at = now
+        db.commit()
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-04")
+        assert r.status_code == 200
+        assert len(r.json()["duplicates"]) == 1
+
+    def test_reason_string_is_human_readable(self, auth_client, db, verified_user):
+        """Reason field references category name, both amounts, and days apart."""
+        m = make_month(db, verified_user, month="2026-03", salary_planned=3000.0)
+        make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
+        make_expense(db, m, name="Rent B", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-03")
+        assert r.status_code == 200
+        pairs = r.json()["duplicates"]
+        assert len(pairs) == 1
+        reason = pairs[0]["reason"]
+        assert "Housing" in reason
+        assert "800" in reason
+        assert "day" in reason.lower()
+
+    def test_data_isolation(self, auth_client, db, second_user):
+        """Duplicates belonging to another user are not returned."""
+        m = make_month(db, second_user, month="2026-03", salary_planned=3000.0)
+        make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
+        make_expense(db, m, name="Rent B", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-03")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []
+
+    def test_deleted_expenses_excluded(self, auth_client, db, verified_user):
+        """Soft-deleted expenses must not appear in duplicate candidates."""
+        from datetime import datetime
+        m = make_month(db, verified_user, month="2026-03", salary_planned=3000.0)
+        e1 = make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
+        e2 = make_expense(db, m, name="Rent B", category="Housing", planned=800.0, actual=800.0)
+
+        # Soft-delete e2
+        e2.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.get("/insights/duplicate-candidates?month=2026-03")
+        assert r.status_code == 200
+        assert r.json()["duplicates"] == []

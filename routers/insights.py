@@ -1845,6 +1845,108 @@ def tag_breakdown(
     }
 
 
+@router.get("/duplicate-candidates")
+def duplicate_candidates(
+    month: str = Query(..., description="Month to scan in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Return pairs of non-deleted expenses in *month* that are likely duplicates.
+
+    A pair qualifies when all three conditions hold:
+    - Same category (case-insensitive)
+    - Amounts within 1% of each other (using the larger as denominator)
+    - ``created_at`` timestamps within 3 days of each other
+      (NULL ``created_at`` is treated as identical timestamps → 0 days apart)
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+    if not month_row:
+        return {"month": month_norm, "duplicates": []}
+
+    expenses = (
+        db.query(MonthlyExpense)
+        .filter(
+            MonthlyExpense.monthly_data_id == month_row.id,
+            MonthlyExpense.deleted_at == None,  # noqa: E711
+        )
+        .all()
+    )
+
+    currency = user.base_currency or "GBP"
+
+    # Build a plain-Python list of decrypted summaries once to avoid O(n²) decryptions
+    items = []
+    for exp in expenses:
+        items.append({
+            "id": exp.id,
+            "name": exp.name or "",
+            "category": (exp.category or "").strip().lower(),
+            "category_display": exp.category or "",
+            "amount": float(exp.actual_amount or exp.planned_amount or 0.0),
+            "created_at": exp.created_at,
+        })
+
+    duplicates = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a = items[i]
+            b = items[j]
+
+            # Condition 1: same category (case-insensitive)
+            if a["category"] != b["category"]:
+                continue
+
+            # Condition 2: amounts within 1%
+            larger = max(a["amount"], b["amount"])
+            if larger == 0:
+                # Both zero — treat as identical amounts (flag as duplicate)
+                pct_diff = 0.0
+            else:
+                pct_diff = abs(a["amount"] - b["amount"]) / larger
+            if pct_diff > 0.01:
+                continue
+
+            # Condition 3: created within 3 days of each other
+            if a["created_at"] is not None and b["created_at"] is not None:
+                days_apart = abs((a["created_at"] - b["created_at"]).days)
+            else:
+                days_apart = 0  # NULL → treat as same-day
+            if days_apart > 3:
+                continue
+
+            # Build human-readable reason
+            amt_a = f"{currency} {a['amount']:.2f}"
+            amt_b = f"{currency} {b['amount']:.2f}"
+            reason = (
+                f"Same category '{a['category_display']}', "
+                f"amounts {amt_a} and {amt_b}, "
+                f"entered {days_apart} day{'s' if days_apart != 1 else ''} apart"
+            )
+
+            duplicates.append({
+                "expense_a": {
+                    "id": a["id"],
+                    "name": a["name"],
+                    "amount": round(a["amount"], 2),
+                    "created_at": a["created_at"].isoformat() if a["created_at"] else None,
+                },
+                "expense_b": {
+                    "id": b["id"],
+                    "name": b["name"],
+                    "amount": round(b["amount"], 2),
+                    "created_at": b["created_at"].isoformat() if b["created_at"] else None,
+                },
+                "reason": reason,
+            })
+
+    return {"month": month_norm, "duplicates": duplicates}
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):

@@ -1285,22 +1285,23 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 20.4 Duplicate Expense Detection [TODO]
+### 20.4 Duplicate Expense Detection [DONE]
 **Goal:** Automatically surface potential duplicate expense entries so users can clean up their data.
 **Scope:**
 - `GET /insights/duplicate-candidates?month=YYYY-MM` — within the given month, finds pairs of non-deleted expenses that share the same category AND have amounts within 1% of each other AND were created within 3 days of each other. Returns `{ duplicates: [{ expense_a: {id, name, amount, created_at}, expense_b: {id, name, amount, created_at}, reason: str }] }`.
 - Comparison is done in Python (Fernet-decrypted). The `reason` field is human-readable (e.g., "Same category 'Housing', amounts £800 and £800, entered 0 days apart").
 - If no duplicates, `duplicates` is an empty list.
+- Added `created_at` column to `MonthlyExpense` (Alembic migration `z6a7b8c9d0e1`).
 
 **Acceptance Criteria:**
-- [ ] Returns empty list when no duplicates exist
-- [ ] Detects expenses with identical amount + category
-- [ ] Detects expenses with amounts within 1% of each other in the same category
-- [ ] Does NOT flag pairs more than 3 days apart
-- [ ] Does NOT flag expenses from different categories
-- [ ] Reason string is human-readable and references both expenses
-- [ ] Data isolation enforced
-- [ ] 8+ backend tests
+- [x] Returns empty list when no duplicates exist
+- [x] Detects expenses with identical amount + category
+- [x] Detects expenses with amounts within 1% of each other in the same category
+- [x] Does NOT flag pairs more than 3 days apart
+- [x] Does NOT flag expenses from different categories
+- [x] Reason string is human-readable and references both expenses
+- [x] Data isolation enforced
+- [x] 8+ backend tests (14 written)
 
 ---
 
@@ -1373,7 +1374,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
   20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover) [DONE]
-  → 20.4 (Duplicate expense detection) → 20.5 (Expense list pagination)
+  → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination)
 ```
 
 ---
