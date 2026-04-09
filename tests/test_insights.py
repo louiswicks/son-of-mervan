@@ -1007,3 +1007,112 @@ class TestMonthPerformance:
         assert "date" in entry
         assert "amount" in entry
         assert entry["amount"] == 1200.0
+
+
+class TestSpendingForecast:
+    """Tests for GET /insights/spending-forecast."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        """Unauthenticated request is rejected."""
+        r = client.get("/insights/spending-forecast?month=2026-04")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_param_returns_422(self, auth_client):
+        """Missing month query param returns 422."""
+        r = auth_client.get("/insights/spending-forecast")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        """Bad month format returns 422."""
+        r = auth_client.get("/insights/spending-forecast?month=not-a-month")
+        assert r.status_code == 422
+
+    def test_lookback_below_minimum_returns_422(self, auth_client):
+        """lookback < 2 returns 422."""
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=1")
+        assert r.status_code == 422
+
+    def test_lookback_above_maximum_returns_422(self, auth_client):
+        """lookback > 6 returns 422."""
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=7")
+        assert r.status_code == 422
+
+    def test_no_historical_data_returns_empty_list(self, auth_client):
+        """No prior months → empty categories list and total 0."""
+        r = auth_client.get("/insights/spending-forecast?month=2099-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month"] == "2099-01"
+        assert body["categories"] == []
+        assert body["total"] == 0.0
+
+    def test_rolling_average_calculated_correctly(self, auth_client, db, verified_user):
+        """Predicted amount for a category equals the mean of prior month actuals."""
+        # 3 prior months: Food £100, £200, £300 → average £200
+        for mo, actual in [("2026-01", 100.0), ("2026-02", 200.0), ("2026-03", 300.0)]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Groceries", category="Food", planned=200.0, actual=actual)
+
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        food = next(c for c in body["categories"] if c["category"] == "Food")
+        assert food["predicted_amount"] == pytest.approx(200.0)
+        assert body["total"] == pytest.approx(200.0)
+
+    def test_categories_with_no_prior_data_omitted(self, auth_client, db, verified_user):
+        """Categories that appear only in the target month (no prior data) are not returned."""
+        # No prior months — target month has data but no history
+        m = make_month(db, verified_user, month="2026-04", salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["categories"] == []
+        assert body["total"] == 0.0
+
+    def test_multiple_categories_all_predicted(self, auth_client, db, verified_user):
+        """Multiple categories each get their own averaged prediction."""
+        for mo in ["2026-01", "2026-02"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=4000.0)
+            make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)
+            make_expense(db, m, name="Food", category="Food", planned=300.0, actual=250.0)
+
+        r = auth_client.get("/insights/spending-forecast?month=2026-03&lookback=2")
+        assert r.status_code == 200
+        body = r.json()
+        cats = {c["category"]: c for c in body["categories"]}
+        assert "Housing" in cats
+        assert "Food" in cats
+        assert cats["Housing"]["predicted_amount"] == pytest.approx(800.0)
+        assert cats["Food"]["predicted_amount"] == pytest.approx(250.0)
+        assert body["total"] == pytest.approx(1050.0)
+
+    def test_only_own_data_used(self, auth_client, db, verified_user, second_user):
+        """Forecast uses only the authenticated user's history."""
+        # Give second user 3 months of high spending
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, second_user, month=mo, salary_planned=9000.0)
+            make_expense(db, m, name="Luxury", category="Luxury", planned=5000.0, actual=5000.0)
+
+        # Authenticated user has no data
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["categories"] == []
+        assert body["total"] == 0.0
+
+    def test_months_of_data_field_returned(self, auth_client, db, verified_user):
+        """Each category entry includes months_of_data showing how many prior months contributed."""
+        # 2 prior months of Food data
+        for mo in ["2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Groceries", category="Food", planned=300.0, actual=250.0)
+
+        r = auth_client.get("/insights/spending-forecast?month=2026-04&lookback=3")
+        assert r.status_code == 200
+        body = r.json()
+        food = next(c for c in body["categories"] if c["category"] == "Food")
+        # Only 2 of the 3 lookback months had Food data
+        assert food["months_of_data"] == 2

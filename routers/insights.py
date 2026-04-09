@@ -1301,6 +1301,76 @@ def month_performance(
     }
 
 
+# -------------------- spending forecast --------------------
+
+@router.get("/spending-forecast")
+def spending_forecast(
+    month: str = Query(..., description="Month to forecast for, YYYY-MM"),
+    lookback: int = Query(3, ge=2, le=6, description="Prior months to average (2–6)"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Predict per-category spending for *month* by averaging actual spend across
+    the previous *lookback* months.
+
+    Only categories that appear in at least one prior month are returned.
+    Categories with no prior data are omitted (not returned as zero).
+    Returns an empty list when no historical data exists at all.
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # Build list of prior month strings (oldest → newest, excluding the target month)
+    year, mo = map(int, month_norm.split("-"))
+    prior_months: list[str] = []
+    for i in range(lookback, 0, -1):
+        pmo = mo - i
+        pyr = year
+        while pmo <= 0:
+            pmo += 12
+            pyr -= 1
+        prior_months.append(f"{pyr:04d}-{pmo:02d}")
+
+    # Collect per-category actual spend across prior months that have data
+    history: Dict[str, List[float]] = {}
+    for pm in prior_months:
+        pm_row = _find_month(all_rows, pm)
+        if pm_row is None:
+            continue
+        for cat, vals in _category_totals(db, pm_row).items():
+            history.setdefault(cat, []).append(vals["actual"])
+
+    if not history:
+        return {
+            "month": month_norm,
+            "lookback": lookback,
+            "categories": [],
+            "total": 0.0,
+        }
+
+    categories: List[Dict[str, Any]] = []
+    for cat in sorted(history.keys()):
+        values = history[cat]
+        avg = round(sum(values) / len(values), 2)
+        categories.append({
+            "category": cat,
+            "predicted_amount": avg,
+            "months_of_data": len(values),
+        })
+
+    total = round(sum(c["predicted_amount"] for c in categories), 2)
+
+    return {
+        "month": month_norm,
+        "lookback": lookback,
+        "categories": categories,
+        "total": total,
+    }
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):

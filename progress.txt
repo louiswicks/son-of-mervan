@@ -1063,3 +1063,13 @@
 - `web/src/components/SonOfMervan.jsx`: Added `CopyPlus` icon import, `copyingForward` state, `nextMonthLabel` computed value, `copyToNextMonth` handler (calls API, shows success/info/error toasts), and "Copy budget to [next month]" secondary button below the "Calculate Budget" button.
 
 **Tests:** 644 backend tests pass; 92.04% coverage; ruff clean.
+
+## Phase 18.2 — Predictive Spending Forecast [DONE] 2026-04-09
+
+**Task:** Add `GET /insights/spending-forecast?month=YYYY-MM&lookback=3` to predict per-category spend for a target month by averaging actual spend across the previous `lookback` months.
+
+**Files modified:**
+- `routers/insights.py`: Added `spending_forecast` endpoint. Builds a list of prior month strings from the `lookback` parameter (2–6, validated by FastAPI Query constraint). Collects per-category actual spend for each prior month that has data (using the existing `_find_month` + `_category_totals` helpers). Categories appearing in zero prior months are omitted entirely. Computes rolling average per category, returns sorted list with `predicted_amount`, `months_of_data`, and a `total` field.
+- `tests/test_insights.py`: Added `TestSpendingForecast` class — 11 tests: unauthenticated 401, missing month 422, invalid month format 422, lookback below minimum 422, lookback above maximum 422, no historical data returns empty list, rolling average calculated correctly (3 months → correct mean), categories with no prior data omitted, multiple categories all predicted, only own data used (data isolation), months_of_data field returned correctly.
+
+**Tests:** 655 total backend tests; 11 new tests all pass in isolation; ruff clean.

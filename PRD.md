@@ -1031,19 +1031,19 @@ Users currently re-enter their planned budget from scratch every month. This ser
 - [x] 12 backend tests; frontend renders a "Copy to next month" button on the budget page
 - [x] All existing tests still pass; coverage ≥ 80%
 
-### 18.2 Predictive Spending Forecast
+### 18.2 Predictive Spending Forecast ✅ DONE
 
 Uses the last N months of actual spending to project what the current month will cost per category.
 
 **Endpoint:** `GET /insights/spending-forecast?month=YYYY-MM&lookback=3`
 
 **Acceptance Criteria:**
-- [ ] Returns per-category predicted amount based on rolling average of `lookback` prior months
-- [ ] `lookback` range 2–6; returns 422 outside this range
-- [ ] Categories with no prior data are omitted (not returned as zero)
-- [ ] Returns 200 with empty list when no historical data exists
-- [ ] Returns predicted `total` (sum of all category predictions)
-- [ ] 6+ backend tests
+- [x] Returns per-category predicted amount based on rolling average of `lookback` prior months
+- [x] `lookback` range 2–6; returns 422 outside this range
+- [x] Categories with no prior data are omitted (not returned as zero)
+- [x] Returns 200 with empty list when no historical data exists
+- [x] Returns predicted `total` (sum of all category predictions)
+- [x] 11 backend tests; all pass
 
 ### 18.3 Subscription Tracker
 
@@ -1129,7 +1129,7 @@ Phase 17 (DONE): Engagement, insight & polish
   → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
 
 Phase 18: Smart forecasting & user productivity
-  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) → 18.3 (Subscription tracker)
+  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker)
   → 18.4 (Quarterly report) → 18.5 (Month comparison)
 ```
 
