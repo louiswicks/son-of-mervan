@@ -1295,3 +1295,222 @@ class TestMonthComparison:
         assert r.status_code == 200
         body = r.json()
         assert body["comparison"] == []
+
+
+class TestTagSummary:
+    def test_unauthenticated_returns_401(self, client):
+        r = client.get("/insights/tag-summary")
+        assert r.status_code in (401, 403)
+
+    def test_no_data_returns_empty_tags(self, auth_client):
+        r = auth_client.get("/insights/tag-summary?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tags"] == []
+        assert body["months_analyzed"] == 3
+
+    def test_months_out_of_range_returns_422(self, auth_client):
+        r = auth_client.get("/insights/tag-summary?months=0")
+        assert r.status_code == 422
+        r2 = auth_client.get("/insights/tag-summary?months=25")
+        assert r2.status_code == 422
+
+    def test_expenses_without_tags_excluded(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0)  # no tags
+
+        r = auth_client.get("/insights/tag-summary?months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tags"] == []
+
+    def test_tagged_expenses_aggregated(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Groceries", category="Food", planned=200.0, actual=200.0, tags=["essential"])
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0, tags=["essential"])
+        make_expense(db, m, name="Netflix", category="Entertainment", planned=15.0, actual=15.0, tags=["subscription"])
+
+        r = auth_client.get("/insights/tag-summary?months=1")
+        assert r.status_code == 200
+        body = r.json()
+        tags_by_name = {entry["tag"]: entry for entry in body["tags"]}
+        assert "essential" in tags_by_name
+        assert "subscription" in tags_by_name
+
+        essential = tags_by_name["essential"]
+        assert essential["total_actual"] == pytest.approx(1000.0)
+        assert essential["expense_count"] == 2
+        assert essential["avg_amount"] == pytest.approx(500.0)
+        assert set(essential["categories"]) == {"Food", "Housing"}
+
+        subscription = tags_by_name["subscription"]
+        assert subscription["total_actual"] == pytest.approx(15.0)
+        assert subscription["expense_count"] == 1
+
+    def test_tags_sorted_by_total_actual_descending(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=5000.0)
+        make_expense(db, m, name="Cheap", category="Other", planned=10.0, actual=10.0, tags=["cheap"])
+        make_expense(db, m, name="Expensive", category="Housing", planned=2000.0, actual=2000.0, tags=["expensive"])
+
+        r = auth_client.get("/insights/tag-summary?months=1")
+        assert r.status_code == 200
+        body = r.json()
+        totals = [entry["total_actual"] for entry in body["tags"]]
+        assert totals == sorted(totals, reverse=True)
+
+    def test_multi_tag_expense_counted_under_each_tag(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Yoga", category="Health", planned=50.0, actual=50.0, tags=["fitness", "wellness"])
+
+        r = auth_client.get("/insights/tag-summary?months=1")
+        assert r.status_code == 200
+        body = r.json()
+        tag_names = {entry["tag"] for entry in body["tags"]}
+        assert "fitness" in tag_names
+        assert "wellness" in tag_names
+
+    def test_data_isolation(self, auth_client, db, verified_user, second_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, second_user, month=current_month, salary_planned=5000.0)
+        make_expense(db, m, name="BigExpense", category="Other", planned=1000.0, actual=1000.0, tags=["secret"])
+
+        r = auth_client.get("/insights/tag-summary?months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tags"] == []
+
+    def test_default_months_param(self, auth_client):
+        r = auth_client.get("/insights/tag-summary")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["months_analyzed"] == 3
+
+    def test_response_structure(self, auth_client):
+        r = auth_client.get("/insights/tag-summary?months=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert "months_analyzed" in body
+        assert "month_range" in body
+        assert "from" in body["month_range"]
+        assert "to" in body["month_range"]
+        assert "tags" in body
+
+
+class TestTagBreakdown:
+    def test_unauthenticated_returns_401(self, client):
+        r = client.get("/insights/tag-breakdown?tag=essential")
+        assert r.status_code in (401, 403)
+
+    def test_missing_tag_param_returns_422(self, auth_client):
+        r = auth_client.get("/insights/tag-breakdown")
+        assert r.status_code == 422
+
+    def test_unknown_tag_returns_zeroed_months(self, auth_client):
+        r = auth_client.get("/insights/tag-breakdown?tag=nonexistent&months=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["grand_total"] == 0.0
+        assert body["grand_count"] == 0
+        assert len(body["monthly"]) == 2
+        for m in body["monthly"]:
+            assert m["total_actual"] == 0.0
+            assert m["expense_count"] == 0
+
+    def test_months_out_of_range_returns_422(self, auth_client):
+        r = auth_client.get("/insights/tag-breakdown?tag=x&months=0")
+        assert r.status_code == 422
+        r2 = auth_client.get("/insights/tag-breakdown?tag=x&months=25")
+        assert r2.status_code == 422
+
+    def test_tag_matching_is_case_insensitive(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Gym", category="Health", planned=40.0, actual=40.0, tags=["Essential"])
+
+        r = auth_client.get("/insights/tag-breakdown?tag=essential&months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["grand_total"] == pytest.approx(40.0)
+        assert body["grand_count"] == 1
+
+    def test_matching_expenses_in_month_entry(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0, tags=["essential"])
+        make_expense(db, m, name="Coffee", category="Food", planned=30.0, actual=30.0, tags=["optional"])
+
+        r = auth_client.get("/insights/tag-breakdown?tag=essential&months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["grand_total"] == pytest.approx(800.0)
+        assert body["grand_count"] == 1
+        month_entry = body["monthly"][0]
+        assert month_entry["expense_count"] == 1
+        assert month_entry["expenses"][0]["name"] == "Rent"
+
+    def test_all_months_returned_including_empty(self, auth_client, db, verified_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        make_expense(db, m, name="Rent", category="Housing", planned=800.0, actual=800.0, tags=["essential"])
+
+        r = auth_client.get("/insights/tag-breakdown?tag=essential&months=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["monthly"]) == 3
+        # At least one month has the tag, others should be zeroed
+        totals = [entry["total_actual"] for entry in body["monthly"]]
+        assert sum(totals) == pytest.approx(800.0)
+
+    def test_grand_total_aggregates_all_months(self, auth_client, db, verified_user):
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        # go back 1 month manually
+        year, mo = now.year, now.month - 1
+        if mo == 0:
+            mo, year = 12, year - 1
+        m2_str = f"{year}-{mo:02d}"
+
+        m1 = make_month(db, verified_user, month=m1_str, salary_planned=3000.0)
+        make_expense(db, m1, name="Rent", category="Housing", planned=800.0, actual=800.0, tags=["essential"])
+        m2 = make_month(db, verified_user, month=m2_str, salary_planned=3000.0)
+        make_expense(db, m2, name="Rent", category="Housing", planned=800.0, actual=750.0, tags=["essential"])
+
+        r = auth_client.get("/insights/tag-breakdown?tag=essential&months=2")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["grand_total"] == pytest.approx(1550.0)
+        assert body["grand_count"] == 2
+
+    def test_data_isolation(self, auth_client, db, verified_user, second_user):
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        m = make_month(db, second_user, month=current_month, salary_planned=5000.0)
+        make_expense(db, m, name="BigRent", category="Housing", planned=2000.0, actual=2000.0, tags=["essential"])
+
+        r = auth_client.get("/insights/tag-breakdown?tag=essential&months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["grand_total"] == 0.0
+
+    def test_response_structure(self, auth_client):
+        r = auth_client.get("/insights/tag-breakdown?tag=test&months=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert "tag" in body
+        assert "months_analyzed" in body
+        assert "grand_total" in body
+        assert "grand_count" in body
+        assert "monthly" in body

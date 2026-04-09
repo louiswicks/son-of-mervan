@@ -1514,6 +1514,165 @@ def month_comparison(
     }
 
 
+@router.get("/tag-summary")
+def tag_summary(
+    months: int = Query(3, ge=1, le=24, description="Number of recent months to analyse"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Aggregate spending by tag across the past N months.
+
+    Returns all tags found in that window, sorted by total actual spend
+    descending.  Each entry includes: tag, total_actual, expense_count,
+    avg_amount, categories (list of distinct categories that share the tag).
+    """
+    user = _require_user(db, current_user)
+    month_list = _month_list(months)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # tag → { total_actual, expense_count, categories: set }
+    tag_data: Dict[str, Dict] = {}
+
+    for month_str in month_list:
+        month_row = _find_month(all_rows, month_str)
+        if month_row is None:
+            continue
+
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == month_row.id,
+                MonthlyExpense.deleted_at == None,  # noqa: E711
+            )
+            .all()
+        )
+
+        for exp in expenses:
+            raw_tags = exp.tags or []
+            if not raw_tags:
+                continue
+            amount = float(exp.actual_amount or exp.planned_amount or 0.0)
+            category = exp.category or "Other"
+
+            for raw_tag in raw_tags:
+                tag = raw_tag.strip()
+                if not tag:
+                    continue
+                if tag not in tag_data:
+                    tag_data[tag] = {
+                        "tag": tag,
+                        "total_actual": 0.0,
+                        "expense_count": 0,
+                        "categories": set(),
+                    }
+                tag_data[tag]["total_actual"] += amount
+                tag_data[tag]["expense_count"] += 1
+                tag_data[tag]["categories"].add(category)
+
+    result = []
+    for entry in tag_data.values():
+        count = entry["expense_count"]
+        total = entry["total_actual"]
+        result.append({
+            "tag": entry["tag"],
+            "total_actual": round(total, 2),
+            "expense_count": count,
+            "avg_amount": round(total / count, 2) if count else 0.0,
+            "categories": sorted(entry["categories"]),
+        })
+
+    result.sort(key=lambda x: (-x["total_actual"], x["tag"]))
+
+    return {
+        "months_analyzed": months,
+        "month_range": {"from": month_list[0], "to": month_list[-1]},
+        "tags": result,
+    }
+
+
+@router.get("/tag-breakdown")
+def tag_breakdown(
+    tag: str = Query(..., min_length=1, description="Tag to analyse (case-insensitive)"),
+    months: int = Query(6, ge=1, le=24, description="Number of recent months to analyse"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Month-by-month spending breakdown for a single tag.
+
+    Matching is case-insensitive.  Every month in the window is included;
+    months with no matching expenses have zeroed values.
+    """
+    user = _require_user(db, current_user)
+    month_list = _month_list(months)
+    tag_lower = tag.strip().lower()
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    monthly_results = []
+    grand_total = 0.0
+    grand_count = 0
+
+    for month_str in month_list:
+        month_row = _find_month(all_rows, month_str)
+        if month_row is None:
+            monthly_results.append({
+                "month": month_str,
+                "total_actual": 0.0,
+                "expense_count": 0,
+                "expenses": [],
+            })
+            continue
+
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == month_row.id,
+                MonthlyExpense.deleted_at == None,  # noqa: E711
+            )
+            .all()
+        )
+
+        month_total = 0.0
+        month_expenses = []
+
+        for exp in expenses:
+            raw_tags = exp.tags or []
+            tags_lower = [t.strip().lower() for t in raw_tags]
+            if tag_lower not in tags_lower:
+                continue
+
+            amount = float(exp.actual_amount or exp.planned_amount or 0.0)
+            month_total += amount
+            month_expenses.append({
+                "name": exp.name or "",
+                "category": exp.category or "Other",
+                "amount": round(amount, 2),
+                "tags": raw_tags,
+            })
+
+        month_expenses.sort(key=lambda x: -x["amount"])
+        grand_total += month_total
+        grand_count += len(month_expenses)
+
+        monthly_results.append({
+            "month": month_str,
+            "total_actual": round(month_total, 2),
+            "expense_count": len(month_expenses),
+            "expenses": month_expenses,
+        })
+
+    return {
+        "tag": tag,
+        "months_analyzed": months,
+        "grand_total": round(grand_total, 2),
+        "grand_count": grand_count,
+        "monthly": monthly_results,
+    }
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):

@@ -1087,6 +1087,88 @@ Lets users see how each spending category changed between two months.
 
 ---
 
+## Phase 19: Expense Intelligence & Custom Analytics
+
+### 19.1 Tag-based Expense Analytics [DONE]
+**Goal:** Surface insights from the tags users already attach to expenses — currently tags exist in the DB but there is no way to query or aggregate them.
+**Scope:**
+- `GET /insights/tag-summary?months=N` — returns all tags used across the past N months (1–24), each with `total_actual`, `expense_count`, `avg_amount`, `categories`, sorted by total spend descending.
+- `GET /insights/tag-breakdown?tag=<tag>&months=N` — returns month-by-month breakdown for a single tag: `total_actual`, `expense_count`, and a list of matching expenses per month.
+
+**Acceptance Criteria:**
+- [x] `tag-summary` returns 200 with `{ months_analyzed, month_range, tags: [...] }`
+- [x] Tags with no spend in the range are omitted
+- [x] `tag-breakdown` returns 200 with `{ tag, months_analyzed, grand_total, grand_count, monthly: [...] }`
+- [x] `tag-breakdown` includes months with no matching expenses (zeroed entries)
+- [x] Tag matching in `tag-breakdown` is case-insensitive
+- [x] Both endpoints return 401 for unauthenticated requests
+- [x] 10+ backend tests; all pass
+
+### 19.2 Auto-categorization Rules [TODO]
+**Goal:** Let users define keyword/regex rules that auto-assign categories to new and existing expenses, reducing manual re-categorization.
+**Scope:**
+- New `CategoryRule` DB model: `pattern` (plaintext), `category` (encrypted), `priority` (int), `user_id`.
+- `GET /category-rules` — list active rules ordered by priority.
+- `POST /category-rules` — create a rule.
+- `PUT /category-rules/{id}` — update pattern/category/priority.
+- `DELETE /category-rules/{id}` — delete.
+- `POST /category-rules/apply?month=YYYY-MM` — reprocess all expenses in the given month against the current rules; returns count of updated expenses.
+- Rules are applied automatically on `POST /monthly-tracker/{month}` (create path) if rules exist.
+
+**Acceptance Criteria:**
+- [ ] CRUD returns correct HTTP status codes; ownership enforced
+- [ ] `apply` endpoint re-categorizes matching expenses and returns `{ updated: N }`
+- [ ] Pattern matching is case-insensitive substring match
+- [ ] Rules applied in priority order; first match wins
+- [ ] Auto-apply triggers on monthly-tracker POST for new expenses
+- [ ] 12+ backend tests
+
+### 19.3 Multiple Income Sources [TODO]
+**Goal:** Users often have multiple income streams (salary, freelance, rental, investments). Currently salary is a single field per month, hiding income composition.
+**Scope:**
+- New `IncomeSource` DB model: `user_id`, `monthly_data_id`, `_name_encrypted`, `_amount_encrypted`, `source_type` (salary/freelance/rental/investment/other).
+- `GET /income-sources?month=YYYY-MM` — list income sources for the month.
+- `POST /income-sources` — add an income source for a month.
+- `PUT /income-sources/{id}` — update.
+- `DELETE /income-sources/{id}` — delete.
+- `GET /monthly-tracker/{month}` response extended with `income_sources` array.
+
+**Acceptance Criteria:**
+- [ ] CRUD returns correct status codes; ownership enforced
+- [ ] `GET /monthly-tracker/{month}` includes `income_sources` list
+- [ ] `source_type` is validated against the enum values
+- [ ] Total of income sources is surfaced as `total_income` in the monthly summary
+- [ ] 10+ backend tests
+
+### 19.4 Year-over-Year Monthly Comparison [TODO]
+**Goal:** Let users see how a given calendar month compares across multiple years (e.g., "How did I spend in January 2024 vs January 2025?").
+**Scope:**
+- `GET /insights/year-over-year?month=MM&years=3` — for the given calendar month (1–12), returns per-category totals for each of the past N years.
+- Response: `{ month_number, years_analyzed, categories: [{category, by_year: [{year, actual}]}, ...] }`
+
+**Acceptance Criteria:**
+- [ ] Returns 422 if `month` is outside 1–12
+- [ ] Only includes years where data exists for that month
+- [ ] Each category entry covers all years (missing years show 0)
+- [ ] 8+ backend tests
+
+### 19.5 Budget Reallocation Suggestions [TODO]
+**Goal:** Automatically identify budget slack (under-used categories) and stress (consistently over-budget categories) and suggest moving budget between them.
+**Scope:**
+- `GET /insights/reallocation-suggestions?months=3` — analyzes the past N months; returns:
+  - `slack_categories`: categories consistently under budget (actual < 70% of planned, 2+ months)
+  - `stress_categories`: categories consistently over budget (actual > 110% of planned, 2+ months)
+  - `suggestions`: list of `{ from_category, to_category, suggested_amount, rationale }` pairs
+
+**Acceptance Criteria:**
+- [ ] Returns empty lists when insufficient data or no patterns found
+- [ ] `months` param validated 1–12
+- [ ] Suggestions pair the highest-slack category with the highest-stress category
+- [ ] Rationale string is human-readable (e.g., "Housing is 30% over budget; Dining has 25% slack")
+- [ ] 8+ backend tests
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -1131,6 +1213,10 @@ Phase 17 (DONE): Engagement, insight & polish
 Phase 18 (DONE): Smart forecasting & user productivity
   18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
   → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
+
+Phase 19 (IN PROGRESS): Expense intelligence & custom analytics
+  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) → 19.3 (Multiple income sources)
+  → 19.4 (Year-over-year comparison) → 19.5 (Budget reallocation suggestions)
 ```
 
 ---

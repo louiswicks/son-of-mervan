@@ -1096,3 +1096,10 @@
 - `tests/test_insights.py`: Added `TestMonthComparison` class — 10 tests: unauthenticated 401/403, missing month_a 422, missing month_b 422, invalid month_a format 422, invalid month_b format 422, no data returns empty comparison, correct amounts + change_abs + change_pct calculated, change_pct null when amount_a is 0, category in only month_a included with amount_b=0 and correct negative change, data isolation (other user's categories excluded).
 
 **Tests:** 683 total backend tests pass; ruff clean.
+
+## Phase 19.1 — Tag-based Expense Analytics [DONE] 2026-04-09
+- `routers/insights.py`: Added two new endpoints. `GET /insights/tag-summary?months=N` (default 3, max 24) aggregates all tagged expenses across the past N months — for each tag returns `total_actual`, `expense_count`, `avg_amount`, `categories` list; sorted by total spend descending. `GET /insights/tag-breakdown?tag=<tag>&months=N` (default 6, case-insensitive) returns month-by-month breakdown for a single tag: per-month `total_actual`, `expense_count`, and expense details; every window month is returned (zeroed when no matching expenses exist). Both endpoints enforce authentication and respect data isolation.
+- `tests/conftest.py`: Extended `make_expense` helper to accept an optional `tags` list parameter (backward-compatible default None).
+- `tests/test_insights.py`: Added `TestTagSummary` (9 tests) and `TestTagBreakdown` (10 tests): unauthenticated 401, empty-tags exclusion, range validation (ge=1 le=24), multi-tag expense counted per tag, data isolation, case-insensitive matching, grand-total aggregation across months, empty-month zeroed entries, response structure shape.
+- Also added Phase 19 (5 tasks: tag analytics, auto-categorization rules, multiple income sources, year-over-year comparison, budget reallocation suggestions) to PRD.md.
+- 704 backend tests pass; ruff clean.

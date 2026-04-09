@@ -83,13 +83,15 @@ def make_month(
 
 
 def make_expense(db, month_row, name="Rent", category="Housing",
-                 planned=800.0, actual=0.0):
+                 planned=800.0, actual=0.0, tags=None):
     """Create a MonthlyExpense row under *month_row*."""
     e = MonthlyExpense(monthly_data_id=month_row.id)
     e.name = name
     e.category = category
     e.planned_amount = planned
     e.actual_amount = actual
+    if tags is not None:
+        e.tags = tags
     db.add(e)
     db.commit()
     db.refresh(e)
