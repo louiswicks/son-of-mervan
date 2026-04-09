@@ -969,18 +969,18 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Unauthenticated request returns 401
 - [x] 5+ backend tests covering: projection logic, dedup, no-data-month, on-track month (no notification)
 
-### 17.4 Monthly Budget Performance Endpoint
+### 17.4 Monthly Budget Performance Endpoint ✅ DONE
 **Goal:** Power a glanceable "This Month" KPI card on the dashboard.
 **Scope:**
 - `GET /insights/month-performance?month=YYYY-MM` — returns salary, actual vs planned YTD, daily spending array for sparkline, and a traffic-light status.
 - Status: `on_track` (≤100%), `warning` (101–110%), `over_budget` (>110%).
 
 **Acceptance Criteria:**
-- [ ] Returns `{ month, salary_planned, actual_ytd, planned_ytd, remaining, savings_rate_pct, daily_actuals: [{date, amount}], status }`
-- [ ] Empty month returns zeroed structure with `status: "on_track"`
-- [ ] `savings_rate_pct` = `(salary_planned - actual_ytd) / salary_planned * 100`, clamped to 0–100
-- [ ] Unauthenticated request returns 401
-- [ ] 4+ backend tests
+- [x] Returns `{ month, salary_planned, actual_ytd, planned_ytd, remaining, savings_rate_pct, daily_actuals: [{date, amount}], status }`
+- [x] Empty month returns zeroed structure with `status: "on_track"`
+- [x] `savings_rate_pct` = `(salary_planned - actual_ytd) / salary_planned * 100`, clamped to 0–100
+- [x] Unauthenticated request returns 401
+- [x] 4+ backend tests (10 tests added)
 
 ### 17.5 Onboarding Wizard
 **Goal:** Guide new users through their first budget setup so they don't land on a blank dashboard.
@@ -1037,7 +1037,7 @@ Phase 16 (DONE): Reliability, developer experience & user onboarding
 
 Phase 17: Engagement, insight & polish
   17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
-  → 17.4 (Month performance endpoint) → 17.5 (Onboarding wizard)
+  → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard)
 ```
 
 ---

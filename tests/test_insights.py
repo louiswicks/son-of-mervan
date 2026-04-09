@@ -921,3 +921,89 @@ class TestSpendingVelocity:
             .count()
         )
         assert count == 0
+
+
+class TestMonthPerformance:
+    def test_empty_month_returns_zeroed_on_track(self, auth_client):
+        """Month with no data returns zeroed structure with status on_track."""
+        r = auth_client.get("/insights/month-performance?month=2099-01")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month"] == "2099-01"
+        assert body["salary_planned"] == 0.0
+        assert body["actual_ytd"] == 0.0
+        assert body["planned_ytd"] == 0.0
+        assert body["remaining"] == 0.0
+        assert body["savings_rate_pct"] == 0.0
+        assert body["daily_actuals"] == []
+        assert body["status"] == "on_track"
+
+    def test_on_track_status_when_actual_le_planned(self, auth_client, db, verified_user):
+        """Status is on_track when actual <= planned."""
+        make_month(db, verified_user, month="2026-05", salary_planned=3000.0, total_planned=2000.0, total_actual=1800.0)
+        r = auth_client.get("/insights/month-performance?month=2026-05")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "on_track"
+        assert body["salary_planned"] == 3000.0
+        assert body["actual_ytd"] == 1800.0
+        assert body["planned_ytd"] == 2000.0
+        assert body["remaining"] == 1200.0
+
+    def test_warning_status_when_actual_101_to_110_pct(self, auth_client, db, verified_user):
+        """Status is warning when actual is 101–110% of planned."""
+        # 2100 / 2000 = 105% → warning
+        make_month(db, verified_user, month="2026-06", salary_planned=3000.0, total_planned=2000.0, total_actual=2100.0)
+        r = auth_client.get("/insights/month-performance?month=2026-06")
+        assert r.status_code == 200
+        assert r.json()["status"] == "warning"
+
+    def test_over_budget_status_when_actual_above_110_pct(self, auth_client, db, verified_user):
+        """Status is over_budget when actual exceeds 110% of planned."""
+        # 2300 / 2000 = 115% → over_budget
+        make_month(db, verified_user, month="2026-07", salary_planned=3000.0, total_planned=2000.0, total_actual=2300.0)
+        r = auth_client.get("/insights/month-performance?month=2026-07")
+        assert r.status_code == 200
+        assert r.json()["status"] == "over_budget"
+
+    def test_savings_rate_pct_calculated_correctly(self, auth_client, db, verified_user):
+        """savings_rate_pct = (salary_planned - actual_ytd) / salary_planned * 100."""
+        # (3000 - 1500) / 3000 * 100 = 50.0
+        make_month(db, verified_user, month="2026-08", salary_planned=3000.0, total_planned=2000.0, total_actual=1500.0)
+        r = auth_client.get("/insights/month-performance?month=2026-08")
+        assert r.status_code == 200
+        assert r.json()["savings_rate_pct"] == 50.0
+
+    def test_savings_rate_clamped_to_zero_when_over_salary(self, auth_client, db, verified_user):
+        """savings_rate_pct is clamped to 0 when actual exceeds salary."""
+        make_month(db, verified_user, month="2026-09", salary_planned=1000.0, total_planned=1200.0, total_actual=1500.0)
+        r = auth_client.get("/insights/month-performance?month=2026-09")
+        assert r.status_code == 200
+        assert r.json()["savings_rate_pct"] == 0.0
+
+    def test_unauthenticated_returns_401(self, client):
+        """Unauthenticated requests are rejected."""
+        r = client.get("/insights/month-performance?month=2026-01")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_param_returns_422(self, auth_client):
+        """Missing month query param returns 422."""
+        r = auth_client.get("/insights/month-performance")
+        assert r.status_code == 422
+
+    def test_invalid_month_format_returns_422(self, auth_client):
+        """Invalid month format returns 422."""
+        r = auth_client.get("/insights/month-performance?month=not-a-month")
+        assert r.status_code == 422
+
+    def test_daily_actuals_populated_when_actual_nonzero(self, auth_client, db, verified_user):
+        """daily_actuals contains at least one entry when actual_ytd > 0."""
+        make_month(db, verified_user, month="2026-10", salary_planned=3000.0, total_planned=2000.0, total_actual=1200.0)
+        r = auth_client.get("/insights/month-performance?month=2026-10")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["daily_actuals"]) > 0
+        entry = body["daily_actuals"][0]
+        assert "date" in entry
+        assert "amount" in entry
+        assert entry["amount"] == 1200.0

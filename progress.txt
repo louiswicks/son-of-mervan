@@ -1023,3 +1023,13 @@
 - `tests/test_insights.py`: Added `TestSpendingVelocity` class — 8 tests: unauthenticated 401, no-data zeroed structure, on-track month returns `on_track=True`, overspend pace returns `on_track=False`, invalid month 422, job fires notification, job dedup prevents duplicate, job does not fire when on track.
 
 **Tests:** 612 backend tests pass; 91.83% coverage; ruff clean; commit: `db58b02`.
+
+## Phase 17.4 — Monthly Budget Performance Endpoint [DONE] 2026-04-09
+
+**Task:** Add `GET /insights/month-performance?month=YYYY-MM` to power a glanceable "This Month" KPI card on the dashboard.
+
+**Files modified:**
+- `routers/insights.py`: Added `month_performance` endpoint. Returns `{ month, salary_planned, actual_ytd, planned_ytd, remaining, savings_rate_pct, daily_actuals: [{date, amount}], status }`. Traffic-light `status`: `on_track` (≤100%), `warning` (101–110%), `over_budget` (>110%). `savings_rate_pct` is `(salary_planned - actual_ytd) / salary_planned * 100` clamped 0–100. Empty month returns zeroed structure with `status: "on_track"`. `daily_actuals` returns a single entry with the month total (MonthlyExpense stores monthly not per-day records; sparkline-compatible).
+- `tests/test_insights.py`: Added `TestMonthPerformance` class — 10 tests: empty month zeroed/on_track, on_track status, warning status (105%), over_budget status (115%), savings rate calculation, savings rate clamped to 0, unauthenticated 401, missing param 422, invalid format 422, daily_actuals populated.
+
+**Tests:** 622 backend tests pass; ruff clean; commit pending.

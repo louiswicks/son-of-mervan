@@ -1225,6 +1225,82 @@ def spending_velocity(
     }
 
 
+@router.get("/month-performance")
+def month_performance(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    KPI summary for a given month powering the "This Month" dashboard card.
+
+    Returns salary, actual vs planned totals, remaining budget, savings rate,
+    per-day actual spending array for sparkline rendering, and a traffic-light status.
+
+    Status logic:
+        on_track   — actual_ytd <= planned_ytd
+        warning    — actual_ytd is 101–110% of planned_ytd
+        over_budget — actual_ytd > 110% of planned_ytd
+    """
+    month_norm = _normalize_month(month)
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    month_row = _find_month(all_rows, month_norm)
+
+    year, mo = map(int, month_norm.split("-"))
+
+    if not month_row:
+        return {
+            "month": month_norm,
+            "salary_planned": 0.0,
+            "actual_ytd": 0.0,
+            "planned_ytd": 0.0,
+            "remaining": 0.0,
+            "savings_rate_pct": 0.0,
+            "daily_actuals": [],
+            "status": "on_track",
+        }
+
+    salary_planned = float(month_row.salary_planned or 0.0)
+    actual_ytd = float(month_row.total_actual or 0.0)
+    planned_ytd = float(month_row.total_planned or 0.0)
+    remaining = round(salary_planned - actual_ytd, 2)
+
+    if salary_planned > 0:
+        raw_rate = (salary_planned - actual_ytd) / salary_planned * 100
+        savings_rate_pct = round(max(0.0, min(100.0, raw_rate)), 2)
+    else:
+        savings_rate_pct = 0.0
+
+    # MonthlyExpense tracks monthly totals, not per-day records.
+    # Return a single data point for sparkline rendering.
+    daily_actuals = [{"date": f"{year:04d}-{mo:02d}-01", "amount": round(actual_ytd, 2)}] if actual_ytd > 0 else []
+
+    # Traffic-light status
+    if planned_ytd <= 0:
+        status = "on_track"
+    else:
+        ratio = actual_ytd / planned_ytd
+        if ratio <= 1.0:
+            status = "on_track"
+        elif ratio <= 1.10:
+            status = "warning"
+        else:
+            status = "over_budget"
+
+    return {
+        "month": month_norm,
+        "salary_planned": round(salary_planned, 2),
+        "actual_ytd": round(actual_ytd, 2),
+        "planned_ytd": round(planned_ytd, 2),
+        "remaining": remaining,
+        "savings_rate_pct": savings_rate_pct,
+        "daily_actuals": daily_actuals,
+        "status": status,
+    }
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):
