@@ -1073,3 +1073,9 @@
 - `tests/test_insights.py`: Added `TestSpendingForecast` class — 11 tests: unauthenticated 401, missing month 422, invalid month format 422, lookback below minimum 422, lookback above maximum 422, no historical data returns empty list, rolling average calculated correctly (3 months → correct mean), categories with no prior data omitted, multiple categories all predicted, only own data used (data isolation), months_of_data field returned correctly.
 
 **Tests:** 655 total backend tests; 11 new tests all pass in isolation; ruff clean.
+
+## Phase 18.3 — Subscription Tracker [DONE] 2026-04-09
+- `GET /insights/subscriptions?year=YYYY` added to `routers/insights.py`. Iterates all 12 months of the requested year, collects expenses per month (decrypting in Python per Fernet pattern), groups by `(name.lower(), category.lower())` key. Any name+category pair seen in 3+ months within the year is flagged as a subscription. Returns `{ name, category, monthly_cost, annual_cost, months_seen, first_seen, last_seen }` per subscription; results sorted by `annual_cost` descending. `monthly_cost` is the mean of all observed actual (or planned if no actual) amounts. `annual_cost = monthly_cost × months_seen`.
+- `tests/test_insights.py`: Added `TestSubscriptionTracker` class — 7 tests: no data returns empty list, unauthenticated returns 401/403, expense in 3 months detected correctly (name/category/costs/dates), expense in only 2 months not flagged, annual_cost == monthly_cost × months_seen, data isolation (other user's subscriptions not returned), multiple subscriptions sorted by annual_cost descending.
+
+**Tests:** 662 total backend tests pass; ruff clean.

@@ -1045,18 +1045,18 @@ Uses the last N months of actual spending to project what the current month will
 - [x] Returns predicted `total` (sum of all category predictions)
 - [x] 11 backend tests; all pass
 
-### 18.3 Subscription Tracker
+### 18.3 Subscription Tracker ✅ DONE
 
 Identifies expenses that appear in 3+ consecutive months with the same name+category as likely subscriptions and exposes a summary endpoint.
 
 **Endpoint:** `GET /insights/subscriptions?year=YYYY`
 
 **Acceptance Criteria:**
-- [ ] Returns list of detected subscriptions: `{ name, category, monthly_cost, annual_cost, months_seen, first_seen, last_seen }`
-- [ ] Only includes expenses appearing in 3+ months within the year
-- [ ] Correctly calculates `annual_cost = monthly_cost × months_seen`
-- [ ] Returns empty list when no subscription-like patterns detected
-- [ ] 5+ backend tests
+- [x] Returns list of detected subscriptions: `{ name, category, monthly_cost, annual_cost, months_seen, first_seen, last_seen }`
+- [x] Only includes expenses appearing in 3+ months within the year
+- [x] Correctly calculates `annual_cost = monthly_cost × months_seen`
+- [x] Returns empty list when no subscription-like patterns detected
+- [x] 7 backend tests; all pass
 
 ### 18.4 Quarterly Financial Report
 
@@ -1129,7 +1129,7 @@ Phase 17 (DONE): Engagement, insight & polish
   → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
 
 Phase 18: Smart forecasting & user productivity
-  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker)
+  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
   → 18.4 (Quarterly report) → 18.5 (Month comparison)
 ```
 
