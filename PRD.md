@@ -998,6 +998,95 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 
 ---
 
+## Phase 18: Smart Forecasting & User Productivity
+
+Addresses the most common friction points for returning users: re-entering the same budget each month, and gaining forward-looking insight from historical data.
+
+### 18.1 Budget Copy Forward ✅ DONE
+
+Users currently re-enter their planned budget from scratch every month. This server-side copy operation lets them clone a previous month's plan in one click.
+
+**Endpoint:** `POST /budget/copy-forward`
+
+**Request body:**
+```json
+{ "from_month": "YYYY-MM", "to_month": "YYYY-MM" }
+```
+
+**Response:**
+```json
+{ "from_month": "YYYY-MM", "to_month": "YYYY-MM", "copied": 5, "skipped": 2 }
+```
+
+**Acceptance Criteria:**
+- [x] `POST /budget/copy-forward` returns 200 with `{ copied, skipped, from_month, to_month }`
+- [x] Copies all non-deleted planned expenses from `from_month` to `to_month`
+- [x] Skips expenses where name+category already exists in `to_month` (no duplicates)
+- [x] Copies `salary_planned` to `to_month` only when `to_month` has no salary set yet
+- [x] Recalculates `total_planned` and `remaining_planned` in `to_month` after copy
+- [x] Returns 404 when `from_month` has no data for the authenticated user
+- [x] Returns 400 when `from_month == to_month`
+- [x] Returns 401 for unauthenticated requests
+- [x] Only copies data owned by the authenticated user
+- [x] 12 backend tests; frontend renders a "Copy to next month" button on the budget page
+- [x] All existing tests still pass; coverage ≥ 80%
+
+### 18.2 Predictive Spending Forecast
+
+Uses the last N months of actual spending to project what the current month will cost per category.
+
+**Endpoint:** `GET /insights/spending-forecast?month=YYYY-MM&lookback=3`
+
+**Acceptance Criteria:**
+- [ ] Returns per-category predicted amount based on rolling average of `lookback` prior months
+- [ ] `lookback` range 2–6; returns 422 outside this range
+- [ ] Categories with no prior data are omitted (not returned as zero)
+- [ ] Returns 200 with empty list when no historical data exists
+- [ ] Returns predicted `total` (sum of all category predictions)
+- [ ] 6+ backend tests
+
+### 18.3 Subscription Tracker
+
+Identifies expenses that appear in 3+ consecutive months with the same name+category as likely subscriptions and exposes a summary endpoint.
+
+**Endpoint:** `GET /insights/subscriptions?year=YYYY`
+
+**Acceptance Criteria:**
+- [ ] Returns list of detected subscriptions: `{ name, category, monthly_cost, annual_cost, months_seen, first_seen, last_seen }`
+- [ ] Only includes expenses appearing in 3+ months within the year
+- [ ] Correctly calculates `annual_cost = monthly_cost × months_seen`
+- [ ] Returns empty list when no subscription-like patterns detected
+- [ ] 5+ backend tests
+
+### 18.4 Quarterly Financial Report
+
+Aggregates 3 months of income and expense data into a single quarterly summary.
+
+**Endpoint:** `GET /reports/quarterly?year=YYYY&quarter=1`
+
+**Acceptance Criteria:**
+- [ ] `quarter` param: 1–4; 422 outside range
+- [ ] Returns per-month breakdown + quarterly totals: `salary_total`, `expense_total`, `savings_total`, `savings_rate_pct`
+- [ ] Returns partial data if not all months in the quarter have data
+- [ ] Returns 200 with zeroed totals when no data exists for any month in the quarter
+- [ ] 6+ backend tests
+
+### 18.5 Month-over-Month Category Comparison
+
+Lets users see how each spending category changed between two months.
+
+**Endpoint:** `GET /insights/month-comparison?month_a=YYYY-MM&month_b=YYYY-MM`
+
+**Acceptance Criteria:**
+- [ ] Returns per-category rows: `{ category, amount_a, amount_b, change_abs, change_pct }`
+- [ ] `change_pct` is null when `amount_a` is 0 (avoid divide-by-zero)
+- [ ] Returns 422 when either month param is missing or invalid format
+- [ ] Categories with spend in only one month are included (other side = 0)
+- [ ] Only returns data for the authenticated user
+- [ ] 6+ backend tests
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -1035,9 +1124,13 @@ Phase 16 (DONE): Reliability, developer experience & user onboarding
   16.1 (Email verification resend) [DONE] → 16.2 (Expired token cleanup) [DONE] → 16.3 (iCal export) [DONE]
   → 16.4 (Month-close card) [DONE] → 16.5 (API changelog endpoint) [DONE]
 
-Phase 17: Engagement, insight & polish
+Phase 17 (DONE): Engagement, insight & polish
   17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
   → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
+
+Phase 18: Smart forecasting & user productivity
+  18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) → 18.3 (Subscription tracker)
+  → 18.4 (Quarterly report) → 18.5 (Month comparison)
 ```
 
 ---

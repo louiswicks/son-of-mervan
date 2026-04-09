@@ -40,6 +40,7 @@ from routers import totp as totp_router
 from routers import banking as banking_router
 from routers import templates as templates_router
 from routers import onboarding as onboarding_router
+from routers import budget_copy as budget_copy_router
 import email_utils
 from collections import defaultdict
 
@@ -811,6 +812,7 @@ app.include_router(totp_router.router)
 app.include_router(banking_router.router)
 app.include_router(templates_router.router)
 app.include_router(onboarding_router.router)
+app.include_router(budget_copy_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

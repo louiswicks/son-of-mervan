@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   PlusCircle, Calculator, Trash2, TrendingUp,
-  DollarSign, PieChart, LayoutTemplate, X, Flame, Wallet
+  DollarSign, PieChart, LayoutTemplate, X, Flame, Wallet, CopyPlus
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -15,6 +15,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useCategories } from "../hooks/useCategories";
 import { useStreaks, useMonthCloseSummary } from "../hooks/useInsights";
 import { getMonthlyTracker } from "../api/expenses";
+import { copyBudgetForward } from "../api/budget";
 import PageWrapper from "./PageWrapper";
 import Card from "./Card";
 import OnboardingStatusWizard from "./OnboardingStatusWizard";
@@ -95,6 +96,7 @@ export default function SonOfMervan() {
   const [results, setResults] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [loadingPrevMonth, setLoadingPrevMonth] = useState(false);
+  const [copyingForward, setCopyingForward] = useState(false);
 
   const navigate = useNavigate();
   const calculateMutation = useCalculateBudget();
@@ -195,6 +197,41 @@ export default function SonOfMervan() {
       toast.error("Could not load previous month's budget");
     } finally {
       setLoadingPrevMonth(false);
+    }
+  };
+
+  const nextMonthLabel = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth(); // 0-based
+    const nextM = m === 11 ? 1 : m + 2;
+    const nextY = m === 11 ? y + 1 : y;
+    return {
+      str: `${nextY}-${String(nextM).padStart(2, "0")}`,
+      display: new Date(nextY, nextM - 1).toLocaleString("default", { month: "long", year: "numeric" }),
+    };
+  })();
+
+  const copyToNextMonth = async () => {
+    setCopyingForward(true);
+    try {
+      const res = await copyBudgetForward(currentMonthStr, nextMonthLabel.str);
+      if (res.copied === 0) {
+        toast(`Budget already exists for ${nextMonthLabel.display} — nothing new to copy.`, { icon: "ℹ️" });
+      } else {
+        toast.success(
+          `Copied ${res.copied} expense${res.copied !== 1 ? "s" : ""} to ${nextMonthLabel.display}${res.skipped > 0 ? ` (${res.skipped} already existed)` : ""}.`
+        );
+      }
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      if (detail && detail.includes("No budget found")) {
+        toast.error("Save this month's budget first before copying it forward.");
+      } else {
+        toast.error("Could not copy budget to next month.");
+      }
+    } finally {
+      setCopyingForward(false);
     }
   };
 
@@ -461,7 +498,7 @@ export default function SonOfMervan() {
             </div>
 
             {/* Calculate button */}
-            <div className="mt-6">
+            <div className="mt-6 space-y-3">
               <button
                 onClick={doCalculate}
                 disabled={loading}
@@ -469,6 +506,18 @@ export default function SonOfMervan() {
               >
                 <Calculator size={17} />
                 {loading ? "Calculating…" : "Calculate Budget"}
+              </button>
+
+              <button
+                type="button"
+                onClick={copyToNextMonth}
+                disabled={copyingForward}
+                data-testid="copy-to-next-month-btn"
+                aria-label={`Copy this month's budget to ${nextMonthLabel.display}`}
+                className="w-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium py-2.5 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+              >
+                <CopyPlus size={15} />
+                {copyingForward ? "Copying…" : `Copy budget to ${nextMonthLabel.display}`}
               </button>
             </div>
           </Card>

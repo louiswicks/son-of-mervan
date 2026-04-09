@@ -1048,3 +1048,18 @@
 - `web/src/components/SonOfMervan.jsx`: Imported `OnboardingStatusWizard` and rendered it as first element inside `<PageWrapper>`.
 
 **Tests:** 632 backend tests pass; 91.94% coverage; ruff clean.
+
+## Phase 18.1 — Budget Copy Forward [DONE] 2026-04-09
+
+**Task:** Allow users to clone a saved month's planned budget to any other month in one server-side operation, eliminating the need to re-enter the same expenses each month.
+
+**Problem solved:** Every month users had to manually re-type (or use "Load previous month" and re-save) their planned expenses. `POST /budget/copy-forward` makes this a single API call.
+
+**Files created/modified:**
+- `routers/budget_copy.py`: New router with `POST /budget/copy-forward`. Accepts `{ from_month, to_month }` (YYYY-MM). Validates both months, enforces they differ. Finds source month via linear decrypt scan (required for Fernet-encrypted month field). Gets or creates destination month. Copies non-deleted planned expenses, skipping any whose name+category already exists in the destination (idempotent). Copies `salary_planned` only when destination has none yet. Recalculates `total_planned` and `remaining_planned` in the destination. Invalidates annual cache for affected years. Returns `{ from_month, to_month, copied, skipped }`.
+- `main.py`: Imported and registered `budget_copy_router`.
+- `tests/test_budget_copy.py`: 12 tests — unauthenticated 401, same-month 400, invalid format 422 (both params), missing source data 404, happy-path copy to empty destination, salary copied when destination has none, salary NOT overwritten when destination already has one, duplicate expenses skipped (copied+skipped counts correct), totals recalculated after copy, data isolation (cannot copy another user's month), source with no expenses 404.
+- `web/src/api/budget.js`: Added `copyBudgetForward(from_month, to_month)` API helper.
+- `web/src/components/SonOfMervan.jsx`: Added `CopyPlus` icon import, `copyingForward` state, `nextMonthLabel` computed value, `copyToNextMonth` handler (calls API, shows success/info/error toasts), and "Copy budget to [next month]" secondary button below the "Calculate Budget" button.
+
+**Tests:** 644 backend tests pass; 92.04% coverage; ruff clean.
