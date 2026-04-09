@@ -1128,3 +1128,14 @@
 - `routers/insights.py`: Added `GET /insights/reallocation-suggestions?months=3` endpoint. `months` param validated 1–12 via `ge=1, le=12`. Iterates the past N months using the existing `_month_list` + `_find_month` + `_category_totals` helpers (Fernet-safe Python-side decryption). Accumulates per-category stats across the window: tracks `planned_sum`, `actual_sum`, `months_with_data`, `slack_months` (usage < 70%), and `stress_months` (usage > 110%). Categories require 2+ months of data to be classified. `slack_categories` sorted by `avg_slack_amount` descending; `stress_categories` by `avg_excess_amount` descending. Suggestions pair highest-slack with highest-stress; `suggested_amount` = min of slack amount and excess amount; `rationale` is a human-readable string naming both categories and their deviation percentages.
 - `tests/test_insights.py`: Added `TestReallocationSuggestions` class — 13 tests: unauthenticated 401/403, months=0 422, months=13 422, no data returns empty lists, response structure keys present, insufficient months (1 month) produces no pattern, slack category detected, stress category detected, suggestion generated when both exist, rationale is human-readable, data isolation, default months param accepted, slack_categories sorted descending.
 - 763 backend tests pass; ruff clean. Phase 19 DONE.
+
+## Phase 20 generated — Financial Wellness, Data Quality & Power-User Productivity [2026-04-09]
+Generated 5 new tasks (20.1–20.5) after completing all 19 prior phases. Tasks: Financial health score, Bulk expense operations, Budget rollover, Duplicate expense detection, Expense list pagination.
+
+## Phase 20.1 — Financial Health Score [DONE (pre-existing)] 2026-04-09
+Discovered that `GET /insights/health-score` was already implemented (routers/insights.py:386) with savings-rate, budget-adherence and emergency-fund components during Phase 20 generation. Marked DONE on discovery; duplicate endpoint removed.
+
+## Phase 20.2 — Bulk Expense Operations [DONE] 2026-04-09
+- `main.py`: Added `POST /expenses/bulk-delete` and `POST /expenses/bulk-categorise`. Both accept `{ ids: [int, ...] }` with max 100 IDs (422 if exceeded, 422 if empty). Ownership enforced via MonthlyData.user_id join (unowned IDs silently skipped). Soft-deleted expenses are no-ops for delete, and skipped for categorise. bulk-categorise also accepts `category: str` and updates the Fernet-encrypted `category` hybrid property. Both return count of affected rows.
+- `tests/test_expenses.py`: Added `TestBulkDeleteExpenses` (9 tests) and `TestBulkCategoriseExpenses` (7 tests) — 16 total: unauthenticated 401/403, empty ids 422, >100 ids 422, deletes owned expenses, no owned ids returns 0, already-deleted expenses skipped, mixed owned/unowned, unknown ids silently ignored, updates category, unowned skipped, deleted skipped.
+- 779 backend tests pass; ruff clean.

@@ -1223,7 +1223,10 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ## Phase 20 — Financial Wellness, Data Quality & Power-User Productivity
 
-### 20.1 Financial Health Score [TODO]
+### 20.1 Financial Health Score [DONE]
+**Note:** Endpoint `GET /insights/health-score` was already implemented prior to Phase 20 planning (at routers/insights.py:386) with savings-rate, budget-adherence, and emergency-fund components. Marked DONE on discovery.
+
+<!--
 **Goal:** Give users a single monthly metric (0–100) that distils their financial behaviour into an actionable score — making it easy to see improvement over time.
 **Scope:**
 - `GET /insights/health-score?month=YYYY-MM` — returns a composite score built from four equally-weighted sub-scores:
@@ -1242,10 +1245,11 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - [ ] Savings rate sub-score caps at 25 when savings rate ≥ 20%
 - [ ] Data isolation: only the authenticated user's data is used
 - [ ] 8+ backend tests
+-->
 
 ---
 
-### 20.2 Bulk Expense Operations [TODO]
+### 20.2 Bulk Expense Operations [DONE]
 **Goal:** Let power users action many expenses at once — reducing friction for data cleanup and re-categorisation.
 **Scope:**
 - `POST /expenses/bulk-delete` — body `{ ids: [int, ...] }` — soft-deletes all owned expenses in the list; unknown/unowned IDs silently skipped; returns `{ deleted: int }`
@@ -1253,13 +1257,13 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Both endpoints: max 100 IDs per request (422 if exceeded); auth required; IDs belonging to another user are silently ignored (no information leak).
 
 **Acceptance Criteria:**
-- [ ] Deleting 0 owned IDs returns `{ deleted: 0 }`
-- [ ] IDs from another user are silently ignored
-- [ ] More than 100 IDs returns 422
-- [ ] Empty `ids` list returns 422
-- [ ] Bulk-categorise updates encrypted category field correctly
-- [ ] Soft-deleted expenses are not re-deleted (no-op)
-- [ ] 8+ backend tests
+- [x] Deleting 0 owned IDs returns `{ deleted: 0 }`
+- [x] IDs from another user are silently ignored
+- [x] More than 100 IDs returns 422
+- [x] Empty `ids` list returns 422
+- [x] Bulk-categorise updates encrypted category field correctly
+- [x] Soft-deleted expenses are not re-deleted (no-op)
+- [x] 8+ backend tests (16 written)
 
 ---
 
@@ -1368,7 +1372,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
   → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions) [DONE]
 
 Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
-  20.1 (Financial health score) → 20.2 (Bulk expense operations) → 20.3 (Budget rollover)
+  20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover)
   → 20.4 (Duplicate expense detection) → 20.5 (Expense list pagination)
 ```
 
