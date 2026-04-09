@@ -30,7 +30,7 @@ from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule, IncomeSource
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password, create_totp_challenge_token
@@ -43,6 +43,7 @@ from routers import onboarding as onboarding_router
 from routers import budget_copy as budget_copy_router
 from routers import reports as reports_router
 from routers import category_rules as category_rules_router
+from routers import income_sources as income_sources_router
 import email_utils
 from collections import defaultdict
 
@@ -578,6 +579,26 @@ async def get_monthly_tracker(
     offset = (page - 1) * page_size
     page_items = expense_dicts[offset: offset + page_size]
 
+    # Income sources — decrypt all for this month
+    raw_income_sources = (
+        db.query(IncomeSource)
+        .filter(
+            IncomeSource.monthly_data_id == month_row.id,
+            IncomeSource.deleted_at == None,
+        )
+        .all()
+    )
+    income_sources = [
+        {
+            "id": s.id,
+            "name": s.name or "",
+            "amount": s.amount,
+            "source_type": s.source_type,
+        }
+        for s in raw_income_sources
+    ]
+    total_income = sum(s["amount"] for s in income_sources)
+
     return {
         "month": month_norm,
         "salary_planned": float(month_row.salary_planned or 0.0),
@@ -591,6 +612,8 @@ async def get_monthly_tracker(
             "pages": pages,
             "page_size": page_size,
         },
+        "income_sources": income_sources,
+        "total_income": total_income,
     }
 
 @app.get("/expenses/search")
@@ -836,6 +859,7 @@ app.include_router(onboarding_router.router)
 app.include_router(budget_copy_router.router)
 app.include_router(reports_router.router)
 app.include_router(category_rules_router.router)
+app.include_router(income_sources_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)

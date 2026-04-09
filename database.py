@@ -1106,6 +1106,56 @@ class CategoryRule(Base):
         return cls._category_encrypted
 
 
+VALID_INCOME_SOURCE_TYPES = {"salary", "freelance", "rental", "investment", "other"}
+
+
+class IncomeSource(Base):
+    """
+    Multiple income streams per monthly data record.
+    source_type: salary / freelance / rental / investment / other
+    """
+    __tablename__ = "income_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    monthly_data_id = Column(Integer, ForeignKey("monthly_data.id"), nullable=False, index=True)
+
+    _name_encrypted = Column("name_encrypted", String(512), nullable=False)
+    _amount_encrypted = Column("amount_encrypted", String(512), nullable=False)
+
+    source_type = Column(String(50), nullable=False, default="salary")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    monthly_data = relationship("MonthlyData")
+
+    @hybrid_property
+    def name(self):
+        return decrypt_value(self._name_encrypted) if self._name_encrypted else None
+
+    @name.setter
+    def name(self, value):
+        self._name_encrypted = encrypt_value(value) if value else None
+
+    @name.expression
+    def name(cls):
+        return cls._name_encrypted
+
+    @hybrid_property
+    def amount(self):
+        val = decrypt_value(self._amount_encrypted) if self._amount_encrypted else None
+        return float(val) if val is not None else 0.0
+
+    @amount.setter
+    def amount(self, value):
+        self._amount_encrypted = encrypt_value(str(value)) if value is not None else None
+
+    @amount.expression
+    def amount(cls):
+        return cls._amount_encrypted
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),

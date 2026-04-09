@@ -1123,7 +1123,7 @@ Lets users see how each spending category changed between two months.
 - [x] Auto-apply triggers on monthly-tracker POST for new expenses
 - [x] 12+ backend tests
 
-### 19.3 Multiple Income Sources [TODO]
+### 19.3 Multiple Income Sources [DONE]
 **Goal:** Users often have multiple income streams (salary, freelance, rental, investments). Currently salary is a single field per month, hiding income composition.
 **Scope:**
 - New `IncomeSource` DB model: `user_id`, `monthly_data_id`, `_name_encrypted`, `_amount_encrypted`, `source_type` (salary/freelance/rental/investment/other).
@@ -1134,11 +1134,11 @@ Lets users see how each spending category changed between two months.
 - `GET /monthly-tracker/{month}` response extended with `income_sources` array.
 
 **Acceptance Criteria:**
-- [ ] CRUD returns correct status codes; ownership enforced
-- [ ] `GET /monthly-tracker/{month}` includes `income_sources` list
-- [ ] `source_type` is validated against the enum values
-- [ ] Total of income sources is surfaced as `total_income` in the monthly summary
-- [ ] 10+ backend tests
+- [x] CRUD returns correct status codes; ownership enforced
+- [x] `GET /monthly-tracker/{month}` includes `income_sources` list
+- [x] `source_type` is validated against the enum values
+- [x] Total of income sources is surfaced as `total_income` in the monthly summary
+- [x] 10+ backend tests (15 written)
 
 ### 19.4 Year-over-Year Monthly Comparison [TODO]
 **Goal:** Let users see how a given calendar month compares across multiple years (e.g., "How did I spend in January 2024 vs January 2025?").
@@ -1215,7 +1215,7 @@ Phase 18 (DONE): Smart forecasting & user productivity
   → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
 
 Phase 19 (IN PROGRESS): Expense intelligence & custom analytics
-  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources)
+  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources) [DONE]
   → 19.4 (Year-over-year comparison) → 19.5 (Budget reallocation suggestions)
 ```
 
