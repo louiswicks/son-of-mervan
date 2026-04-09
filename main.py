@@ -30,6 +30,7 @@ from core.limiter import limiter
 from core.idempotency import compute_key_hash, get_cached_response, save_response as save_idempotency
 from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
+from middleware.request_id import RequestIDMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
 from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule, IncomeSource, Notification
@@ -78,6 +79,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 CORS_ORIGINS = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
+app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
