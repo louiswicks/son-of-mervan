@@ -1305,7 +1305,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 20.5 Expense List Pagination [TODO]
+### 20.5 Expense List Pagination [DONE]
 **Goal:** Make the expense list endpoint production-ready for users with years of data by adding cursor-based pagination.
 **Scope:**
 - `GET /monthly-tracker/{month}` currently returns all expenses. Add optional query params `limit` (default 50, max 200) and `cursor` (opaque string encoding `last_seen_id`). Response gains `{ next_cursor: str | null, total: int }` wrapper alongside existing `expenses` list.
@@ -1313,13 +1313,13 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Cursor is a base64-encoded expense ID (integer); server decodes it, filters `id < cursor_id` (newest-first ordering), returns next batch.
 
 **Acceptance Criteria:**
-- [ ] Default limit of 50 is applied when no params given
-- [ ] `limit` above 200 returns 422
-- [ ] `next_cursor` is null when no more results
-- [ ] Sequential pages return non-overlapping, correctly ordered results
-- [ ] `total` count reflects all non-deleted expenses for the month
-- [ ] Existing response shape is preserved (expenses array still present)
-- [ ] 8+ backend tests
+- [x] Default limit of 50 is applied when no params given
+- [x] `limit` above 200 returns 422
+- [x] `next_cursor` is null when no more results
+- [x] Sequential pages return non-overlapping, correctly ordered results
+- [x] `total` count reflects all non-deleted expenses for the month
+- [x] Existing response shape is preserved (expenses array still present)
+- [x] 8+ backend tests (11 written)
 
 ---
 
@@ -1374,7 +1374,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
   20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover) [DONE]
-  → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination)
+  → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination) [DONE]
 ```
 
 ---
