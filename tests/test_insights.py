@@ -1956,7 +1956,7 @@ class TestDuplicateCandidates:
         """Soft-deleted expenses must not appear in duplicate candidates."""
         from datetime import datetime
         m = make_month(db, verified_user, month="2026-03", salary_planned=3000.0)
-        e1 = make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
+        make_expense(db, m, name="Rent A", category="Housing", planned=800.0, actual=800.0)
         e2 = make_expense(db, m, name="Rent B", category="Housing", planned=800.0, actual=800.0)
 
         # Soft-delete e2

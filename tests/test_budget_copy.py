@@ -99,7 +99,7 @@ class TestBudgetCopyForward:
         src = make_month(db, verified_user, month="2026-01", salary_planned=3000.0)
         make_expense(db, src, name="Rent", category="Housing", planned=900.0)
 
-        dest = make_month(db, verified_user, month="2026-02", salary_planned=4000.0)
+        make_month(db, verified_user, month="2026-02", salary_planned=4000.0)
 
         r = auth_client.post(
             "/budget/copy-forward",

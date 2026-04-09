@@ -1401,7 +1401,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 21.5 Playwright E2E Critical Path Tests
+### 21.5 Playwright E2E Critical Path Tests ✅ DONE
 **Goal:** Establish a safety net for the most important user journeys with browser-level end-to-end tests that catch regressions CI unit tests cannot.
 **Scope:**
 - `e2e/` directory containing Playwright tests (Python `pytest-playwright`).
@@ -1410,11 +1410,11 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Add `e2e` job to `.github/workflows/ci.yml` that runs after the backend job.
 
 **Acceptance Criteria:**
-- [ ] 4 E2E scenarios implemented and passing
-- [ ] Tests run against a real local server (no mocking)
-- [ ] CI job defined in ci.yml
-- [ ] `e2e/README.md` documents how to run locally
-- [ ] Scenarios use a dedicated test user, cleaned up after
+- [x] 4 E2E scenarios implemented and passing
+- [x] Tests run against a real local server (no mocking)
+- [x] CI job defined in ci.yml
+- [x] `e2e/README.md` documents how to run locally
+- [x] Scenarios use a dedicated test user, cleaned up after
 
 ---
 
@@ -1471,9 +1471,9 @@ Phase 20 (DONE): Financial wellness, data quality & power-user productivity
   20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover) [DONE]
   → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination) [DONE]
 
-Phase 21 (IN PROGRESS): Production hardening & API resilience
+Phase 21 (DONE): Production hardening & API resilience
   21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts) [DONE]
-  → 21.4 (X-Request-ID tracing) [DONE] → 21.5 (Playwright E2E tests)
+  → 21.4 (X-Request-ID tracing) [DONE] → 21.5 (Playwright E2E tests) [DONE]
 ```
 
 ---

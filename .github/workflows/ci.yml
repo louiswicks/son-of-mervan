@@ -83,6 +83,30 @@ jobs:
         run: npx eslint src/ --ext .js,.jsx --max-warnings 50
         working-directory: web
 
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: backend-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: pytest e2e/ -v
+        env:
+          JWT_SECRET_KEY: e2e-ci-jwt-secret-not-for-production
+          ENCRYPTION_KEY: ${{ secrets.E2E_ENCRYPTION_KEY || '' }}
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest

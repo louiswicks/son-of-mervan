@@ -51,15 +51,22 @@ if not DATABASE_URL:
     )
 else:
     connect_args = {}
+    pool_kwargs: dict = {"pool_pre_ping": True}
     if DATABASE_URL.startswith("postgresql"):
         connect_args = {"sslmode": "require"}
-    
+        pool_kwargs.update({"pool_size": 10, "max_overflow": 20})
+    elif DATABASE_URL.startswith("sqlite"):
+        # SQLite with an explicit DATABASE_URL: use a single shared connection so
+        # BackgroundScheduler threads and async request handlers never contend for
+        # a write lock.  check_same_thread=False lets threads share the connection.
+        from sqlalchemy.pool import StaticPool
+        connect_args = {"check_same_thread": False}
+        pool_kwargs.update({"poolclass": StaticPool})
+
     engine = create_engine(
         DATABASE_URL,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
         connect_args=connect_args,
+        **pool_kwargs,
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

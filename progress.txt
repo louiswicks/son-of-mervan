@@ -1219,3 +1219,28 @@ Added a `_check_spending_anomaly()` helper in `main.py` called after each expens
 - `main.py`: Added import and middleware registration.
 
 **Tests:** 862 total backend tests pass; coverage 93.41%; ruff clean.
+
+---
+
+## Phase 21.5 — Playwright E2E Critical Path Tests [DONE] 2026-04-09
+
+**Task:** Add a pytest-playwright E2E test suite that runs against a real uvicorn server to catch regressions CI unit tests cannot detect.
+
+**Files created/modified:**
+- `e2e/conftest.py`: Session-scoped server fixture starts a real uvicorn process on port 8799, backed by an isolated SQLite DB. Generates a Fernet key + deterministic JWT secret per session. Registers, verifies, and logs in a dedicated E2E test user (`e2e_test_user@example.com`). Server env disables SMTP and APScheduler to avoid side effects. DB file is cleaned up on session teardown.
+- `e2e/test_critical_paths.py`: 10 tests across 4 critical path classes:
+  - `TestSignupVerifyLogin` — signup, verify email via `dev_verify_url`, login; unverified user → 403; wrong password → 401.
+  - `TestCalculateBudget` — `POST /calculate-budget?commit=false` returns correct totals; commit=false does not persist data.
+  - `TestMonthlyTracker` — commit plan, post actuals, GET to verify; unauthenticated → 401/403.
+  - `TestAnnualOverview` — 12 months returned with correct totals; unauth → 401/403; invalid year → 4xx.
+- `e2e/README.md`: Documents prerequisites, how to run locally, scenario table, design notes.
+- `.github/workflows/ci.yml`: Added `e2e` job (runs after `backend-test`): installs deps, installs Playwright browser binaries, runs `pytest e2e/ -v`.
+- `requirements.txt`: Added `pytest-playwright>=0.4.4`.
+
+**Bug fixes discovered during E2E testing:**
+- `database.py`: When `DATABASE_URL` is set to a `sqlite://` URL, the engine was created in the `else` branch without `check_same_thread: False` and with `pool_size=10, max_overflow=20` (PostgreSQL defaults). Added SQLite detection: uses `StaticPool` + `check_same_thread=False` for SQLite URLs to avoid write-lock contention with BackgroundScheduler threads.
+- `database.py`: Added `DISABLE_SCHEDULER` env var support in `main.py` to skip APScheduler startup in E2E environments.
+- `alembic/versions/b2c3d4e5f6a7_add_category_rules_table.py`: The `category_rules` table existed in `database.py` but had no Alembic migration. All unit tests use `Base.metadata.create_all()` which masked this. The real server (Alembic-driven) raised `OperationalError: no such table: category_rules`. Added the missing migration.
+- `tests/test_budget_copy.py`, `tests/test_insights.py`: Fixed 2 pre-existing ruff F841 (unused variable) errors.
+
+**Tests:** 10 E2E tests pass; 862 backend unit tests pass; ruff clean.

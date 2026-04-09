@@ -1271,6 +1271,8 @@ def purge_expired_tokens(session_factory):
 
 @app.on_event("startup")
 def _start_scheduler():
+    if os.getenv("DISABLE_SCHEDULER", "").lower() in ("1", "true", "yes"):
+        return  # Skip background jobs in E2E/test environments
     from routers.recurring import generate_all_recurring
     from routers.alerts import check_budget_alerts
     from routers.currency import sync_exchange_rates
