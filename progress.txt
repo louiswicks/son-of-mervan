@@ -1033,3 +1033,18 @@
 - `tests/test_insights.py`: Added `TestMonthPerformance` class — 10 tests: empty month zeroed/on_track, on_track status, warning status (105%), over_budget status (115%), savings rate calculation, savings rate clamped to 0, unauthenticated 401, missing param 422, invalid format 422, daily_actuals populated.
 
 **Tests:** 622 backend tests pass; ruff clean; commit pending.
+
+## Phase 17.5 — Onboarding Wizard [DONE] 2026-04-09
+
+**Task:** Guide new users through their first budget setup so they don't land on a blank dashboard.
+
+**Files created/modified:**
+- `database.py`: Added `onboarding_dismissed_at = Column(DateTime, nullable=True, default=None)` to `User` model.
+- `alembic/versions/w3x4y5z6a7b8_add_onboarding_dismissed_at.py`: New migration adding the column (revises v2w3x4y5z6a7).
+- `routers/onboarding.py`: New router with `GET /onboarding/status` and `POST /onboarding/dismiss`. Status derives each step's `done` flag from real DB state: salary (any MonthlyData with salary_planned > 0), expense (any non-deleted MonthlyExpense), savings goal (any non-deleted SavingsGoal), recurring expense (any non-deleted RecurringExpense). Returns `{ completed, dismissed, steps }`. Dismiss sets `onboarding_dismissed_at`; idempotent.
+- `main.py`: Imported and registered `onboarding_router`.
+- `tests/test_onboarding.py`: 9 tests — unauthenticated 401 on both endpoints, fresh user all steps incomplete, each individual step flips `done=True` when the corresponding DB row exists, `completed=True` when dismissed, dismiss returns `{dismissed: true}`, dismiss idempotent.
+- `web/src/components/OnboardingStatusWizard.jsx`: Modal wizard component. Shows on dashboard when `completed=false` and not locally dismissed. Lists 4 steps with check/circle icons; clicking an incomplete step dismisses and navigates to the relevant route. "Skip for now" / "Finish" button at bottom. Fetches from `GET /onboarding/status`; POST to `/onboarding/dismiss` on skip/finish.
+- `web/src/components/SonOfMervan.jsx`: Imported `OnboardingStatusWizard` and rendered it as first element inside `<PageWrapper>`.
+
+**Tests:** 632 backend tests pass; 91.94% coverage; ruff clean.

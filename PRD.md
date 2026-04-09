@@ -982,19 +982,19 @@ Phase 16 addresses user-facing reliability gaps and production hygiene that beco
 - [x] Unauthenticated request returns 401
 - [x] 4+ backend tests (10 tests added)
 
-### 17.5 Onboarding Wizard
+### 17.5 Onboarding Wizard ✅ DONE
 **Goal:** Guide new users through their first budget setup so they don't land on a blank dashboard.
 **Scope:**
 - Backend: `GET /onboarding/status` returns `{ completed: bool, steps: [{id, label, done: bool}] }` based on whether the user has: set salary, added any planned expense, added a savings goal, linked a bank or added a recurring expense.
 - Frontend: `OnboardingWizard.jsx` modal that shows on dashboard when `completed=false`. 4-step flow: (1) Set salary, (2) Add first expense, (3) Add savings goal, (4) Explore (dismissed). Persists dismissal in Zustand store.
 
 **Acceptance Criteria:**
-- [ ] `GET /onboarding/status` returns correct step completion based on DB state
-- [ ] Each step's `done` flag is derived from real data (not user-input flag)
-- [ ] `POST /onboarding/dismiss` marks onboarding as permanently dismissed (stored on User model as `onboarding_dismissed_at`)
-- [ ] Frontend wizard appears on dashboard for users with `completed=false` and no prior dismissal
-- [ ] Wizard is skippable (dismiss button on any step)
-- [ ] 4+ backend tests; frontend wizard renders correctly with mock data
+- [x] `GET /onboarding/status` returns correct step completion based on DB state
+- [x] Each step's `done` flag is derived from real data (not user-input flag)
+- [x] `POST /onboarding/dismiss` marks onboarding as permanently dismissed (stored on User model as `onboarding_dismissed_at`)
+- [x] Frontend wizard appears on dashboard for users with `completed=false` and no prior dismissal
+- [x] Wizard is skippable (dismiss button on any step)
+- [x] 4+ backend tests; frontend wizard renders correctly with mock data
 
 ---
 
@@ -1037,7 +1037,7 @@ Phase 16 (DONE): Reliability, developer experience & user onboarding
 
 Phase 17: Engagement, insight & polish
   17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
-  → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard)
+  → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
 ```
 
 ---
