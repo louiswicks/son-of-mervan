@@ -1104,7 +1104,7 @@ Lets users see how each spending category changed between two months.
 - [x] Both endpoints return 401 for unauthenticated requests
 - [x] 10+ backend tests; all pass
 
-### 19.2 Auto-categorization Rules [TODO]
+### 19.2 Auto-categorization Rules [DONE]
 **Goal:** Let users define keyword/regex rules that auto-assign categories to new and existing expenses, reducing manual re-categorization.
 **Scope:**
 - New `CategoryRule` DB model: `pattern` (plaintext), `category` (encrypted), `priority` (int), `user_id`.
@@ -1116,12 +1116,12 @@ Lets users see how each spending category changed between two months.
 - Rules are applied automatically on `POST /monthly-tracker/{month}` (create path) if rules exist.
 
 **Acceptance Criteria:**
-- [ ] CRUD returns correct HTTP status codes; ownership enforced
-- [ ] `apply` endpoint re-categorizes matching expenses and returns `{ updated: N }`
-- [ ] Pattern matching is case-insensitive substring match
-- [ ] Rules applied in priority order; first match wins
-- [ ] Auto-apply triggers on monthly-tracker POST for new expenses
-- [ ] 12+ backend tests
+- [x] CRUD returns correct HTTP status codes; ownership enforced
+- [x] `apply` endpoint re-categorizes matching expenses and returns `{ updated: N }`
+- [x] Pattern matching is case-insensitive substring match
+- [x] Rules applied in priority order; first match wins
+- [x] Auto-apply triggers on monthly-tracker POST for new expenses
+- [x] 12+ backend tests
 
 ### 19.3 Multiple Income Sources [TODO]
 **Goal:** Users often have multiple income streams (salary, freelance, rental, investments). Currently salary is a single field per month, hiding income composition.
@@ -1215,7 +1215,7 @@ Phase 18 (DONE): Smart forecasting & user productivity
   → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
 
 Phase 19 (IN PROGRESS): Expense intelligence & custom analytics
-  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) → 19.3 (Multiple income sources)
+  19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources)
   → 19.4 (Year-over-year comparison) → 19.5 (Budget reallocation suggestions)
 ```
 

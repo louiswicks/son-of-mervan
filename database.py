@@ -1070,6 +1070,42 @@ class BankTransaction(Base):
         return cls._currency_encrypted
 
 
+class CategoryRule(Base):
+    """
+    User-defined rule: if an expense name (case-insensitive substring match)
+    contains *pattern*, auto-assign *category*.
+    Rules are evaluated in ascending *priority* order; first match wins.
+    """
+    __tablename__ = "category_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # pattern stored in plaintext — it is not sensitive financial data
+    pattern = Column(String(256), nullable=False)
+
+    # category is encrypted (consistent with every other category field)
+    _category_encrypted = Column("category_encrypted", String(512), nullable=False)
+
+    priority = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+    @hybrid_property
+    def category(self):
+        return decrypt_value(self._category_encrypted) if self._category_encrypted else None
+
+    @category.setter
+    def category(self, value):
+        self._category_encrypted = encrypt_value(value) if value else None
+
+    @category.expression
+    def category(cls):
+        return cls._category_encrypted
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),

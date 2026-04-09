@@ -30,7 +30,7 @@ from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password, create_totp_challenge_token
@@ -42,6 +42,7 @@ from routers import templates as templates_router
 from routers import onboarding as onboarding_router
 from routers import budget_copy as budget_copy_router
 from routers import reports as reports_router
+from routers import category_rules as category_rules_router
 import email_utils
 from collections import defaultdict
 
@@ -413,7 +414,26 @@ async def save_actuals(
         )
         .all()
     )
+
+    # Load user's category rules once (sorted by priority) for auto-apply
+    from routers.category_rules import apply_rules_to_name
+    active_rules = (
+        db.query(CategoryRule)
+        .filter(
+            CategoryRule.user_id == user.id,
+            CategoryRule.deleted_at == None,
+        )
+        .order_by(CategoryRule.priority, CategoryRule.id)
+        .all()
+    )
+
     for item in items:
+        # Auto-apply category rules to new expenses (override only when rule matches)
+        if active_rules:
+            matched_cat = apply_rules_to_name(active_rules, item.name)
+            if matched_cat:
+                item.category = matched_cat
+
         exp = find_expense_by_values(existing_expenses, item.name, item.category)
         
         item_currency = (item.currency or "").upper() or (user.base_currency or "GBP")
@@ -815,6 +835,7 @@ app.include_router(templates_router.router)
 app.include_router(onboarding_router.router)
 app.include_router(budget_copy_router.router)
 app.include_router(reports_router.router)
+app.include_router(category_rules_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)
