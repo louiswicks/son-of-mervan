@@ -1180,3 +1180,24 @@ Generated 5 new tasks (21.1–21.5) after completing all 20 prior phases. Tasks:
 - `tests/test_export.py`: Added `TestGdprExport` class — 9 tests: 200 with JSON, unauthenticated 401/403, all required top-level keys present, Content-Disposition contains user_id and date, expense data decrypted correctly, soft-deleted expenses included, data isolation (other user's data excluded), app_version is non-empty string, exported_at parses as ISO datetime.
 
 **Tests:** 843 total backend tests pass; ruff clean.
+
+---
+
+## Phase 21.3 — Spending Anomaly Alerts [DONE]
+**Date:** 2026-04-09
+
+**Problem solved:** Users had no automatic signal when they entered an expense significantly above their historical norm for a category. This made it easy to miss data entry errors and overspending.
+
+**Approach:**
+Added a `_check_spending_anomaly()` helper in `main.py` called after each expense is saved in `POST /monthly-tracker/{month}`. The helper:
+1. Resolves the 6 calendar months prior to the current month.
+2. Fetches all MonthlyData rows for the user, decrypts the month field in Python (Fernet non-deterministic constraint), and keeps only those in the 6-month window.
+3. For each matching historical month, decrypts MonthlyExpense rows and collects actual_amounts for the same category.
+4. If ≥ 3 data points and std > 0 and actual > mean + 2σ, creates a `Notification` (type=`spending_anomaly`, dedup_key=`anomaly_{expense_id}`).
+5. Wrapped in a try/except so anomaly side-effects never fail the main request.
+
+**Files modified:**
+- `main.py`: Added `Notification` to database import. Added `_check_spending_anomaly()` helper (~100 lines). Wired call into `save_actuals()` after the second `db.commit()` (totals recalc), iterating over `refreshed_expenses`.
+- `tests/test_spending_anomaly.py`: New file — 11 tests covering: anomaly fires when > mean+2σ, message contains avg, dedup_key matches expense_id, no notification with < 3 historical points, no notification with 1 point, no notification within normal range, no notification when std=0, no notification with zero history, dedup prevents duplicates, user scoping, endpoint returns 200.
+
+**Tests:** 854 total backend tests pass; coverage 93.36%; ruff clean.

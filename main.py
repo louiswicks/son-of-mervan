@@ -32,7 +32,7 @@ from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule, IncomeSource
+from database import get_db, User, MonthlyData, MonthlyExpense, RefreshToken, PasswordResetToken, AuditLog, CategoryRule, IncomeSource, Notification
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from security import create_access_token, verify_token, verify_password, create_totp_challenge_token
@@ -519,6 +519,14 @@ async def save_actuals(
     db.add(month_row)
     db.commit()
     db.refresh(month_row)
+
+    # Spending anomaly detection — fire notifications for statistically unusual expenses
+    for expense in refreshed_expenses:
+        try:
+            _check_spending_anomaly(db, user, expense, month_norm)
+        except Exception:
+            pass  # Never fail the main request due to anomaly side-effects
+
     invalidate_annual_cache(user.id, int(month_norm[:4]))
 
     expenses_by_category = {}
@@ -810,6 +818,114 @@ def _write_audit(
         changed_fields=json.dumps({"before": before, "after": after}),
     )
     db.add(log)
+
+
+def _check_spending_anomaly(
+    db: Session,
+    user: User,
+    expense: MonthlyExpense,
+    current_month: str,
+) -> None:
+    """Create a spending_anomaly Notification if expense.actual_amount is an outlier.
+
+    Compares the expense's category actual amount against the last 6 months of
+    history (excluding current_month). Triggers only when:
+      - >= 3 historical data points exist for the category
+      - std > 0
+      - actual_amount > mean + 2 * std
+    Dedup key prevents duplicate notifications for the same expense.
+    """
+    import math
+
+    # Determine the 6-month window before current month
+    try:
+        cur_dt = datetime.strptime(current_month, "%Y-%m")
+    except ValueError:
+        return
+
+    # Build ordered list of the 6 months preceding current_month
+    historical_months = []
+    for i in range(1, 7):
+        m = cur_dt.month - i
+        y = cur_dt.year + (m - 1) // 12
+        m = ((m - 1) % 12) + 1
+        historical_months.append(f"{y:04d}-{m:02d}")
+
+    # Fetch all MonthlyData rows for this user (excluding current month)
+    all_month_rows = (
+        db.query(MonthlyData)
+        .filter(MonthlyData.user_id == user.id)
+        .all()
+    )
+
+    # Decrypt month field and keep only rows in our 6-month window
+    target_category = expense.category
+    historical_amounts: list[float] = []
+
+    for row in all_month_rows:
+        try:
+            row_month = row.month
+        except Exception:
+            continue
+        if row_month not in historical_months:
+            continue
+        # Find expenses in this historical month matching the category
+        hist_expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == row.id,
+                MonthlyExpense.deleted_at == None,
+            )
+            .all()
+        )
+        for he in hist_expenses:
+            try:
+                if he.category == target_category and he.actual_amount is not None:
+                    historical_amounts.append(float(he.actual_amount))
+            except Exception:
+                continue
+
+    n = len(historical_amounts)
+    if n < 3:
+        return
+
+    mean = sum(historical_amounts) / n
+    variance = sum((x - mean) ** 2 for x in historical_amounts) / n
+    std = math.sqrt(variance)
+
+    if std == 0:
+        return
+
+    actual = float(expense.actual_amount or 0.0)
+    if actual <= mean + 2 * std:
+        return
+
+    # Check dedup to avoid re-notifying for the same expense
+    dedup_key = f"anomaly_{expense.id}"
+    existing = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == user.id,
+            Notification.dedup_key == dedup_key,
+        )
+        .first()
+    )
+    if existing:
+        return
+
+    currency_symbol = "£" if (user.base_currency or "GBP") == "GBP" else (user.base_currency or "GBP")
+    notif = Notification(
+        user_id=user.id,
+        type="spending_anomaly",
+        dedup_key=dedup_key,
+    )
+    notif.title = f"Unusual spending in {target_category}"
+    notif.message = (
+        f"Your {target_category} spend of {currency_symbol}{actual:.2f} is significantly "
+        f"higher than usual (avg {currency_symbol}{mean:.2f})."
+    )
+    db.add(notif)
+    db.commit()
 
 
 @app.put("/expenses/{expense_id}")

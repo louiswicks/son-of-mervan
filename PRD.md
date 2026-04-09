@@ -1366,7 +1366,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 21.3 Spending Anomaly Alerts
+### 21.3 Spending Anomaly Alerts [DONE]
 **Goal:** Automatically notify users when a submitted expense is unusually large compared to their history for that category, helping them catch data entry errors and overspending early.
 **Scope:**
 - On `POST /monthly-tracker/{month}`, after saving each expense, compare `actual_amount` to the user's historical per-category mean and standard deviation (last 6 months, excluding the current month).
@@ -1374,12 +1374,12 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - If fewer than 3 historical data points, or std = 0, skip anomaly check (no false positives).
 
 **Acceptance Criteria:**
-- [ ] No notification created when history is insufficient (< 3 months)
-- [ ] No notification when amount is within normal range
-- [ ] Notification created when amount exceeds mean + 2σ
-- [ ] Dedup key prevents duplicate notifications for the same expense
-- [ ] Notifications are scoped to the authenticated user
-- [ ] 8+ backend tests
+- [x] No notification created when history is insufficient (< 3 months)
+- [x] No notification when amount is within normal range
+- [x] Notification created when amount exceeds mean + 2σ
+- [x] Dedup key prevents duplicate notifications for the same expense
+- [x] Notifications are scoped to the authenticated user
+- [x] 8+ backend tests
 
 ---
 
@@ -1472,7 +1472,7 @@ Phase 20 (DONE): Financial wellness, data quality & power-user productivity
   → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination) [DONE]
 
 Phase 21 (IN PROGRESS): Production hardening & API resilience
-  21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts)
+  21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts) [DONE]
   → 21.4 (X-Request-ID tracing) → 21.5 (Playwright E2E tests)
 ```
 
