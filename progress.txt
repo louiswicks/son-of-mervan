@@ -1201,3 +1201,21 @@ Added a `_check_spending_anomaly()` helper in `main.py` called after each expens
 - `tests/test_spending_anomaly.py`: New file — 11 tests covering: anomaly fires when > mean+2σ, message contains avg, dedup_key matches expense_id, no notification with < 3 historical points, no notification with 1 point, no notification within normal range, no notification when std=0, no notification with zero history, dedup prevents duplicates, user scoping, endpoint returns 200.
 
 **Tests:** 854 total backend tests pass; coverage 93.36%; ruff clean.
+
+---
+
+## PRD 21.4 — X-Request-ID Tracing Middleware [2026-04-09]
+
+**Goal:** Add distributed tracing support so every request can be correlated across logs.
+
+**What was implemented:**
+- `middleware/request_id.py`: New `RequestIDMiddleware` extending `BaseHTTPMiddleware`. Reads `X-Request-ID` from the incoming request; if it is a valid UUID4 it is echoed back, otherwise a fresh UUID4 is generated. The ID is bound into the structlog context via `structlog.contextvars.bind_contextvars(request_id=...)` before the request is processed, so every log line emitted during the request carries the `request_id` field. The context is cleared at the start of each request to prevent leakage between requests.
+- `main.py`: Added `from middleware.request_id import RequestIDMiddleware` and registered `app.add_middleware(RequestIDMiddleware)` directly after `SecurityHeadersMiddleware`.
+- `tests/test_request_id.py`: 8 tests covering: header always present, valid UUID4 echoed, invalid value replaced, missing header generates UUID4, each request gets a unique ID, UUID1 (not UUID4) is replaced, header present on authenticated endpoints, client ID propagated on POST requests.
+
+**Files modified/created:**
+- `middleware/request_id.py`: New file.
+- `tests/test_request_id.py`: New file — 8 tests.
+- `main.py`: Added import and middleware registration.
+
+**Tests:** 862 total backend tests pass; coverage 93.41%; ruff clean.

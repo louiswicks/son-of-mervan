@@ -1383,7 +1383,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 21.4 X-Request-ID Tracing Middleware
+### 21.4 X-Request-ID Tracing Middleware [DONE]
 **Goal:** Add distributed tracing support so every request can be correlated across logs, making production debugging significantly faster.
 **Scope:**
 - Add `middleware/request_id.py` — a Starlette middleware that reads `X-Request-ID` from the incoming request (if present and valid UUID4), or generates a new UUID4.
@@ -1392,12 +1392,12 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Register in `main.py` (after SecurityHeadersMiddleware).
 
 **Acceptance Criteria:**
-- [ ] Response always contains `X-Request-ID` header
-- [ ] Client-supplied UUID4 is echoed back unchanged
-- [ ] Non-UUID4 client header is replaced with a new UUID4
-- [ ] Missing header → server generates UUID4
-- [ ] Request ID appears in structured log output for the request
-- [ ] 5+ backend tests
+- [x] Response always contains `X-Request-ID` header
+- [x] Client-supplied UUID4 is echoed back unchanged
+- [x] Non-UUID4 client header is replaced with a new UUID4
+- [x] Missing header → server generates UUID4
+- [x] Request ID appears in structured log output for the request
+- [x] 5+ backend tests (8 written)
 
 ---
 
@@ -1473,7 +1473,7 @@ Phase 20 (DONE): Financial wellness, data quality & power-user productivity
 
 Phase 21 (IN PROGRESS): Production hardening & API resilience
   21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) [DONE] → 21.3 (Spending anomaly alerts) [DONE]
-  → 21.4 (X-Request-ID tracing) → 21.5 (Playwright E2E tests)
+  → 21.4 (X-Request-ID tracing) [DONE] → 21.5 (Playwright E2E tests)
 ```
 
 ---
