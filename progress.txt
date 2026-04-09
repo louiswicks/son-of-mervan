@@ -1079,3 +1079,10 @@
 - `tests/test_insights.py`: Added `TestSubscriptionTracker` class — 7 tests: no data returns empty list, unauthenticated returns 401/403, expense in 3 months detected correctly (name/category/costs/dates), expense in only 2 months not flagged, annual_cost == monthly_cost × months_seen, data isolation (other user's subscriptions not returned), multiple subscriptions sorted by annual_cost descending.
 
 **Tests:** 662 total backend tests pass; ruff clean.
+
+## Phase 18.4 — Quarterly Financial Report [DONE] 2026-04-09
+- `GET /reports/quarterly?year=YYYY&quarter=1` added in new `routers/reports.py`. Accepts `year` (int, required) and `quarter` (int, 1–4, FastAPI ge/le validation returns 422 outside range). Fetches all MonthlyData for the user, decrypts in Python (Fernet non-deterministic pattern). Maps quarter to 3 month numbers, builds per-month breakdown with `salary`, `expense_total`, `savings`, `savings_rate_pct`, and `has_data` flag. Months with no data are included as zeroed placeholders. Aggregates quarterly totals: `salary_total`, `expense_total`, `savings_total`, `savings_rate_pct` (null when salary_total = 0). Uses `is not None` checks instead of truthiness to correctly handle `salary_actual=0.0` (explicit zero income) without falling back to `salary_planned`.
+- `main.py`: imported and registered `reports_router`.
+- `tests/test_reports.py`: 12 tests — unauthenticated 401/403, quarter=0 422, quarter=5 422, missing year 422, missing quarter 422, no data returns zeroed totals with 3 placeholder months, all 4 quarters return exactly 3 months, correct month labels per quarter, full quarter calculates correct totals and savings_rate_pct, partial quarter zeroes missing months, savings_rate_pct null when salary=0, data isolation (other user's data excluded).
+
+**Tests:** 673 total backend tests pass; ruff clean.

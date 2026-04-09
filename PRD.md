@@ -1065,11 +1065,11 @@ Aggregates 3 months of income and expense data into a single quarterly summary.
 **Endpoint:** `GET /reports/quarterly?year=YYYY&quarter=1`
 
 **Acceptance Criteria:**
-- [ ] `quarter` param: 1–4; 422 outside range
-- [ ] Returns per-month breakdown + quarterly totals: `salary_total`, `expense_total`, `savings_total`, `savings_rate_pct`
-- [ ] Returns partial data if not all months in the quarter have data
-- [ ] Returns 200 with zeroed totals when no data exists for any month in the quarter
-- [ ] 6+ backend tests
+- [x] `quarter` param: 1–4; 422 outside range
+- [x] Returns per-month breakdown + quarterly totals: `salary_total`, `expense_total`, `savings_total`, `savings_rate_pct`
+- [x] Returns partial data if not all months in the quarter have data
+- [x] Returns 200 with zeroed totals when no data exists for any month in the quarter
+- [x] 12 backend tests; all pass
 
 ### 18.5 Month-over-Month Category Comparison
 
@@ -1130,7 +1130,7 @@ Phase 17 (DONE): Engagement, insight & polish
 
 Phase 18: Smart forecasting & user productivity
   18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
-  → 18.4 (Quarterly report) → 18.5 (Month comparison)
+  → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison)
 ```
 
 ---
