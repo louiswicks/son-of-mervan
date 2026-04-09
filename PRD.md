@@ -1152,7 +1152,7 @@ Lets users see how each spending category changed between two months.
 - [x] Each category entry covers all years (missing years show 0)
 - [x] 8+ backend tests (11 written)
 
-### 19.5 Budget Reallocation Suggestions [TODO]
+### 19.5 Budget Reallocation Suggestions [DONE]
 **Goal:** Automatically identify budget slack (under-used categories) and stress (consistently over-budget categories) and suggest moving budget between them.
 **Scope:**
 - `GET /insights/reallocation-suggestions?months=3` — analyzes the past N months; returns:
@@ -1161,11 +1161,11 @@ Lets users see how each spending category changed between two months.
   - `suggestions`: list of `{ from_category, to_category, suggested_amount, rationale }` pairs
 
 **Acceptance Criteria:**
-- [ ] Returns empty lists when insufficient data or no patterns found
-- [ ] `months` param validated 1–12
-- [ ] Suggestions pair the highest-slack category with the highest-stress category
-- [ ] Rationale string is human-readable (e.g., "Housing is 30% over budget; Dining has 25% slack")
-- [ ] 8+ backend tests
+- [x] Returns empty lists when insufficient data or no patterns found
+- [x] `months` param validated 1–12
+- [x] Suggestions pair the highest-slack category with the highest-stress category
+- [x] Rationale string is human-readable (e.g., "Housing is 30% over budget; Dining has 25% slack")
+- [x] 8+ backend tests (13 written)
 
 ---
 
@@ -1214,9 +1214,9 @@ Phase 18 (DONE): Smart forecasting & user productivity
   18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
   → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
 
-Phase 19 (IN PROGRESS): Expense intelligence & custom analytics
+Phase 19 (DONE): Expense intelligence & custom analytics
   19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources) [DONE]
-  → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions)
+  → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions) [DONE]
 ```
 
 ---
