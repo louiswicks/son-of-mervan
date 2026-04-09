@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -510,10 +511,20 @@ async def get_monthly_tracker(
     category: Optional[str] = Query(None, description="Filter by category"),
     page: int = Query(1, ge=1, description="Page number (1-based)"),
     page_size: int = Query(25, ge=1, le=100, description="Items per page"),
+    limit: int = Query(50, ge=1, le=200, description="Cursor-pagination page size (max 200)"),
+    cursor: Optional[str] = Query(None, description="Opaque cursor from previous response (base64-encoded last expense ID)"),
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
     month_norm = normalize_month(month)
+
+    # Validate cursor early so invalid cursors always get 422 regardless of month state
+    cursor_id: Optional[int] = None
+    if cursor is not None:
+        try:
+            cursor_id = int(base64.b64decode(cursor.encode(), validate=True).decode())
+        except Exception:
+            raise HTTPException(status_code=422, detail="Invalid cursor")
 
     user = get_user_by_email(db, current_user)
     if not user:
@@ -522,7 +533,7 @@ async def get_monthly_tracker(
             "salary_planned": 0.0,
             "salary_actual": 0.0,
             "rows": [],
-            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size},
+            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size, "next_cursor": None},
         }
 
     # Use encrypted column for query
@@ -533,7 +544,7 @@ async def get_monthly_tracker(
             "salary_planned": 0.0,
             "salary_actual": 0.0,
             "rows": [],
-            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size},
+            "expenses": {"items": [], "total": 0, "page": page, "pages": 0, "page_size": page_size, "next_cursor": None},
         }
 
     all_expenses = (
@@ -574,11 +585,19 @@ async def get_monthly_tracker(
         for cat, v in sums.items()
     ]
 
-    # Paginate
     total = len(expense_dicts)
     pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 0
-    offset = (page - 1) * page_size
-    page_items = expense_dicts[offset: offset + page_size]
+
+    # Cursor-based pagination (newest-first by id)
+    sorted_expenses = sorted(expense_dicts, key=lambda e: e["id"], reverse=True)
+    next_cursor: Optional[str] = None
+
+    if cursor_id is not None:
+        sorted_expenses = [e for e in sorted_expenses if e["id"] < cursor_id]
+
+    page_items = sorted_expenses[:limit]
+    if len(sorted_expenses) > limit:
+        next_cursor = base64.b64encode(str(page_items[-1]["id"]).encode()).decode()
 
     # Income sources — decrypt all for this month
     raw_income_sources = (
@@ -612,6 +631,7 @@ async def get_monthly_tracker(
             "page": page,
             "pages": pages,
             "page_size": page_size,
+            "next_cursor": next_cursor,
         },
         "income_sources": income_sources,
         "total_income": total_income,

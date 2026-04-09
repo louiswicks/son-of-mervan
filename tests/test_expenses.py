@@ -1,4 +1,5 @@
 """Tests for individual expense CRUD and monthly tracker endpoints."""
+import base64
 from datetime import datetime
 
 import pytest
@@ -147,25 +148,29 @@ class TestMonthlyTrackerGet:
         assert len(items) == 1
         assert items[0]["category"] == "Housing"
 
-    def test_pagination_respects_page_size(self, auth_client, db, verified_user):
+    def test_pagination_respects_limit(self, auth_client, db, verified_user):
         month = make_month(db, verified_user, "2026-05")
         for i in range(7):
             make_expense(db, month, f"Expense{i}", "Food", 50, 50)
 
-        r = auth_client.get("/monthly-tracker/2026-05?page=1&page_size=3")
+        r = auth_client.get("/monthly-tracker/2026-05?limit=3")
         data = r.json()
         assert data["expenses"]["total"] == 7
-        assert data["expenses"]["pages"] == 3
         assert len(data["expenses"]["items"]) == 3
+        assert data["expenses"]["next_cursor"] is not None
 
-    def test_pagination_second_page(self, auth_client, db, verified_user):
+    def test_pagination_second_page_via_cursor(self, auth_client, db, verified_user):
         month = make_month(db, verified_user, "2026-06")
         for i in range(5):
             make_expense(db, month, f"Expense{i}", "Food", 50, 50)
 
-        r = auth_client.get("/monthly-tracker/2026-06?page=2&page_size=3")
-        data = r.json()
-        assert len(data["expenses"]["items"]) == 2  # remaining 2 items on page 2
+        r1 = auth_client.get("/monthly-tracker/2026-06?limit=3")
+        cursor = r1.json()["expenses"]["next_cursor"]
+        assert cursor is not None
+
+        r2 = auth_client.get(f"/monthly-tracker/2026-06?limit=3&cursor={cursor}")
+        data = r2.json()
+        assert len(data["expenses"]["items"]) == 2  # remaining 2 items on second page
 
     def test_includes_salary_totals(self, auth_client, db, verified_user):
         make_month(db, verified_user, "2026-07", salary_planned=3500.0)
@@ -544,3 +549,127 @@ class TestBulkCategoriseExpenses:
         r = auth_client.post("/expenses/bulk-categorise", json={"ids": [999999], "category": "Food"})
         assert r.status_code == 200
         assert r.json()["updated"] == 0
+
+
+class TestMonthlyTrackerPagination:
+    """Phase 20.5 — Cursor-based pagination for GET /monthly-tracker/{month}."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/monthly-tracker/2026-01")
+        assert r.status_code in (401, 403)
+
+    def test_limit_above_200_returns_422(self, auth_client):
+        r = auth_client.get("/monthly-tracker/2026-01?limit=201")
+        assert r.status_code == 422
+
+    def test_default_limit_applied_no_params(self, auth_client, db, verified_user):
+        """When no limit/cursor given, default limit of 50 is applied."""
+        month = make_month(db, verified_user, "2026-01")
+        for i in range(60):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r = auth_client.get("/monthly-tracker/2026-01")
+        assert r.status_code == 200
+        body = r.json()["expenses"]
+        assert len(body["items"]) == 50
+        assert body["total"] == 60
+
+    def test_next_cursor_null_when_no_more_results(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2026-02")
+        for i in range(3):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r = auth_client.get("/monthly-tracker/2026-02?limit=10")
+        assert r.status_code == 200
+        assert r.json()["expenses"]["next_cursor"] is None
+
+    def test_next_cursor_present_when_more_results(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2026-03")
+        for i in range(5):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r = auth_client.get("/monthly-tracker/2026-03?limit=3")
+        assert r.status_code == 200
+        body = r.json()["expenses"]
+        assert body["next_cursor"] is not None
+        assert len(body["items"]) == 3
+
+    def test_sequential_pages_non_overlapping(self, auth_client, db, verified_user):
+        """Two pages fetched with cursor must have no overlapping IDs."""
+        month = make_month(db, verified_user, "2026-04")
+        for i in range(7):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r1 = auth_client.get("/monthly-tracker/2026-04?limit=4")
+        assert r1.status_code == 200
+        body1 = r1.json()["expenses"]
+        ids_page1 = {e["id"] for e in body1["items"]}
+        cursor = body1["next_cursor"]
+        assert cursor is not None
+
+        r2 = auth_client.get(f"/monthly-tracker/2026-04?limit=4&cursor={cursor}")
+        assert r2.status_code == 200
+        body2 = r2.json()["expenses"]
+        ids_page2 = {e["id"] for e in body2["items"]}
+
+        assert ids_page1.isdisjoint(ids_page2)
+        assert len(ids_page1) + len(ids_page2) == 7
+
+    def test_total_reflects_all_non_deleted_expenses(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2026-05")
+        for i in range(4):
+            make_expense(db, month, name=f"A{i}", category="Food", planned=10.0)
+        deleted = make_expense(db, month, name="Deleted", category="Food", planned=10.0)
+        deleted.deleted_at = datetime.utcnow()
+        db.commit()
+
+        r = auth_client.get("/monthly-tracker/2026-05?limit=50")
+        assert r.status_code == 200
+        assert r.json()["expenses"]["total"] == 4
+
+    def test_existing_response_shape_preserved(self, auth_client, db, verified_user):
+        month = make_month(db, verified_user, "2026-06")
+        make_expense(db, month, name="Rent", category="Housing", planned=800.0)
+
+        r = auth_client.get("/monthly-tracker/2026-06")
+        assert r.status_code == 200
+        body = r.json()
+        # Top-level fields
+        assert "rows" in body
+        assert "salary_planned" in body
+        assert "salary_actual" in body
+        # expenses sub-object
+        exp = body["expenses"]
+        assert "items" in exp
+        assert "total" in exp
+        assert "next_cursor" in exp
+
+    def test_invalid_cursor_returns_422(self, auth_client):
+        r = auth_client.get("/monthly-tracker/2026-01?cursor=!!!notbase64!!!")
+        assert r.status_code == 422
+
+    def test_last_page_has_null_next_cursor(self, auth_client, db, verified_user):
+        """Fetching the second (final) page with cursor returns next_cursor=null."""
+        month = make_month(db, verified_user, "2026-07")
+        for i in range(5):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r1 = auth_client.get("/monthly-tracker/2026-07?limit=3")
+        cursor = r1.json()["expenses"]["next_cursor"]
+        assert cursor is not None
+
+        r2 = auth_client.get(f"/monthly-tracker/2026-07?limit=3&cursor={cursor}")
+        assert r2.status_code == 200
+        assert r2.json()["expenses"]["next_cursor"] is None
+
+    def test_cursor_encodes_expense_id_in_base64(self, auth_client, db, verified_user):
+        """next_cursor should decode to a valid integer expense ID."""
+        month = make_month(db, verified_user, "2026-08")
+        for i in range(3):
+            make_expense(db, month, name=f"Exp{i}", category="Food", planned=10.0)
+
+        r = auth_client.get("/monthly-tracker/2026-08?limit=2")
+        cursor = r.json()["expenses"]["next_cursor"]
+        assert cursor is not None
+        decoded = int(base64.b64decode(cursor.encode()).decode())
+        assert decoded > 0
