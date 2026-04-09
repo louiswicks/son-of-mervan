@@ -1086,3 +1086,13 @@
 - `tests/test_reports.py`: 12 tests — unauthenticated 401/403, quarter=0 422, quarter=5 422, missing year 422, missing quarter 422, no data returns zeroed totals with 3 placeholder months, all 4 quarters return exactly 3 months, correct month labels per quarter, full quarter calculates correct totals and savings_rate_pct, partial quarter zeroes missing months, savings_rate_pct null when salary=0, data isolation (other user's data excluded).
 
 **Tests:** 673 total backend tests pass; ruff clean.
+
+## Phase 18.5 — Month-over-Month Category Comparison [DONE] 2026-04-09
+
+**Task:** Add `GET /insights/month-comparison?month_a=YYYY-MM&month_b=YYYY-MM` to let users see how each spending category changed between any two months.
+
+**Files modified:**
+- `routers/insights.py`: Added `month_comparison` endpoint. Normalises both month params via the existing `_normalize_month` helper (returns 422 on bad format). Fetches all MonthlyData for the user, finds each month via `_find_month` + `_category_totals` (Fernet-safe Python-side decryption). Computes the union of categories across both months, sorts alphabetically, and builds a per-category row: `{ category, amount_a, amount_b, change_abs, change_pct }`. `change_pct` is `null` when `amount_a` is 0 to avoid divide-by-zero. Categories present in only one month are included with the other side as 0.
+- `tests/test_insights.py`: Added `TestMonthComparison` class — 10 tests: unauthenticated 401/403, missing month_a 422, missing month_b 422, invalid month_a format 422, invalid month_b format 422, no data returns empty comparison, correct amounts + change_abs + change_pct calculated, change_pct null when amount_a is 0, category in only month_a included with amount_b=0 and correct negative change, data isolation (other user's categories excluded).
+
+**Tests:** 683 total backend tests pass; ruff clean.

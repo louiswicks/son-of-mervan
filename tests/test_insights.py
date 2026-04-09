@@ -1205,3 +1205,93 @@ class TestSubscriptionTracker:
         assert len(subs) == 2
         assert subs[0]["annual_cost"] >= subs[1]["annual_cost"]
         assert subs[0]["name"] == "Gym"
+
+
+class TestMonthComparison:
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code in (401, 403)
+
+    def test_missing_month_a_returns_422(self, auth_client):
+        r = auth_client.get("/insights/month-comparison?month_b=2026-02")
+        assert r.status_code == 422
+
+    def test_missing_month_b_returns_422(self, auth_client):
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01")
+        assert r.status_code == 422
+
+    def test_invalid_month_a_format_returns_422(self, auth_client):
+        r = auth_client.get("/insights/month-comparison?month_a=January&month_b=2026-02")
+        assert r.status_code == 422
+
+    def test_invalid_month_b_format_returns_422(self, auth_client):
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=badformat")
+        assert r.status_code == 422
+
+    def test_no_data_returns_empty_comparison(self, auth_client):
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["month_a"] == "2026-01"
+        assert body["month_b"] == "2026-02"
+        assert body["comparison"] == []
+
+    def test_correct_amounts_and_change(self, auth_client, db, verified_user):
+        """change_abs and change_pct are computed correctly."""
+        m_a = make_month(db, verified_user, month="2026-01", salary_planned=3000.0)
+        make_expense(db, m_a, name="Rent", category="Housing", planned=800.0, actual=800.0)
+
+        m_b = make_month(db, verified_user, month="2026-02", salary_planned=3000.0)
+        make_expense(db, m_b, name="Rent", category="Housing", planned=800.0, actual=1000.0)
+
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        rows = {row["category"]: row for row in body["comparison"]}
+        housing = rows["Housing"]
+        assert housing["amount_a"] == pytest.approx(800.0)
+        assert housing["amount_b"] == pytest.approx(1000.0)
+        assert housing["change_abs"] == pytest.approx(200.0)
+        assert housing["change_pct"] == pytest.approx(25.0)
+
+    def test_change_pct_null_when_amount_a_is_zero(self, auth_client, db, verified_user):
+        """change_pct is null when amount_a is 0 (new category in month_b only)."""
+        m_b = make_month(db, verified_user, month="2026-02", salary_planned=3000.0)
+        make_expense(db, m_b, name="Gym", category="Health", planned=50.0, actual=50.0)
+
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        rows = {row["category"]: row for row in body["comparison"]}
+        health = rows["Health"]
+        assert health["amount_a"] == 0.0
+        assert health["amount_b"] == pytest.approx(50.0)
+        assert health["change_abs"] == pytest.approx(50.0)
+        assert health["change_pct"] is None
+
+    def test_category_in_only_month_a_included(self, auth_client, db, verified_user):
+        """Category with spend only in month_a is included with amount_b=0."""
+        m_a = make_month(db, verified_user, month="2026-01", salary_planned=3000.0)
+        make_expense(db, m_a, name="Travel", category="Transport", planned=200.0, actual=200.0)
+
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        rows = {row["category"]: row for row in body["comparison"]}
+        transport = rows["Transport"]
+        assert transport["amount_a"] == pytest.approx(200.0)
+        assert transport["amount_b"] == 0.0
+        assert transport["change_abs"] == pytest.approx(-200.0)
+        assert transport["change_pct"] == pytest.approx(-100.0)
+
+    def test_data_isolation(self, auth_client, db, verified_user, second_user):
+        """Another user's expenses are not included."""
+        m_a = make_month(db, second_user, month="2026-01", salary_planned=5000.0)
+        make_expense(db, m_a, name="BigRent", category="Housing", planned=2000.0, actual=2000.0)
+        m_b = make_month(db, second_user, month="2026-02", salary_planned=5000.0)
+        make_expense(db, m_b, name="BigRent", category="Housing", planned=2000.0, actual=2500.0)
+
+        r = auth_client.get("/insights/month-comparison?month_a=2026-01&month_b=2026-02")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["comparison"] == []

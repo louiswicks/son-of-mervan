@@ -1460,6 +1460,60 @@ def subscription_tracker(
     }
 
 
+@router.get("/month-comparison")
+def month_comparison(
+    month_a: str = Query(..., description="First month in YYYY-MM format"),
+    month_b: str = Query(..., description="Second month in YYYY-MM format"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Compare per-category spending between two months.
+
+    Returns per-category rows:
+      { category, amount_a, amount_b, change_abs, change_pct }
+
+    change_pct is null when amount_a is 0 (avoid divide-by-zero).
+    Categories with spend in only one month are included (other side = 0).
+    """
+    month_a_norm = _normalize_month(month_a)
+    month_b_norm = _normalize_month(month_b)
+
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+    row_a = _find_month(all_rows, month_a_norm)
+    row_b = _find_month(all_rows, month_b_norm)
+
+    cats_a = _category_totals(db, row_a)
+    cats_b = _category_totals(db, row_b)
+
+    all_categories = sorted(set(cats_a.keys()) | set(cats_b.keys()))
+
+    comparison = []
+    for cat in all_categories:
+        amount_a = round(cats_a.get(cat, {}).get("actual", 0.0), 2)
+        amount_b = round(cats_b.get(cat, {}).get("actual", 0.0), 2)
+        change_abs = round(amount_b - amount_a, 2)
+        change_pct: Optional[float] = None
+        if amount_a != 0:
+            change_pct = round((change_abs / amount_a) * 100, 1)
+
+        comparison.append({
+            "category": cat,
+            "amount_a": amount_a,
+            "amount_b": amount_b,
+            "change_abs": change_abs,
+            "change_pct": change_pct,
+        })
+
+    return {
+        "month_a": month_a_norm,
+        "month_b": month_b_norm,
+        "comparison": comparison,
+    }
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):

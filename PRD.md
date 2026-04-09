@@ -1078,12 +1078,12 @@ Lets users see how each spending category changed between two months.
 **Endpoint:** `GET /insights/month-comparison?month_a=YYYY-MM&month_b=YYYY-MM`
 
 **Acceptance Criteria:**
-- [ ] Returns per-category rows: `{ category, amount_a, amount_b, change_abs, change_pct }`
-- [ ] `change_pct` is null when `amount_a` is 0 (avoid divide-by-zero)
-- [ ] Returns 422 when either month param is missing or invalid format
-- [ ] Categories with spend in only one month are included (other side = 0)
-- [ ] Only returns data for the authenticated user
-- [ ] 6+ backend tests
+- [x] Returns per-category rows: `{ category, amount_a, amount_b, change_abs, change_pct }`
+- [x] `change_pct` is null when `amount_a` is 0 (avoid divide-by-zero)
+- [x] Returns 422 when either month param is missing or invalid format
+- [x] Categories with spend in only one month are included (other side = 0)
+- [x] Only returns data for the authenticated user
+- [x] 10 backend tests; all pass
 
 ---
 
@@ -1128,9 +1128,9 @@ Phase 17 (DONE): Engagement, insight & polish
   17.1 (Expense search) [DONE] → 17.2 (Budget templates) [DONE] → 17.3 (Spending velocity warnings) [DONE]
   → 17.4 (Month performance endpoint) [DONE] → 17.5 (Onboarding wizard) [DONE]
 
-Phase 18: Smart forecasting & user productivity
+Phase 18 (DONE): Smart forecasting & user productivity
   18.1 (Budget copy forward) [DONE] → 18.2 (Spending forecast) [DONE] → 18.3 (Subscription tracker) [DONE]
-  → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison)
+  → 18.4 (Quarterly report) [DONE] → 18.5 (Month comparison) [DONE]
 ```
 
 ---
