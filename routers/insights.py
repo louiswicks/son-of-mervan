@@ -1371,6 +1371,95 @@ def spending_forecast(
     }
 
 
+# -------------------- subscription tracker --------------------
+
+@router.get("/subscriptions")
+def subscription_tracker(
+    year: int = Query(..., description="Year to analyse, e.g. 2026"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Detect likely subscriptions: expenses whose (name, category) pair appears
+    in 3 or more distinct months within *year*.
+
+    Returns a list of:
+      { name, category, monthly_cost, annual_cost, months_seen, first_seen, last_seen }
+
+    monthly_cost  = average actual_amount across the months seen
+    annual_cost   = monthly_cost × months_seen
+    first_seen    = earliest YYYY-MM in which the expense appeared
+    last_seen     = latest YYYY-MM in which the expense appeared
+    """
+    user = _require_user(db, current_user)
+
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # Build month strings for the requested year
+    year_months = [f"{year:04d}-{mo:02d}" for mo in range(1, 13)]
+
+    # key: (name_lower, category_lower) → {months: set[str], amounts: list[float]}
+    tracker: Dict[tuple, Dict] = {}
+
+    for month_str in year_months:
+        month_row = _find_month(all_rows, month_str)
+        if month_row is None:
+            continue
+
+        expenses = (
+            db.query(MonthlyExpense)
+            .filter(
+                MonthlyExpense.monthly_data_id == month_row.id,
+                MonthlyExpense.deleted_at == None,  # noqa: E711
+            )
+            .all()
+        )
+
+        for exp in expenses:
+            name = (exp.name or "").strip()
+            category = (exp.category or "Other").strip()
+            if not name:
+                continue
+
+            key = (name.lower(), category.lower())
+            if key not in tracker:
+                tracker[key] = {
+                    "name": name,
+                    "category": category,
+                    "months": set(),
+                    "amounts": [],
+                }
+            tracker[key]["months"].add(month_str)
+            tracker[key]["amounts"].append(float(exp.actual_amount or exp.planned_amount or 0.0))
+
+    subscriptions = []
+    for entry in tracker.values():
+        months_seen = len(entry["months"])
+        if months_seen < 3:
+            continue
+
+        monthly_cost = round(sum(entry["amounts"]) / len(entry["amounts"]), 2)
+        annual_cost = round(monthly_cost * months_seen, 2)
+        sorted_months = sorted(entry["months"])
+
+        subscriptions.append({
+            "name": entry["name"],
+            "category": entry["category"],
+            "monthly_cost": monthly_cost,
+            "annual_cost": annual_cost,
+            "months_seen": months_seen,
+            "first_seen": sorted_months[0],
+            "last_seen": sorted_months[-1],
+        })
+
+    subscriptions.sort(key=lambda s: (-s["annual_cost"], s["name"]))
+
+    return {
+        "year": year,
+        "subscriptions": subscriptions,
+    }
+
+
 # -------------------- background job --------------------
 
 def check_spending_velocity(session_factory):

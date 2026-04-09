@@ -1116,3 +1116,92 @@ class TestSpendingForecast:
         food = next(c for c in body["categories"] if c["category"] == "Food")
         # Only 2 of the 3 lookback months had Food data
         assert food["months_of_data"] == 2
+
+
+class TestSubscriptionTracker:
+    """Tests for GET /insights/subscriptions?year=YYYY"""
+
+    def test_no_data_returns_empty_list(self, auth_client):
+        """No expenses → empty subscriptions list."""
+        r = auth_client.get("/insights/subscriptions?year=2099")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["year"] == 2099
+        assert body["subscriptions"] == []
+
+    def test_requires_auth(self, client):
+        """Unauthenticated request returns 401 or 403."""
+        r = client.get("/insights/subscriptions?year=2026")
+        assert r.status_code in (401, 403)
+
+    def test_detects_subscription_appearing_3_months(self, auth_client, db, verified_user):
+        """Expense with same name+category in 3 months is detected as a subscription."""
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Netflix", category="Entertainment", planned=15.0, actual=15.0)
+
+        r = auth_client.get("/insights/subscriptions?year=2026")
+        assert r.status_code == 200
+        body = r.json()
+        subs = body["subscriptions"]
+        assert len(subs) == 1
+        s = subs[0]
+        assert s["name"] == "Netflix"
+        assert s["category"] == "Entertainment"
+        assert s["months_seen"] == 3
+        assert s["monthly_cost"] == pytest.approx(15.0)
+        assert s["annual_cost"] == pytest.approx(45.0)
+        assert s["first_seen"] == "2026-01"
+        assert s["last_seen"] == "2026-03"
+
+    def test_expense_in_only_2_months_not_detected(self, auth_client, db, verified_user):
+        """Expense appearing in only 2 months is NOT flagged as a subscription."""
+        for mo in ["2026-01", "2026-02"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Spotify", category="Entertainment", planned=10.0, actual=10.0)
+
+        r = auth_client.get("/insights/subscriptions?year=2026")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["subscriptions"] == []
+
+    def test_annual_cost_equals_monthly_cost_times_months_seen(self, auth_client, db, verified_user):
+        """annual_cost == monthly_cost * months_seen."""
+        for mo in ["2026-01", "2026-02", "2026-03", "2026-04"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=3000.0)
+            make_expense(db, m, name="Gym", category="Health", planned=50.0, actual=50.0)
+
+        r = auth_client.get("/insights/subscriptions?year=2026")
+        assert r.status_code == 200
+        body = r.json()
+        s = next(x for x in body["subscriptions"] if x["name"] == "Gym")
+        assert s["months_seen"] == 4
+        assert s["annual_cost"] == pytest.approx(s["monthly_cost"] * s["months_seen"])
+
+    def test_only_own_data_returned(self, auth_client, db, verified_user, second_user):
+        """Subscriptions from another user are not included."""
+        # second_user has a subscription-like expense
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, second_user, month=mo, salary_planned=5000.0)
+            make_expense(db, m, name="AdobeCC", category="Software", planned=60.0, actual=60.0)
+
+        # verified_user has no expenses
+        r = auth_client.get("/insights/subscriptions?year=2026")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["subscriptions"] == []
+
+    def test_multiple_subscriptions_sorted_by_annual_cost_desc(self, auth_client, db, verified_user):
+        """Results are sorted by annual_cost descending."""
+        for mo in ["2026-01", "2026-02", "2026-03"]:
+            m = make_month(db, verified_user, month=mo, salary_planned=5000.0)
+            make_expense(db, m, name="Netflix", category="Entertainment", planned=15.0, actual=15.0)
+            make_expense(db, m, name="Gym", category="Health", planned=50.0, actual=50.0)
+
+        r = auth_client.get("/insights/subscriptions?year=2026")
+        assert r.status_code == 200
+        body = r.json()
+        subs = body["subscriptions"]
+        assert len(subs) == 2
+        assert subs[0]["annual_cost"] >= subs[1]["annual_cost"]
+        assert subs[0]["name"] == "Gym"
