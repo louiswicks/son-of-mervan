@@ -17,6 +17,7 @@ import { useStreaks, useMonthCloseSummary } from "../hooks/useInsights";
 import { getMonthlyTracker } from "../api/expenses";
 import PageWrapper from "./PageWrapper";
 import Card from "./Card";
+import OnboardingStatusWizard from "./OnboardingStatusWizard";
 
 const FALLBACK_CATEGORIES = [
   "Housing","Transportation","Food","Utilities","Insurance",
@@ -252,6 +253,7 @@ export default function SonOfMervan() {
 
   return (
     <PageWrapper>
+        <OnboardingStatusWizard />
 
         {/* Page Header */}
         <div className="mb-5 sm:mb-6">

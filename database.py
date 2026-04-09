@@ -93,6 +93,9 @@ class User(Base):
     # Onboarding wizard completion flag (default False — new users see the wizard)
     has_completed_onboarding = Column(Boolean, nullable=False, default=False, server_default="0")
 
+    # Onboarding wizard dismissal timestamp — NULL means wizard may show; set means permanently dismissed
+    onboarding_dismissed_at = Column(DateTime, nullable=True, default=None)
+
     # Email notification preferences (all default True — users receive all email types by default)
     notif_budget_alerts = Column(Boolean, nullable=False, default=True, server_default="1")
     notif_milestones = Column(Boolean, nullable=False, default=True, server_default="1")
