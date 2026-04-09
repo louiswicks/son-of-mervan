@@ -1,3 +1,11 @@
+## Phase 20.3 — Budget Rollover [DONE] 2026-04-09
+- `database.py`: Added `rolled_over_from` (String(7), nullable) column to `MonthlyData` — idempotency marker set to the source month string ("YYYY-MM") after a rollover is applied.
+- `alembic/versions/y5z6a7b8c9d0_add_rolled_over_from_to_monthly_data.py`: Migration adding the column; down_revision = x4y5z6a7b8c9.
+- `routers/rollover.py` (new): `POST /monthly-tracker/{month}/rollover` — auth required. For each non-deleted expense in the source month where `actual_amount < planned_amount`, adds the surplus (`planned - actual`) to the matching expense (by name, case-insensitive) in the next month, or creates a new planned expense when no match exists. Copies `salary_planned` to the destination month when creating it fresh. Sets `dest.rolled_over_from = source_month` for idempotency — a second call with the same source month returns the current totals without re-applying. Handles Dec→Jan year boundary correctly. Invalidates annual overview cache for affected years.
+- `main.py`: Imported and registered `rollover_router`.
+- `tests/test_rollover.py`: 13 tests covering: unauthenticated 401, missing source 404, invalid month format 422, empty result when fully spent, surplus rolled over correctly, overspent categories skipped, dest month created when absent, surplus added to existing dest expense, new expense created when no match, Dec→Jan year boundary, idempotency (no double-apply), cross-user data isolation, response shape validation.
+- 792 backend tests pass; ruff clean.
+
 ## Phase 17.2 — Budget Templates [DONE] 2026-04-09
 - `routers/templates.py`: New router with `GET /budget-templates` (public) and `POST /budget-templates/{id}/apply?month=YYYY-MM` (auth required). Five static templates: Student, Single Professional, Family, Frugal Saver, High Earner. Apply endpoint is additive — existing expense rows are left untouched. Returns 400 if month has no planned salary set; 404 for unknown template id. Amounts calculated as `salary * pct_of_salary / 100`, rounded to 2 dp.
 - `main.py`: Imported and registered `templates_router`.

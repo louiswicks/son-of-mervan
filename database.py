@@ -180,7 +180,10 @@ class MonthlyData(Base):
     _remaining_actual_encrypted = Column("remaining_actual_encrypted", String(512), default=None)
     
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+    # Idempotency marker: set to the source month ("YYYY-MM") after a rollover
+    # is applied to this record. Prevents double-counting on re-runs.
+    rolled_over_from = Column(String(7), nullable=True, default=None)
+
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", back_populates="months")
     expenses = relationship("MonthlyExpense", back_populates="monthly", cascade="all, delete-orphan")

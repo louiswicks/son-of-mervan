@@ -1267,7 +1267,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
-### 20.3 Budget Rollover [TODO]
+### 20.3 Budget Rollover [DONE]
 **Goal:** Allow users to carry unspent planned budget from one month into the next, supporting envelope-style budgeting.
 **Scope:**
 - `POST /monthly-tracker/{month}/rollover` — for each non-deleted expense in `month` where `actual_amount < planned_amount`, adds the difference (`planned_amount − actual_amount`) to the matching category's `planned_amount` in the next month. Creates the next month's `MonthlyData` record if it doesn't exist (copying salary_planned). Returns `{ rolled_over_categories: [{ category, amount }], total_rolled_over: float }`.
@@ -1275,13 +1275,13 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Idempotent: re-rolling over the same month does not double-count (checks a `rolled_over_from` marker stored in the `MonthlyData` JSON metadata field or a DB flag).
 
 **Acceptance Criteria:**
-- [ ] Returns empty lists when no unspent budget exists
-- [ ] Correctly calculates rollover amount per category
-- [ ] Does not carry over categories where actual ≥ planned
-- [ ] Next month MonthlyData is created if absent
-- [ ] Operation is idempotent (second call returns same amounts, does not double-add)
-- [ ] Data isolation enforced
-- [ ] 8+ backend tests
+- [x] Returns empty lists when no unspent budget exists
+- [x] Correctly calculates rollover amount per category
+- [x] Does not carry over categories where actual ≥ planned
+- [x] Next month MonthlyData is created if absent
+- [x] Operation is idempotent (second call returns same amounts, does not double-add)
+- [x] Data isolation enforced
+- [x] 8+ backend tests (13 written)
 
 ---
 
@@ -1372,7 +1372,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
   → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions) [DONE]
 
 Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
-  20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover)
+  20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover) [DONE]
   → 20.4 (Duplicate expense detection) → 20.5 (Expense list pagination)
 ```
 

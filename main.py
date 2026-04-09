@@ -44,6 +44,7 @@ from routers import budget_copy as budget_copy_router
 from routers import reports as reports_router
 from routers import category_rules as category_rules_router
 from routers import income_sources as income_sources_router
+from routers import rollover as rollover_router
 import email_utils
 from collections import defaultdict
 
@@ -935,6 +936,7 @@ app.include_router(budget_copy_router.router)
 app.include_router(reports_router.router)
 app.include_router(category_rules_router.router)
 app.include_router(income_sources_router.router)
+app.include_router(rollover_router.router)
 
 # -------------------- Scheduler --------------------
 _scheduler = BackgroundScheduler(daemon=True)
