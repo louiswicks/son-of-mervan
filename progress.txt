@@ -1244,3 +1244,17 @@ Added a `_check_spending_anomaly()` helper in `main.py` called after each expens
 - `tests/test_budget_copy.py`, `tests/test_insights.py`: Fixed 2 pre-existing ruff F841 (unused variable) errors.
 
 **Tests:** 10 E2E tests pass; 862 backend unit tests pass; ruff clean.
+
+## Phase 22.1 — Kubernetes-Compatible Health Probes [DONE] 2026-04-09
+- All 21 prior phases complete; Phase 22 generated as next set of production-maturity improvements.
+- **Phase 22 plan added to PRD.md**: 5 tasks — 22.1 Health Probes, 22.2 Redis Rate Limiting, 22.3 Google OAuth, 22.4 PWA Support, 22.5 Admin Observability API.
+- `main.py`:
+  - Added `_APP_START_TIME = time.monotonic()` at module load for uptime tracking.
+  - Added Pydantic response models: `HealthLiveResponse`, `HealthCheckDetail`, `HealthReadyResponse`, `HealthDetailedResponse`.
+  - `GET /health/live` — liveness probe, always 200, no dependency checks.
+  - `GET /health/ready` — readiness probe; runs `SELECT 1` against DB via SQLAlchemy, pings Redis if `REDIS_URL` is set; returns 503 + JSON with failing check name when any required dependency is down.
+  - `GET /health` — enhanced to return `uptime_seconds`, `memory_mb` (via `resource.getrusage`, platform-aware for macOS vs Linux), `db_ok`, `redis_ok` (None when Redis not configured), `scheduler_running`, `version`.
+  - `_memory_rss_mb()` helper: reads RSS from `resource.RUSAGE_SELF`; handles macOS (bytes) vs Linux (kilobytes) difference; returns None on unsupported platforms.
+- `railway.toml` (new): points `healthcheckPath` at `/health/ready` with 30-second timeout and ON_FAILURE restart policy.
+- `tests/test_health.py` (new): 23 tests across 3 classes — `TestHealthLive` (4 tests), `TestHealthReady` (10 tests including 503 and degraded-status cases), `TestHealthDetailed` (9 tests).
+- **Test results**: 885 backend tests passing; 93.33% coverage; ruff clean.

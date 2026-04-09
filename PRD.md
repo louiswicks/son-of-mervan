@@ -1420,7 +1420,7 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ## Phase 22 — Infrastructure Maturity & Developer Experience
 
-### 22.1 Kubernetes-Compatible Health Probes [IN PROGRESS]
+### 22.1 Kubernetes-Compatible Health Probes [DONE]
 **Goal:** Replace the bare `/health` stub with production-grade liveness and readiness probes that container orchestration platforms (Railway, Kubernetes) can use to make intelligent routing decisions.
 
 **Background:** The current `/health` returns `{"status": "ok", "version": "..."}` regardless of whether the database is reachable or the app is in a degraded state. Railway's zero-downtime deploys and Kubernetes liveness/readiness probes need richer signals.
@@ -1433,12 +1433,12 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 - Add response model schemas so FastAPI docs are accurate.
 
 **Acceptance Criteria:**
-- [ ] `GET /health/live` always returns `{"status": "alive"}` with HTTP 200
-- [ ] `GET /health/ready` returns 200 + full check results when all healthy; 503 + failed check name when DB unreachable
-- [ ] `GET /health` returns uptime, memory_mb, db_ok, redis_ok, scheduler_running, version
-- [ ] All three endpoints excluded from rate limiting
-- [ ] Unit tests cover: ready-pass, ready-fail-db, ready-fail-redis scenarios
-- [ ] `railway.toml` health check path updated to `/health/ready`
+- [x] `GET /health/live` always returns `{"status": "alive"}` with HTTP 200
+- [x] `GET /health/ready` returns 200 + full check results when all healthy; 503 + failed check name when DB unreachable
+- [x] `GET /health` returns uptime, memory_mb, db_ok, redis_ok, scheduler_running, version
+- [x] All three endpoints excluded from rate limiting
+- [x] Unit tests cover: ready-pass, ready-fail-db, ready-fail-redis scenarios
+- [x] `railway.toml` health check path updated to `/health/ready`
 
 ---
 
@@ -1574,7 +1574,7 @@ Phase 21 (DONE): Production hardening & API resilience
   → 21.4 (X-Request-ID tracing) [DONE] → 21.5 (Playwright E2E tests) [DONE]
 
 Phase 22 (IN PROGRESS): Infrastructure maturity & developer experience
-  22.1 (Health probes) [IN PROGRESS] → 22.2 (Redis rate limiting) → 22.3 (Google OAuth)
+  22.1 (Health probes) [DONE] → 22.2 (Redis rate limiting) → 22.3 (Google OAuth)
   → 22.4 (PWA support) → 22.5 (Admin observability API)
 ```
 
