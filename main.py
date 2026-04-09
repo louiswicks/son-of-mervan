@@ -11,7 +11,7 @@ from fastapi import Body
 from fastapi import Query
 import hashlib
 import secrets
-from fastapi import FastAPI, HTTPException, Depends, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -27,6 +27,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from core.logging_config import setup_logging
 from core.config import settings, VERSION, CHANGELOG
 from core.limiter import limiter
+from core.idempotency import compute_key_hash, get_cached_response, save_response as save_idempotency
 from core.cache import invalidate_annual_cache
 from middleware.security import SecurityHeadersMiddleware
 from alembic.config import Config as AlembicConfig
@@ -261,7 +262,11 @@ async def calculate_budget(
     commit: bool = Query(False),
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
 ):
+    if x_idempotency_key is not None and len(x_idempotency_key) > 256:
+        raise HTTPException(status_code=422, detail="X-Idempotency-Key must be ≤256 characters")
+
     month_norm = normalize_month(budget_data.month)
 
     logger.debug(
@@ -293,6 +298,15 @@ async def calculate_budget(
         recs.append("Good job! Consider increasing your savings rate.")
     else:
         recs.append("Excellent! You have a healthy planned surplus.")
+
+    # ---------- IDEMPOTENCY CHECK (commit path only) ----------
+    _idem_key_hash = None
+    if commit and x_idempotency_key:
+        user_for_idem = require_user_by_email(db, current_user)
+        _idem_key_hash = compute_key_hash(user_for_idem.id, x_idempotency_key)
+        cached = get_cached_response(db, _idem_key_hash)
+        if cached is not None:
+            return cached
 
     # ---------- READ-ONLY PATH ----------
     if not commit:
@@ -373,7 +387,7 @@ async def calculate_budget(
     logger.debug("calculate_budget committed all expenses")
     invalidate_annual_cache(user.id, int(month_norm[:4]))
 
-    return {
+    response_data = {
         "id": month_row.id,
         "month": month_row.month,
         "monthly_salary": month_row.salary_planned,
@@ -388,17 +402,34 @@ async def calculate_budget(
         "committed": True,
     }
 
+    if _idem_key_hash and x_idempotency_key:
+        save_idempotency(db, user.id, x_idempotency_key, "/calculate-budget", response_data)
+
+    return response_data
+
 @app.post("/monthly-tracker/{month}")
 async def save_actuals(
     month: str = Path(..., description="Month in YYYY-MM format"),
     data: ActualBudgetRequest = Body(None),
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
 ):
+    if x_idempotency_key is not None and len(x_idempotency_key) > 256:
+        raise HTTPException(status_code=422, detail="X-Idempotency-Key must be ≤256 characters")
+
     month_norm = normalize_month(month)
     user = get_user_by_email(db, current_user)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Idempotency check
+    _idem_key_hash = None
+    if x_idempotency_key:
+        _idem_key_hash = compute_key_hash(user.id, x_idempotency_key)
+        cached = get_cached_response(db, _idem_key_hash)
+        if cached is not None:
+            return cached
 
     # IMPORTANT: Use get_or_create_month instead of manual query
     # This ensures we use the same record that calculate-budget created
@@ -494,7 +525,7 @@ async def save_actuals(
     for e in refreshed_expenses:
         expenses_by_category[e.category] = expenses_by_category.get(e.category, 0.0) + (e.actual_amount or 0.0)
 
-    return {
+    response_data = {
         "month": month_row.month,
         "salary": salary_actual,
         "total_actual": month_row.total_actual,
@@ -504,6 +535,11 @@ async def save_actuals(
         "expenses_by_category": expenses_by_category,
         "user": current_user,
     }
+
+    if _idem_key_hash and x_idempotency_key:
+        save_idempotency(db, user.id, x_idempotency_key, f"/monthly-tracker/{month_norm}", response_data)
+
+    return response_data
 
 @app.get("/monthly-tracker/{month}")
 async def get_monthly_tracker(

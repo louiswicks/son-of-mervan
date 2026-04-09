@@ -1162,6 +1162,23 @@ class IncomeSource(Base):
         return cls._amount_encrypted
 
 
+class IdempotencyRecord(Base):
+    """
+    Stores idempotency keys for financial mutation endpoints.
+    key_hash = SHA-256(user_id + ":" + client_key) — unique per user+key pair.
+    Responses older than 24 hours are treated as expired and the key may be reused.
+    """
+    __tablename__ = "idempotency_records"
+    id = Column(Integer, primary_key=True, index=True)
+    key_hash = Column(String(64), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    request_path = Column(String(256), nullable=False)
+    response_body = Column(Text, nullable=False)  # JSON-serialised response dict
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+
+
 # Default categories seeded for every new user on their first GET /categories.
 DEFAULT_CATEGORIES = [
     ("Housing",        "#ef4444"),

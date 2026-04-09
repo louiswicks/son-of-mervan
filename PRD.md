@@ -1323,6 +1323,101 @@ Phase 19 (DONE): Expense intelligence & custom analytics
 
 ---
 
+## Phase 21 — Production Hardening & API Resilience
+
+### 21.1 Idempotency Keys for Financial Mutations [DONE]
+**Goal:** Prevent duplicate financial records caused by network retries or double-clicks by adding idempotency key support to the two endpoints that write financial data.
+**Scope:**
+- Clients may send an optional `X-Idempotency-Key` header (1–256 ASCII chars) on `POST /calculate-budget?commit=true` and `POST /monthly-tracker/{month}`.
+- An `IdempotencyRecord` DB table stores: `id`, `key_hash` (SHA-256 of `user_id + ":" + key`), `user_id`, `request_path`, `response_body` (JSON text), `created_at`.
+- Unique constraint on `key_hash` so duplicate writes are caught at the DB level.
+- `core/idempotency.py` provides `get_cached_response(db, key_hash)` → dict|None (returns None if not found or older than 24 h) and `save_response(db, user_id, key, path, response)`.
+- If a matching non-expired record exists the endpoint returns the cached JSON immediately (no DB writes).
+- Key longer than 256 chars → 422. Key scoped per user: same key from different users is independent.
+- Alembic migration `a1b2c3d4e5f6_add_idempotency_records`.
+
+**Acceptance Criteria:**
+- [x] No header → request processes normally
+- [x] First request with key → saves record, returns response
+- [x] Second request with same key (within 24 h) → returns cached response, no new DB writes
+- [x] Key > 256 chars → 422
+- [x] Same key from different users → independent (different records)
+- [x] Expired key (simulated > 24 h) → treated as new request
+- [x] Works on both `POST /calculate-budget?commit=true` and `POST /monthly-tracker/{month}`
+- [x] 10+ backend tests (17 written)
+
+---
+
+### 21.2 GDPR Full Data Export (JSON)
+**Goal:** Give users a complete, portable export of all their data in a machine-readable format, satisfying GDPR "right to portability" requirements.
+**Scope:**
+- `GET /export/gdpr` — returns a JSON object containing all of the user's data across every table, with all Fernet-encrypted fields decrypted.
+- Covers: user profile, monthly data + expenses (including soft-deleted), savings goals + contributions, recurring expenses, debts, net worth snapshots, income sources, budget alerts, bank connections (metadata only — no tokens), category rules, households (membership details).
+- Response header `Content-Disposition: attachment; filename="gdpr-export-<user_id>-<date>.json"`.
+- Includes `exported_at` and `app_version` metadata fields at the top level.
+
+**Acceptance Criteria:**
+- [ ] Returns 200 with JSON download for authenticated user
+- [ ] All Fernet-encrypted fields are decrypted in the output
+- [ ] `exported_at` and `app_version` present in response
+- [ ] Contains `profile`, `monthly_budgets`, `expenses`, `savings_goals`, `recurring_expenses` top-level keys
+- [ ] Data isolation enforced (only caller's data)
+- [ ] 5+ backend tests
+
+---
+
+### 21.3 Spending Anomaly Alerts
+**Goal:** Automatically notify users when a submitted expense is unusually large compared to their history for that category, helping them catch data entry errors and overspending early.
+**Scope:**
+- On `POST /monthly-tracker/{month}`, after saving each expense, compare `actual_amount` to the user's historical per-category mean and standard deviation (last 6 months, excluding the current month).
+- If `actual_amount > mean + 2 × std` (and std > 0 and ≥ 3 data points), create a `Notification` (type `spending_anomaly`, dedup_key `anomaly_{expense_id}`) with title "Unusual spending in {category}" and message "Your {category} spend of {amount} is significantly higher than usual (avg {avg})."
+- If fewer than 3 historical data points, or std = 0, skip anomaly check (no false positives).
+
+**Acceptance Criteria:**
+- [ ] No notification created when history is insufficient (< 3 months)
+- [ ] No notification when amount is within normal range
+- [ ] Notification created when amount exceeds mean + 2σ
+- [ ] Dedup key prevents duplicate notifications for the same expense
+- [ ] Notifications are scoped to the authenticated user
+- [ ] 8+ backend tests
+
+---
+
+### 21.4 X-Request-ID Tracing Middleware
+**Goal:** Add distributed tracing support so every request can be correlated across logs, making production debugging significantly faster.
+**Scope:**
+- Add `middleware/request_id.py` — a Starlette middleware that reads `X-Request-ID` from the incoming request (if present and valid UUID4), or generates a new UUID4.
+- Attaches the request ID to the response as `X-Request-ID`.
+- Binds the request ID into the structlog context for every log line emitted during the request via `structlog.contextvars.bind_contextvars(request_id=...)`.
+- Register in `main.py` (after SecurityHeadersMiddleware).
+
+**Acceptance Criteria:**
+- [ ] Response always contains `X-Request-ID` header
+- [ ] Client-supplied UUID4 is echoed back unchanged
+- [ ] Non-UUID4 client header is replaced with a new UUID4
+- [ ] Missing header → server generates UUID4
+- [ ] Request ID appears in structured log output for the request
+- [ ] 5+ backend tests
+
+---
+
+### 21.5 Playwright E2E Critical Path Tests
+**Goal:** Establish a safety net for the most important user journeys with browser-level end-to-end tests that catch regressions CI unit tests cannot.
+**Scope:**
+- `e2e/` directory containing Playwright tests (Python `pytest-playwright`).
+- 4 critical path scenarios: (1) signup → email verify → login, (2) calculate budget (commit=false), (3) POST monthly tracker actuals, (4) GET annual overview.
+- `e2e/conftest.py` handles local server startup and test user setup.
+- Add `e2e` job to `.github/workflows/ci.yml` that runs after the backend job.
+
+**Acceptance Criteria:**
+- [ ] 4 E2E scenarios implemented and passing
+- [ ] Tests run against a real local server (no mocking)
+- [ ] CI job defined in ci.yml
+- [ ] `e2e/README.md` documents how to run locally
+- [ ] Scenarios use a dedicated test user, cleaned up after
+
+---
+
 ## 10. Implementation Sequence
 
 ```
@@ -1372,9 +1467,13 @@ Phase 19 (DONE): Expense intelligence & custom analytics
   19.1 (Tag analytics) [DONE] → 19.2 (Auto-categorization rules) [DONE] → 19.3 (Multiple income sources) [DONE]
   → 19.4 (Year-over-year comparison) [DONE] → 19.5 (Budget reallocation suggestions) [DONE]
 
-Phase 20 (IN PROGRESS): Financial wellness, data quality & power-user productivity
+Phase 20 (DONE): Financial wellness, data quality & power-user productivity
   20.1 (Financial health score) [DONE] → 20.2 (Bulk expense operations) [DONE] → 20.3 (Budget rollover) [DONE]
   → 20.4 (Duplicate expense detection) [DONE] → 20.5 (Expense list pagination) [DONE]
+
+Phase 21 (IN PROGRESS): Production hardening & API resilience
+  21.1 (Idempotency keys) [DONE] → 21.2 (GDPR full data export) → 21.3 (Spending anomaly alerts)
+  → 21.4 (X-Request-ID tracing) → 21.5 (Playwright E2E tests)
 ```
 
 ---
