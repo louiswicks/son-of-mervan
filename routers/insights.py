@@ -1519,6 +1519,119 @@ def year_over_year(
     }
 
 
+@router.get("/reallocation-suggestions")
+def reallocation_suggestions(
+    months: int = Query(3, ge=1, le=12, description="Number of past months to analyse (1–12)"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Identify budget slack and stress across the past N months and suggest reallocation.
+
+    Slack: actual < 70% of planned for 2+ months.
+    Stress: actual > 110% of planned for 2+ months.
+
+    Response:
+      {
+        slack_categories: [{ category, avg_usage_pct, avg_slack_amount }],
+        stress_categories: [{ category, avg_usage_pct, avg_excess_amount }],
+        suggestions: [{ from_category, to_category, suggested_amount, rationale }],
+      }
+    """
+    user = _require_user(db, current_user)
+
+    month_list = _month_list(months)
+    all_rows = db.query(MonthlyData).filter(MonthlyData.user_id == user.id).all()
+
+    # Accumulate per-category stats across the window
+    # { category: { "planned_sum": float, "actual_sum": float, "months_with_data": int,
+    #               "slack_months": int, "stress_months": int } }
+    cat_stats: Dict[str, Dict[str, Any]] = {}
+
+    for month_str in month_list:
+        row = _find_month(all_rows, month_str)
+        if row is None:
+            continue
+        cat_totals = _category_totals(db, row)
+        for cat, vals in cat_totals.items():
+            planned = vals["planned"]
+            actual = vals["actual"]
+            if planned <= 0:
+                continue  # Skip categories with no planned budget
+            if cat not in cat_stats:
+                cat_stats[cat] = {
+                    "planned_sum": 0.0,
+                    "actual_sum": 0.0,
+                    "months_with_data": 0,
+                    "slack_months": 0,
+                    "stress_months": 0,
+                }
+            s = cat_stats[cat]
+            s["planned_sum"] += planned
+            s["actual_sum"] += actual
+            s["months_with_data"] += 1
+            usage_ratio = actual / planned
+            if usage_ratio < 0.70:
+                s["slack_months"] += 1
+            if usage_ratio > 1.10:
+                s["stress_months"] += 1
+
+    slack_categories: List[Dict[str, Any]] = []
+    stress_categories: List[Dict[str, Any]] = []
+
+    for cat, s in cat_stats.items():
+        n = s["months_with_data"]
+        if n < 2:
+            continue  # Need 2+ months of data to establish a pattern
+        avg_planned = s["planned_sum"] / n
+        avg_actual = s["actual_sum"] / n
+        avg_usage_pct = round((avg_actual / avg_planned) * 100, 1)
+
+        if s["slack_months"] >= 2:
+            avg_slack = round(avg_planned - avg_actual, 2)
+            slack_categories.append({
+                "category": cat,
+                "avg_usage_pct": avg_usage_pct,
+                "avg_slack_amount": avg_slack,
+            })
+
+        if s["stress_months"] >= 2:
+            avg_excess = round(avg_actual - avg_planned, 2)
+            stress_categories.append({
+                "category": cat,
+                "avg_usage_pct": avg_usage_pct,
+                "avg_excess_amount": avg_excess,
+            })
+
+    # Sort: most slack first, most stressed first
+    slack_categories.sort(key=lambda x: x["avg_slack_amount"], reverse=True)
+    stress_categories.sort(key=lambda x: x["avg_excess_amount"], reverse=True)
+
+    # Generate suggestions: pair highest-slack with highest-stress
+    suggestions: List[Dict[str, Any]] = []
+    for i in range(min(len(slack_categories), len(stress_categories))):
+        slack = slack_categories[i]
+        stress = stress_categories[i]
+        suggested_amount = round(min(slack["avg_slack_amount"], stress["avg_excess_amount"]), 2)
+        slack_pct = round(100 - slack["avg_usage_pct"], 1)
+        rationale = (
+            f"{stress['category']} is {stress['avg_usage_pct'] - 100:.1f}% over budget on average; "
+            f"{slack['category']} has {slack_pct:.1f}% slack"
+        )
+        suggestions.append({
+            "from_category": slack["category"],
+            "to_category": stress["category"],
+            "suggested_amount": suggested_amount,
+            "rationale": rationale,
+        })
+
+    return {
+        "slack_categories": slack_categories,
+        "stress_categories": stress_categories,
+        "suggestions": suggestions,
+    }
+
+
 @router.get("/month-comparison")
 def month_comparison(
     month_a: str = Query(..., description="First month in YYYY-MM format"),

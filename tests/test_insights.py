@@ -1630,3 +1630,189 @@ class TestYearOverYear:
         assert "years_analyzed" in body
         assert "categories" in body
         assert body["month_number"] == 7
+
+
+class TestReallocationSuggestions:
+    """Tests for GET /insights/reallocation-suggestions."""
+
+    def test_unauthenticated_returns_401_or_403(self, client):
+        r = client.get("/insights/reallocation-suggestions")
+        assert r.status_code in (401, 403)
+
+    def test_months_below_range_returns_422(self, auth_client):
+        r = auth_client.get("/insights/reallocation-suggestions?months=0")
+        assert r.status_code == 422
+
+    def test_months_above_range_returns_422(self, auth_client):
+        r = auth_client.get("/insights/reallocation-suggestions?months=13")
+        assert r.status_code == 422
+
+    def test_no_data_returns_empty_lists(self, auth_client):
+        """No expense data → all three lists empty."""
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["slack_categories"] == []
+        assert body["stress_categories"] == []
+        assert body["suggestions"] == []
+
+    def test_response_structure(self, auth_client):
+        """Response always contains the three required keys."""
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert "slack_categories" in body
+        assert "stress_categories" in body
+        assert "suggestions" in body
+
+    def test_insufficient_months_no_pattern(self, auth_client, db, verified_user):
+        """Only 1 month of data → requires 2+, so no slack/stress detected."""
+        now = __import__("datetime").datetime.utcnow()
+        current_month = now.strftime("%Y-%m")
+        m = make_month(db, verified_user, month=current_month, salary_planned=3000.0)
+        # Under-budget: actual = 50% of planned
+        make_expense(db, m, name="Rent", category="Housing", planned=1000.0, actual=500.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        # 1 month is not enough to establish a pattern (need 2+)
+        assert body["slack_categories"] == []
+
+    def test_slack_category_detected(self, auth_client, db, verified_user):
+        """Category consistently under 70% of budget in 2+ months → appears in slack_categories."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        m1 = make_month(db, verified_user, month=m1_str, salary_planned=3000.0)
+        make_expense(db, m1, name="Dining", category="Dining", planned=500.0, actual=200.0)
+
+        m2 = make_month(db, verified_user, month=m2_str, salary_planned=3000.0)
+        make_expense(db, m2, name="Dining", category="Dining", planned=500.0, actual=200.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        cats = [c["category"] for c in body["slack_categories"]]
+        assert "Dining" in cats
+
+    def test_stress_category_detected(self, auth_client, db, verified_user):
+        """Category consistently over 110% of budget in 2+ months → appears in stress_categories."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        m1 = make_month(db, verified_user, month=m1_str, salary_planned=3000.0)
+        make_expense(db, m1, name="Groceries", category="Food", planned=300.0, actual=400.0)
+
+        m2 = make_month(db, verified_user, month=m2_str, salary_planned=3000.0)
+        make_expense(db, m2, name="Groceries", category="Food", planned=300.0, actual=400.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        cats = [c["category"] for c in body["stress_categories"]]
+        assert "Food" in cats
+
+    def test_suggestion_generated_when_both_exist(self, auth_client, db, verified_user):
+        """When slack and stress categories both exist, at least one suggestion is returned."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        for month_str in (m1_str, m2_str):
+            m = make_month(db, verified_user, month=month_str, salary_planned=4000.0)
+            # Slack: Dining at 40% usage
+            make_expense(db, m, name="Dining", category="Dining", planned=600.0, actual=240.0)
+            # Stress: Housing at 130% usage
+            make_expense(db, m, name="Rent", category="Housing", planned=1000.0, actual=1300.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["suggestions"]) >= 1
+        suggestion = body["suggestions"][0]
+        assert "from_category" in suggestion
+        assert "to_category" in suggestion
+        assert "suggested_amount" in suggestion
+        assert "rationale" in suggestion
+
+    def test_suggestion_rationale_is_human_readable(self, auth_client, db, verified_user):
+        """Rationale string mentions both category names."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        for month_str in (m1_str, m2_str):
+            m = make_month(db, verified_user, month=month_str, salary_planned=4000.0)
+            make_expense(db, m, name="Dining", category="Dining", planned=600.0, actual=240.0)
+            make_expense(db, m, name="Rent", category="Housing", planned=1000.0, actual=1300.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        body = r.json()
+        rationale = body["suggestions"][0]["rationale"]
+        assert isinstance(rationale, str)
+        assert len(rationale) > 10  # Non-trivial string
+        assert "Housing" in rationale or "Dining" in rationale
+
+    def test_data_isolation(self, auth_client, db, verified_user, second_user):
+        """Another user's data does not influence the suggestions."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        for month_str in (m1_str, m2_str):
+            m = make_month(db, second_user, month=month_str, salary_planned=9000.0)
+            make_expense(db, m, name="SecretDining", category="SecretDining", planned=600.0, actual=200.0)
+            make_expense(db, m, name="SecretRent", category="SecretHousing", planned=1000.0, actual=1400.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        # Authenticated user (verified_user) has no data → all empty
+        assert body["slack_categories"] == []
+        assert body["stress_categories"] == []
+        assert body["suggestions"] == []
+
+    def test_default_months_param(self, auth_client):
+        """Default months parameter (3) is accepted without query string."""
+        r = auth_client.get("/insights/reallocation-suggestions")
+        assert r.status_code == 200
+
+    def test_slack_categories_sorted_by_slack_descending(self, auth_client, db, verified_user):
+        """slack_categories sorted by avg_slack_amount descending (most slack first)."""
+        from datetime import datetime
+        now = datetime.utcnow()
+        m1_str = f"{now.year}-{now.month:02d}"
+        mo = now.month - 1 or 12
+        yr = now.year if now.month > 1 else now.year - 1
+        m2_str = f"{yr}-{mo:02d}"
+
+        for month_str in (m1_str, m2_str):
+            m = make_month(db, verified_user, month=month_str, salary_planned=5000.0)
+            # BigSlack: planned=1000, actual=200 → slack=800
+            make_expense(db, m, name="BigSlack", category="BigSlack", planned=1000.0, actual=200.0)
+            # SmallSlack: planned=500, actual=100 → slack=400
+            make_expense(db, m, name="SmallSlack", category="SmallSlack", planned=500.0, actual=100.0)
+
+        r = auth_client.get("/insights/reallocation-suggestions?months=3")
+        assert r.status_code == 200
+        body = r.json()
+        slack_amounts = [c["avg_slack_amount"] for c in body["slack_categories"]]
+        assert slack_amounts == sorted(slack_amounts, reverse=True)
