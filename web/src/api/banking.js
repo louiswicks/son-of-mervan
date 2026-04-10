@@ -1,8 +1,17 @@
 import client from "./client";
 
+// TrueLayer
 export const getConnectUrl = () =>
   client.get("/banking/connect").then((r) => r.data);
 
+// GoCardless
+export const listInstitutions = (country = "GB") =>
+  client.get("/banking/institutions", { params: { country } }).then((r) => r.data);
+
+export const getConnectUrlGocardless = (institutionId) =>
+  client.get("/banking/connect/gocardless", { params: { institution_id: institutionId } }).then((r) => r.data);
+
+// Shared
 export const listConnections = () =>
   client.get("/banking/connections").then((r) => r.data);
 

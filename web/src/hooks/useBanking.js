@@ -4,8 +4,10 @@ import {
   confirmAllDrafts,
   disconnectBank,
   getConnectUrl,
+  getConnectUrlGocardless,
   listConnections,
   listDrafts,
+  listInstitutions,
   reviewDraft,
   syncTransactions,
 } from "../api/banking";
@@ -26,6 +28,15 @@ export function useDrafts(page = 1, pageSize = 25) {
   });
 }
 
+export function useInstitutions(country = "GB") {
+  return useQuery({
+    queryKey: ["banking-institutions", country],
+    queryFn: () => listInstitutions(country),
+    staleTime: 24 * 60 * 60 * 1000, // institution list rarely changes
+    retry: 1,
+  });
+}
+
 export function useConnectBank() {
   return useMutation({
     mutationFn: getConnectUrl,
@@ -33,6 +44,16 @@ export function useConnectBank() {
       window.location.href = auth_url;
     },
     onError: () => toast.error("Failed to start bank connection"),
+  });
+}
+
+export function useConnectGocardless() {
+  return useMutation({
+    mutationFn: (institutionId) => getConnectUrlGocardless(institutionId),
+    onSuccess: ({ auth_url }) => {
+      window.location.href = auth_url;
+    },
+    onError: () => toast.error("Failed to start GoCardless bank connection"),
   });
 }
 

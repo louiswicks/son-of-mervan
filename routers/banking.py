@@ -1,13 +1,20 @@
 """
-routers/banking.py — TrueLayer open banking OAuth integration.
+routers/banking.py — Open banking integration (TrueLayer + GoCardless).
 
-Endpoints:
+TrueLayer endpoints (sandbox/mock testing):
   GET    /banking/connect                 Generate TrueLayer authorisation URL (auth required)
   GET    /banking/callback?code=&state=   OAuth callback — exchanges code, stores BankConnection
   POST   /banking/refresh/{id}            Refresh access token for a connection (auth required)
+
+GoCardless endpoints (real UK banks: HSBC, Santander, Monzo, etc.):
+  GET    /banking/institutions            List UK banks available via GoCardless
+  GET    /banking/connect/gocardless      Create requisition and return auth link (auth required)
+  GET    /banking/callback/gocardless     Callback after bank auth; stores BankConnection
+
+Shared endpoints:
   GET    /banking/connections             List the current user's active bank connections (auth required)
   DELETE /banking/connections/{id}        Disconnect a bank connection; deletes drafts, nulls confirmed (auth required)
-  POST   /banking/sync                    Fetch transactions from TrueLayer and create draft rows (auth required)
+  POST   /banking/sync                    Fetch transactions (TrueLayer or GoCardless) and create draft rows (auth required)
   GET    /banking/drafts                  List pending draft transactions (auth required)
   PATCH  /banking/drafts/{id}             Confirm or reject a draft transaction (auth required)
   POST   /banking/drafts/confirm-all      Bulk confirm all drafts for the authenticated user (auth required)
@@ -253,6 +260,234 @@ def _fetch_first_account_id(access_token: str) -> str:
     except Exception as exc:
         logger.warning("Could not fetch TrueLayer accounts: %s", exc)
     return ""
+
+
+# ---------------------------------------------------------------------------
+# GoCardless helpers
+# ---------------------------------------------------------------------------
+
+GC_BASE = "https://bankaccountdata.gocardless.com/api/v2"
+
+
+def _gc_configured() -> bool:
+    return bool(settings.GOCARDLESS_SECRET_ID and settings.GOCARDLESS_SECRET_KEY)
+
+
+def _gc_api_token() -> str:
+    """Get a short-lived GoCardless API token using our app credentials."""
+    try:
+        resp = httpx.post(
+            f"{GC_BASE}/token/new/",
+            json={"secret_id": settings.GOCARDLESS_SECRET_ID, "secret_key": settings.GOCARDLESS_SECRET_KEY},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()["access"]
+    except Exception as exc:
+        logger.error("GoCardless token fetch failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Could not authenticate with GoCardless")
+
+
+# ---------------------------------------------------------------------------
+# GET /banking/institutions
+# ---------------------------------------------------------------------------
+
+@router.get("/institutions")
+def list_institutions(
+    country: str = Query(default="GB"),
+    current_user: str = Depends(verify_token),
+):
+    """List banks available via GoCardless for a given country (default GB)."""
+    if not _gc_configured():
+        raise HTTPException(status_code=503, detail="GoCardless is not configured on this server")
+    token = _gc_api_token()
+    try:
+        resp = httpx.get(
+            f"{GC_BASE}/institutions/",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"country": country},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        logger.error("GoCardless institutions fetch failed: %s", exc.response.text)
+        raise HTTPException(status_code=502, detail="Failed to fetch institutions from GoCardless")
+
+
+# ---------------------------------------------------------------------------
+# GET /banking/connect/gocardless
+# ---------------------------------------------------------------------------
+
+@router.get("/connect/gocardless", response_model=BankConnectResponse)
+def connect_gocardless(
+    institution_id: str = Query(..., description="GoCardless institution ID e.g. MONZO_MONZGB2L"),
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a GoCardless end-user agreement and requisition for the given
+    institution, then return the bank authorisation link.
+    """
+    if not _gc_configured():
+        raise HTTPException(status_code=503, detail="GoCardless is not configured on this server")
+
+    user = _require_user(db, current_user)
+    state = _make_state(user.id)
+    token = _gc_api_token()
+
+    # Create end-user agreement (90 days history, 90 days access)
+    try:
+        agreement_resp = httpx.post(
+            f"{GC_BASE}/agreements/enduser/",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "institution_id": institution_id,
+                "max_historical_days": 90,
+                "access_valid_for_days": 90,
+                "access_scope": ["balances", "details", "transactions"],
+            },
+            timeout=15,
+        )
+        agreement_resp.raise_for_status()
+        agreement_id = agreement_resp.json().get("id")
+    except httpx.HTTPStatusError as exc:
+        logger.error("GoCardless agreement creation failed: %s", exc.response.text)
+        raise HTTPException(status_code=502, detail="Failed to create bank agreement")
+
+    # Create requisition — state stored in 'reference' for CSRF check on callback
+    try:
+        req_resp = httpx.post(
+            f"{GC_BASE}/requisitions/",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "redirect": settings.GOCARDLESS_REDIRECT_URI,
+                "institution_id": institution_id,
+                "reference": state,
+                "agreement": agreement_id,
+                "user_language": "EN",
+            },
+            timeout=15,
+        )
+        req_resp.raise_for_status()
+        data = req_resp.json()
+    except httpx.HTTPStatusError as exc:
+        logger.error("GoCardless requisition creation failed: %s", exc.response.text)
+        raise HTTPException(status_code=502, detail="Failed to create bank requisition")
+
+    logger.info("Created GoCardless requisition for user %s, institution %s", user.id, institution_id)
+    return BankConnectResponse(auth_url=data["link"])
+
+
+# ---------------------------------------------------------------------------
+# GET /banking/callback/gocardless
+# ---------------------------------------------------------------------------
+
+@router.get("/callback/gocardless")
+def gocardless_callback(
+    ref: str = Query(..., description="GoCardless requisition ID"),
+    error: str = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Callback from GoCardless after the user completes bank authorisation.
+    Fetches account IDs from the requisition and stores a BankConnection row.
+    """
+    if error:
+        logger.warning("GoCardless callback received error: %s", error)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_BASE_URL}/#/banking?error={error}",
+            status_code=302,
+        )
+
+    if not _gc_configured():
+        raise HTTPException(status_code=503, detail="GoCardless is not configured")
+
+    token = _gc_api_token()
+
+    # Fetch the requisition — contains accounts list and our CSRF reference
+    try:
+        req_resp = httpx.get(
+            f"{GC_BASE}/requisitions/{ref}/",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15,
+        )
+        req_resp.raise_for_status()
+        req_data = req_resp.json()
+    except Exception as exc:
+        logger.error("GoCardless requisition fetch failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Failed to fetch bank connection details from GoCardless")
+
+    # Verify CSRF — reference field holds the HMAC-signed state we stored
+    state = req_data.get("reference", "")
+    user_id = _verify_state(state)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    account_ids = req_data.get("accounts", [])
+    institution_id = req_data.get("institution_id", "unknown")
+
+    # Store connection: requisition_id in access_token field, account IDs comma-separated
+    conn = BankConnection(user_id=user_id)
+    conn.provider = f"gocardless:{institution_id}"
+    conn.access_token = ref  # requisition_id — used to re-fetch accounts if needed
+    conn.refresh_token = ""
+    conn.account_id = ",".join(account_ids)
+    db.add(conn)
+    db.commit()
+    db.refresh(conn)
+
+    logger.info(
+        "GoCardless BankConnection %s created for user %s (%d accounts, institution %s)",
+        conn.id, user_id, len(account_ids), institution_id,
+    )
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_BASE_URL}/#/banking?connected=true",
+        status_code=302,
+    )
+
+
+def _fetch_transactions_gocardless(account_ids_str: str, from_dt: datetime) -> list[dict]:
+    """
+    Fetch and normalise transactions from GoCardless for all stored account IDs.
+    Returns a list of dicts with keys: transaction_id, description, amount, currency, date.
+    """
+    token = _gc_api_token()
+    from_str = from_dt.strftime("%Y-%m-%d")
+    to_str = datetime.utcnow().strftime("%Y-%m-%d")
+    account_ids = [a.strip() for a in account_ids_str.split(",") if a.strip()]
+
+    results = []
+    for account_id in account_ids:
+        try:
+            resp = httpx.get(
+                f"{GC_BASE}/accounts/{account_id}/transactions/",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"date_from": from_str, "date_to": to_str},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            booked = resp.json().get("transactions", {}).get("booked", [])
+            for t in booked:
+                amount_info = t.get("transactionAmount", {})
+                results.append({
+                    "transaction_id": t.get("transactionId") or t.get("internalTransactionId", ""),
+                    "description": (
+                        t.get("remittanceInformationUnstructured")
+                        or t.get("creditorName")
+                        or t.get("remittanceInformationStructured")
+                        or ""
+                    ),
+                    "amount": float(amount_info.get("amount", 0)),
+                    "currency": amount_info.get("currency", "GBP"),
+                    "date": t.get("bookingDate") or t.get("valueDate", ""),
+                })
+        except Exception as exc:
+            logger.warning("GoCardless transactions fetch failed for account %s: %s", account_id, exc)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -557,19 +792,26 @@ def sync_transactions(
     # Determine fetch window
     from_dt = conn.last_synced_at or (datetime.utcnow() - timedelta(days=90))
 
-    # Fetch transactions — auto-refresh token on 401
-    try:
-        raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
-    except HTTPException as exc:
-        if exc.status_code == 502:
-            # Try refreshing the token and retrying once
-            logger.info("Refreshing token for connection %s and retrying sync", conn.id)
-            _do_refresh_connection(db, conn)
+    # Fetch transactions — route to correct provider
+    is_gocardless = (conn.provider or "").startswith("gocardless:")
+    if is_gocardless:
+        if not _gc_configured():
+            raise HTTPException(status_code=503, detail="GoCardless is not configured on this server")
+        raw_txns = _fetch_transactions_gocardless(conn.account_id, from_dt)
+    else:
+        if not _truelayer_configured():
+            raise HTTPException(status_code=503, detail="Open banking is not configured on this server")
+        try:
             raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
-        else:
-            raise
+        except HTTPException as exc:
+            if exc.status_code == 502:
+                logger.info("Refreshing TrueLayer token for connection %s and retrying sync", conn.id)
+                _do_refresh_connection(db, conn)
+                raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
+            else:
+                raise
 
-    # Collect existing external IDs for deduplication (decrypt all rows for this connection)
+    # Collect existing external IDs for deduplication
     existing_txns = (
         db.query(BankTransaction)
         .filter(BankTransaction.bank_connection_id == conn.id)
@@ -580,15 +822,24 @@ def sync_transactions(
     synced = 0
     skipped = 0
     for raw in raw_txns:
-        ext_id = raw.get("transaction_id") or raw.get("id", "")
+        # Normalised keys differ between providers — GoCardless normalisation done in helper
+        if is_gocardless:
+            ext_id = raw.get("transaction_id", "")
+            description = raw.get("description", "")
+            amount = raw.get("amount")
+            currency = raw.get("currency", "GBP")
+            txn_date_str = raw.get("date", "")
+        else:
+            ext_id = raw.get("transaction_id") or raw.get("id", "")
+            description = raw.get("description") or raw.get("merchant_name") or ""
+            amount = raw.get("amount")
+            currency = raw.get("currency", "GBP")
+            txn_date_str = raw.get("timestamp") or raw.get("date") or ""
+
         if not ext_id or ext_id in existing_external_ids:
             skipped += 1
             continue
 
-        description = raw.get("description") or raw.get("merchant_name") or ""
-        amount = raw.get("amount")
-        currency = raw.get("currency", "GBP")
-        txn_date_str = raw.get("timestamp") or raw.get("date") or ""
         try:
             from datetime import date as date_type
             if "T" in txn_date_str:

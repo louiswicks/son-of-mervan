@@ -8,10 +8,14 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Search,
+  Building2,
 } from "lucide-react";
 import {
   useConnections,
   useConnectBank,
+  useConnectGocardless,
+  useInstitutions,
   useSyncTransactions,
   useDisconnectBank,
   useReviewDraft,
@@ -264,16 +268,15 @@ function ConnectedCard({ connection }) {
 
   return (
     <>
-      {/* Sandbox banner */}
-      {connection.is_sandbox && (
+      {/* Sandbox banner — only for TrueLayer sandbox connections */}
+      {connection.is_sandbox && !(connection.provider || "").startsWith("gocardless") && (
         <div
           className="flex items-center gap-2 px-4 py-2.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm mb-4"
           role="status"
         >
           <AlertTriangle size={16} className="flex-shrink-0" aria-hidden="true" />
           <span>
-            <strong>Sandbox mode</strong> — Using TrueLayer Sandbox. Mock data only, no real
-            transactions.
+            <strong>Sandbox mode</strong> — TrueLayer mock data only, no real transactions.
           </span>
         </div>
       )}
@@ -357,44 +360,159 @@ function ConnectedCard({ connection }) {
   );
 }
 
+// -------------------- Institution Picker (GoCardless) --------------------
+
+function InstitutionPicker({ onSelect, isConnecting }) {
+  const [search, setSearch] = useState("");
+  const { data: institutions, isLoading, isError } = useInstitutions("GB");
+
+  const filtered = (institutions || []).filter((inst) =>
+    inst.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+        <input
+          type="text"
+          placeholder="Search banks…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Search banks"
+        />
+      </div>
+
+      {isLoading && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-16 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {isError && (
+        <p className="text-sm text-red-500 text-center py-4">
+          Could not load banks — GoCardless may not be configured.
+        </p>
+      )}
+
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+          {filtered.length === 0 ? (
+            <p className="col-span-3 text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              No banks found for "{search}"
+            </p>
+          ) : (
+            filtered.map((inst) => (
+              <button
+                key={inst.id}
+                onClick={() => onSelect(inst.id)}
+                disabled={isConnecting}
+                className="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center disabled:opacity-50"
+                aria-label={`Connect ${inst.name}`}
+              >
+                {inst.logo ? (
+                  <img src={inst.logo} alt="" className="w-8 h-8 rounded-lg object-contain" aria-hidden="true" />
+                ) : (
+                  <Building2 size={24} className="text-gray-400" aria-hidden="true" />
+                )}
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300 leading-tight line-clamp-2">
+                  {inst.name}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // -------------------- Disconnected State --------------------
 
-function DisconnectedCard({ onConnect, isConnecting }) {
+function DisconnectedCard() {
+  const connectGocardless = useConnectGocardless();
+  const connectTruelayer = useConnectBank();
+  const [showSandbox, setShowSandbox] = useState(false);
+
+  const isConnecting = connectGocardless.isPending || connectTruelayer.isPending;
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-8 flex flex-col items-center text-center max-w-md mx-auto">
-      <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mb-5">
-        <Landmark size={32} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
+    <div className="space-y-4">
+      {/* GoCardless — primary option for real banks */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+            <Landmark size={20} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Connect your bank</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              HSBC, Santander, Monzo, and 100+ UK banks via GoCardless
+            </p>
+          </div>
+        </div>
+
+        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 mb-4">
+          {[
+            "Read-only — we can never move your money",
+            "Transactions need your approval before they're saved",
+            "You can disconnect at any time",
+          ].map((item) => (
+            <li key={item} className="flex items-center gap-2">
+              <CheckCircle size={13} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+
+        <InstitutionPicker
+          onSelect={(institutionId) => connectGocardless.mutate(institutionId)}
+          isConnecting={isConnecting}
+        />
+
+        {connectGocardless.isPending && (
+          <p className="text-sm text-blue-600 dark:text-blue-400 text-center mt-3">
+            Redirecting to your bank…
+          </p>
+        )}
       </div>
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-        Connect your bank
-      </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
-        Securely link your bank account to automatically import transactions for review. We
-        connect via TrueLayer — read-only access, no payments.
-      </p>
 
-      <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2 text-left mb-8 w-full">
-        {[
-          "Read-only — we can never move your money",
-          "Transactions need your approval before they're saved",
-          "You can disconnect at any time",
-          "Bank credentials are handled by TrueLayer, not us",
-        ].map((item) => (
-          <li key={item} className="flex items-center gap-2">
-            <CheckCircle size={15} className="text-green-500 flex-shrink-0" aria-hidden="true" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        onClick={onConnect}
-        disabled={isConnecting}
-        className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 transition-colors min-h-[48px] w-full justify-center"
-      >
-        <Landmark size={16} aria-hidden="true" />
-        {isConnecting ? "Redirecting to bank…" : "Connect Bank"}
-      </button>
+      {/* TrueLayer — sandbox/testing */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+        <button
+          onClick={() => setShowSandbox((s) => !s)}
+          className="flex items-center justify-between w-full px-5 py-3.5 text-left"
+          aria-expanded={showSandbox}
+        >
+          <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <AlertTriangle size={14} className="text-yellow-500" aria-hidden="true" />
+            TrueLayer sandbox (mock data only)
+          </span>
+          {showSandbox ? (
+            <ChevronUp size={16} className="text-gray-400" aria-hidden="true" />
+          ) : (
+            <ChevronDown size={16} className="text-gray-400" aria-hidden="true" />
+          )}
+        </button>
+        {showSandbox && (
+          <div className="px-5 pb-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Use TrueLayer to test the integration with fake transaction data. Not connected to any real bank.
+            </p>
+            <button
+              onClick={() => connectTruelayer.mutate()}
+              disabled={isConnecting}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 disabled:opacity-60 transition-colors"
+            >
+              <Landmark size={14} aria-hidden="true" />
+              {connectTruelayer.isPending ? "Redirecting…" : "Connect TrueLayer Sandbox"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -403,7 +521,6 @@ function DisconnectedCard({ onConnect, isConnecting }) {
 
 export default function BankConnectionPage() {
   const { data, isLoading } = useConnections();
-  const connectMutation = useConnectBank();
 
   const connections = data?.connections ?? [];
   const activeConnection = connections[0] ?? null;
@@ -425,10 +542,7 @@ export default function BankConnectionPage() {
       ) : activeConnection ? (
         <ConnectedCard connection={activeConnection} />
       ) : (
-        <DisconnectedCard
-          onConnect={() => connectMutation.mutate()}
-          isConnecting={connectMutation.isPending}
-        />
+        <DisconnectedCard />
       )}
     </div>
   );

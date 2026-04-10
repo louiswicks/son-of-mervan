@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # Set to True to use TrueLayer sandbox (mock bank data)
     TRUELAYER_SANDBOX: bool = True
 
+    # GoCardless Bank Account Data (formerly Nordigen) — leave empty to disable
+    # Sign up free at https://bankaccountdata.gocardless.com
+    # Supports HSBC, Santander, Monzo, and most major UK banks
+    GOCARDLESS_SECRET_ID: str = ""
+    GOCARDLESS_SECRET_KEY: str = ""
+    GOCARDLESS_REDIRECT_URI: str = "http://localhost:8000/banking/callback/gocardless"
+
     @field_validator("JWT_SECRET_KEY")
     @classmethod
     def jwt_secret_must_not_be_empty(cls, v: str) -> str:
