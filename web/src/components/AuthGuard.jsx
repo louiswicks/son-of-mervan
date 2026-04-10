@@ -6,7 +6,7 @@ import {
   Repeat, PiggyBank, Bell, X, Trash2, BellOff, Lightbulb, Sliders,
   LineChart, CalendarDays, Receipt, Users, Tag, Upload, Waves,
   TrendingDown, BarChart3, ChevronLeft, ChevronRight, MoreHorizontal,
-  LogOut, Menu, Landmark,
+  LogOut, Landmark,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
