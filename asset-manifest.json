@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/son-of-mervan/static/css/main.0d8c50cc.css",
-    "main.js": "/son-of-mervan/static/js/main.0d20de73.js",
+    "main.js": "/son-of-mervan/static/js/main.25388283.js",
     "static/js/85.8c3de035.chunk.js": "/son-of-mervan/static/js/85.8c3de035.chunk.js",
     "static/js/881.8f21eee8.chunk.js": "/son-of-mervan/static/js/881.8f21eee8.chunk.js",
     "static/js/922.66a9933f.chunk.js": "/son-of-mervan/static/js/922.66a9933f.chunk.js",
@@ -27,7 +27,7 @@
     "static/js/316.fb97ed55.chunk.js": "/son-of-mervan/static/js/316.fb97ed55.chunk.js",
     "static/js/168.579f64cc.chunk.js": "/son-of-mervan/static/js/168.579f64cc.chunk.js",
     "static/js/354.e6614159.chunk.js": "/son-of-mervan/static/js/354.e6614159.chunk.js",
-    "static/js/243.b397ff55.chunk.js": "/son-of-mervan/static/js/243.b397ff55.chunk.js",
+    "static/js/646.f2e5ad34.chunk.js": "/son-of-mervan/static/js/646.f2e5ad34.chunk.js",
     "static/js/453.4874a390.chunk.js": "/son-of-mervan/static/js/453.4874a390.chunk.js",
     "static/js/459.776f9886.chunk.js": "/son-of-mervan/static/js/459.776f9886.chunk.js",
     "static/js/379.511ffa8d.chunk.js": "/son-of-mervan/static/js/379.511ffa8d.chunk.js",
@@ -41,7 +41,7 @@
     "static/js/360.0730f80e.chunk.js": "/son-of-mervan/static/js/360.0730f80e.chunk.js",
     "index.html": "/son-of-mervan/index.html",
     "main.0d8c50cc.css.map": "/son-of-mervan/static/css/main.0d8c50cc.css.map",
-    "main.0d20de73.js.map": "/son-of-mervan/static/js/main.0d20de73.js.map",
+    "main.25388283.js.map": "/son-of-mervan/static/js/main.25388283.js.map",
     "85.8c3de035.chunk.js.map": "/son-of-mervan/static/js/85.8c3de035.chunk.js.map",
     "881.8f21eee8.chunk.js.map": "/son-of-mervan/static/js/881.8f21eee8.chunk.js.map",
     "922.66a9933f.chunk.js.map": "/son-of-mervan/static/js/922.66a9933f.chunk.js.map",
@@ -67,7 +67,7 @@
     "316.fb97ed55.chunk.js.map": "/son-of-mervan/static/js/316.fb97ed55.chunk.js.map",
     "168.579f64cc.chunk.js.map": "/son-of-mervan/static/js/168.579f64cc.chunk.js.map",
     "354.e6614159.chunk.js.map": "/son-of-mervan/static/js/354.e6614159.chunk.js.map",
-    "243.b397ff55.chunk.js.map": "/son-of-mervan/static/js/243.b397ff55.chunk.js.map",
+    "646.f2e5ad34.chunk.js.map": "/son-of-mervan/static/js/646.f2e5ad34.chunk.js.map",
     "453.4874a390.chunk.js.map": "/son-of-mervan/static/js/453.4874a390.chunk.js.map",
     "459.776f9886.chunk.js.map": "/son-of-mervan/static/js/459.776f9886.chunk.js.map",
     "379.511ffa8d.chunk.js.map": "/son-of-mervan/static/js/379.511ffa8d.chunk.js.map",
@@ -82,6 +82,6 @@
   },
   "entrypoints": [
     "static/css/main.0d8c50cc.css",
-    "static/js/main.0d20de73.js"
+    "static/js/main.25388283.js"
   ]
 }
