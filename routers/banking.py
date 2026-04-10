@@ -144,7 +144,7 @@ def connect_bank(
     params = {
         "response_type": "code",
         "client_id": settings.TRUELAYER_CLIENT_ID,
-        "scope": "accounts transactions balance",
+        "scope": "info accounts transactions balance offline_access",
         "redirect_uri": settings.TRUELAYER_REDIRECT_URI,
         "state": state,
         "providers": "uk-ob-all uk-oauth-all",
