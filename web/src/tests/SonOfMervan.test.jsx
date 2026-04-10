@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock recharts before any imports that use it
@@ -41,6 +42,7 @@ jest.mock('../hooks/useCategories', () => ({
 
 jest.mock('../hooks/useInsights', () => ({
   useStreaks: () => ({ data: null }),
+  useMonthCloseSummary: () => ({ data: null }),
 }));
 
 const mockGetMonthlyTracker = jest.fn();
@@ -68,7 +70,9 @@ function renderSonOfMervan() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <SonOfMervan />
+      <MemoryRouter>
+        <SonOfMervan />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

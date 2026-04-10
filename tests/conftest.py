@@ -51,7 +51,8 @@ from core.limiter import limiter
 import pytest
 from starlette.testclient import TestClient
 
-# ── Create all tables once per session (idempotent) ───────────────────────────
+# ── Recreate all tables every session so new ORM columns are always present ───
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 # ── Constants ─────────────────────────────────────────────────────────────────

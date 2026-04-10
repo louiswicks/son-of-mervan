@@ -33,7 +33,7 @@ def _wait_for_server(url: str, timeout: float = 30.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(f"{url}/health", timeout=1) as r:
+            with urllib.request.urlopen(f"{url}/health", timeout=1) as r:  # nosec B310
                 if r.status == 200:
                     return
         except Exception:
