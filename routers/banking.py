@@ -147,9 +147,9 @@ def connect_bank(
         "scope": "info accounts transactions balance offline_access",
         "redirect_uri": settings.TRUELAYER_REDIRECT_URI,
         "state": state,
-        "providers": "uk-ob-all uk-oauth-all",
+        "providers": "mock" if settings.TRUELAYER_SANDBOX else "uk-ob-all uk-oauth-all",
     }
-    auth_url = f"{_auth_base()}/?{urlencode(params)}"
+    auth_url = f"{_auth_base()}?{urlencode(params)}"
     logger.info("Generated TrueLayer auth URL for user %s", user.id)
     return BankConnectResponse(auth_url=auth_url)
 
