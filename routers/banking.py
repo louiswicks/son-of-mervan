@@ -604,24 +604,43 @@ def connection_details(
     currency = None
     account_name = conn.provider or "Bank account"
 
-    try:
-        resp = httpx.get(
+    def _get_accounts(token: str) -> list:
+        r = httpx.get(
             f"{_api_base()}/data/v1/accounts",
-            headers={"Authorization": f"Bearer {conn.access_token}"},
+            headers={"Authorization": f"Bearer {token}"},
             timeout=15,
         )
-        resp.raise_for_status()
-        accounts = resp.json().get("results", [])
-        if accounts:
-            acc = accounts[0]
-            account_name = (
-                acc.get("display_name")
-                or acc.get("account_type", "")
-                + " — "
-                + acc.get("provider", {}).get("display_name", conn.provider or "")
-            ).strip(" —")
+        r.raise_for_status()
+        return r.json().get("results", [])
+
+    try:
+        accounts = _get_accounts(conn.access_token)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            # Token expired — refresh and retry once
+            try:
+                _do_refresh_connection(db, conn)
+                accounts = _get_accounts(conn.access_token)
+            except Exception as refresh_exc:
+                logger.warning("Token refresh failed in details: %s", refresh_exc)
+        else:
+            logger.warning("TrueLayer accounts fetch failed %s: %s", exc.response.status_code, exc.response.text)
     except Exception as exc:
         logger.warning("Could not fetch TrueLayer account details: %s", exc)
+
+    if accounts:
+        acc = accounts[0]
+        provider_name = acc.get("provider", {}).get("display_name", "")
+        display = acc.get("display_name", "")
+        account_type = acc.get("account_type", "")
+        if display:
+            account_name = display
+        elif provider_name and account_type:
+            account_name = f"{provider_name} {account_type}"
+        elif provider_name:
+            account_name = provider_name
+        else:
+            account_name = conn.provider or "Bank account"
 
     if accounts:
         try:
@@ -813,14 +832,25 @@ def _fetch_transactions(access_token: str, account_id: str, from_dt: datetime) -
             url,
             headers={"Authorization": f"Bearer {access_token}"},
             params={"from": from_str},
-            timeout=30,
+            timeout=10,
         )
         resp.raise_for_status()
         return resp.json().get("results", [])
     except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
         error_body = exc.response.text
-        logger.error("TrueLayer transactions fetch failed %s: %s", exc.response.status_code, error_body)
+        logger.error("TrueLayer transactions fetch failed %s: %s", status, error_body)
+        if status == 403:
+            raise HTTPException(
+                status_code=403,
+                detail="TrueLayer rejected the request — your app may still be in testing mode. Contact TrueLayer to enable production access.",
+            )
+        if status == 401:
+            raise HTTPException(status_code=401, detail="TrueLayer access token expired")
         raise HTTPException(status_code=502, detail=f"Failed to fetch transactions from TrueLayer: {error_body}")
+    except httpx.TimeoutException:
+        logger.error("TrueLayer transactions fetch timed out for account %s", account_id)
+        raise HTTPException(status_code=504, detail="TrueLayer request timed out — try again in a moment")
     except httpx.RequestError as exc:
         logger.error("TrueLayer transactions network error: %s", exc)
         raise HTTPException(status_code=502, detail="Could not reach TrueLayer")
@@ -900,8 +930,8 @@ def sync_transactions(
             try:
                 raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
             except HTTPException as exc:
-                if exc.status_code == 502:
-                    logger.info("Refreshing TrueLayer token for connection %s and retrying sync", conn.id)
+                if exc.status_code == 401:
+                    logger.info("TrueLayer token expired for connection %s — refreshing and retrying", conn.id)
                     _do_refresh_connection(db, conn)
                     raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
                 else:
