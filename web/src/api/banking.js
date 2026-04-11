@@ -18,6 +18,9 @@ export const getConnectUrlGocardless = (institutionId) =>
 export const listConnections = () =>
   client.get("/banking/connections").then((r) => r.data);
 
+export const getConnectionDetails = (id) =>
+  client.get(`/banking/connections/${id}/details`).then((r) => r.data);
+
 export const syncTransactions = (connectionId) => {
   const params = connectionId ? { connection_id: connectionId } : {};
   return client.post("/banking/sync", null, { params }).then((r) => r.data);

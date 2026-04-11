@@ -227,30 +227,16 @@ def banking_callback(
     access_token = tokens.get("access_token", "")
     refresh_token = tokens.get("refresh_token", "")
 
-    # Fetch the first account to store as the linked account_id
-    account_id = _fetch_first_account_id(access_token)
+    # Fetch account ID and bank display name from TrueLayer
+    account_id, provider_name = _fetch_truelayer_account_info(access_token)
 
-    # Upsert: if the user already has an active connection, update it
-    existing = (
-        db.query(BankConnection)
-        .filter(
-            BankConnection.user_id == user_id,
-            BankConnection.disconnected_at.is_(None),
-        )
-        .first()
-    )
-    if existing:
-        existing.access_token = access_token
-        existing.refresh_token = refresh_token
-        existing.account_id = account_id
-        conn = existing
-    else:
-        conn = BankConnection(user_id=user_id)
-        conn.provider = "truelayer-sandbox" if settings.TRUELAYER_SANDBOX else "truelayer"
-        conn.access_token = access_token
-        conn.refresh_token = refresh_token
-        conn.account_id = account_id
-        db.add(conn)
+    # Always create a new connection — multiple accounts are supported
+    conn = BankConnection(user_id=user_id)
+    conn.provider = provider_name
+    conn.access_token = access_token
+    conn.refresh_token = refresh_token
+    conn.account_id = account_id
+    db.add(conn)
 
     db.commit()
     db.refresh(conn)
@@ -260,8 +246,11 @@ def banking_callback(
     return RedirectResponse(url=frontend_url, status_code=302)
 
 
-def _fetch_first_account_id(access_token: str) -> str:
-    """Call TrueLayer /data/v1/accounts and return the first account_id."""
+def _fetch_truelayer_account_info(access_token: str) -> tuple[str, str]:
+    """
+    Call TrueLayer /data/v1/accounts and return (account_id, provider_display_name).
+    Falls back to empty strings on failure.
+    """
     try:
         resp = httpx.get(
             f"{_api_base()}/data/v1/accounts",
@@ -271,10 +260,18 @@ def _fetch_first_account_id(access_token: str) -> str:
         resp.raise_for_status()
         results = resp.json().get("results", [])
         if results:
-            return results[0].get("account_id", "")
+            account = results[0]
+            account_id = account.get("account_id", "")
+            # TrueLayer returns provider.display_name e.g. "Monzo"
+            provider_name = (
+                account.get("provider", {}).get("display_name")
+                or account.get("provider", {}).get("provider_id")
+                or "truelayer"
+            )
+            return account_id, provider_name
     except Exception as exc:
         logger.warning("Could not fetch TrueLayer accounts: %s", exc)
-    return ""
+    return "", "truelayer"
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +566,83 @@ def refresh_connection(
 
 
 # ---------------------------------------------------------------------------
+# GET /banking/connections/{id}/details — live account name + balance
+# ---------------------------------------------------------------------------
+
+@router.get("/connections/{connection_id}/details")
+def connection_details(
+    connection_id: int,
+    current_user: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Fetch live account name and balance from TrueLayer for a connection.
+    Not cached — called by the frontend when the card is rendered.
+    """
+    user = _require_user(db, current_user)
+    conn = (
+        db.query(BankConnection)
+        .filter(
+            BankConnection.id == connection_id,
+            BankConnection.user_id == user.id,
+            BankConnection.disconnected_at.is_(None),
+        )
+        .first()
+    )
+    if not conn:
+        raise HTTPException(status_code=404, detail="Bank connection not found")
+
+    is_gocardless = (conn.provider or "").startswith("gocardless:")
+    if is_gocardless:
+        return {"account_name": conn.provider.replace("gocardless:", ""), "balance": None, "currency": None}
+
+    if not _truelayer_configured():
+        raise HTTPException(status_code=503, detail="Open banking is not configured")
+
+    accounts = []
+    balance = None
+    currency = None
+    account_name = conn.provider or "Bank account"
+
+    try:
+        resp = httpx.get(
+            f"{_api_base()}/data/v1/accounts",
+            headers={"Authorization": f"Bearer {conn.access_token}"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        accounts = resp.json().get("results", [])
+        if accounts:
+            acc = accounts[0]
+            account_name = (
+                acc.get("display_name")
+                or acc.get("account_type", "")
+                + " — "
+                + acc.get("provider", {}).get("display_name", conn.provider or "")
+            ).strip(" —")
+    except Exception as exc:
+        logger.warning("Could not fetch TrueLayer account details: %s", exc)
+
+    if accounts:
+        try:
+            account_id = accounts[0].get("account_id", conn.account_id)
+            bal_resp = httpx.get(
+                f"{_api_base()}/data/v1/accounts/{account_id}/balance",
+                headers={"Authorization": f"Bearer {conn.access_token}"},
+                timeout=15,
+            )
+            bal_resp.raise_for_status()
+            bal_results = bal_resp.json().get("results", [])
+            if bal_results:
+                balance = bal_results[0].get("available") or bal_results[0].get("current")
+                currency = bal_results[0].get("currency", "GBP")
+        except Exception as exc:
+            logger.warning("Could not fetch TrueLayer balance: %s", exc)
+
+    return {"account_name": account_name, "balance": balance, "currency": currency}
+
+
+# ---------------------------------------------------------------------------
 # GET /banking/connections
 # ---------------------------------------------------------------------------
 
@@ -744,8 +818,9 @@ def _fetch_transactions(access_token: str, account_id: str, from_dt: datetime) -
         resp.raise_for_status()
         return resp.json().get("results", [])
     except httpx.HTTPStatusError as exc:
-        logger.error("TrueLayer transactions fetch failed %s: %s", exc.response.status_code, exc.response.text)
-        raise HTTPException(status_code=502, detail="Failed to fetch transactions from TrueLayer")
+        error_body = exc.response.text
+        logger.error("TrueLayer transactions fetch failed %s: %s", exc.response.status_code, error_body)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch transactions from TrueLayer: {error_body}")
     except httpx.RequestError as exc:
         logger.error("TrueLayer transactions network error: %s", exc)
         raise HTTPException(status_code=502, detail="Could not reach TrueLayer")

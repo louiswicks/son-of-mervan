@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   useBankingStatus,
+  useConnectionDetails,
   useConnections,
   useConnectBank,
   useConnectGocardless,
@@ -189,11 +190,12 @@ function DraftsPanel() {
 
   if (drafts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="flex flex-col items-center justify-center py-12 text-center px-4">
         <CheckCircle size={40} className="text-green-400 mb-3" aria-hidden="true" />
-        <p className="text-gray-600 dark:text-gray-400 font-medium">No pending transactions</p>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-          Sync your bank to pull in new transactions for review.
+        <p className="text-gray-600 dark:text-gray-400 font-medium">No transactions to review</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 max-w-xs">
+          Click <strong>Sync Now</strong> to pull your latest transactions. New transactions appear
+          here for you to confirm or reject before they're saved to your tracker.
         </p>
       </div>
     );
@@ -264,12 +266,28 @@ function DraftsPanel() {
 function ConnectedCard({ connection }) {
   const sync = useSyncTransactions();
   const disconnect = useDisconnectBank();
+  const { data: details, isLoading: detailsLoading } = useConnectionDetails(connection.id);
   const [disconnectConfirm, setDisconnectConfirm] = useState(false);
   const [draftsOpen, setDraftsOpen] = useState(true);
+  const [syncError, setSyncError] = useState(null);
+
+  const handleSync = () => {
+    setSyncError(null);
+    sync.mutate(connection.id, {
+      onError: (err) => {
+        const msg = err?.response?.data?.detail || "Sync failed";
+        setSyncError(msg);
+      },
+    });
+  };
+
+  const bankName = details?.account_name || connection.provider || "Connected Bank";
+  const balance = details?.balance;
+  const currency = details?.currency || "GBP";
 
   return (
     <>
-      {/* Sandbox banner — only for TrueLayer sandbox connections */}
+      {/* Sandbox banner */}
       {connection.is_sandbox && !(connection.provider || "").startsWith("gocardless") && (
         <div
           className="flex items-center gap-2 px-4 py-2.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm mb-4"
@@ -290,24 +308,25 @@ function ConnectedCard({ connection }) {
               <Landmark size={20} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {connection.provider ?? "Connected Bank"}
-              </p>
-              {connection.account_id && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                  {connection.account_id}
+              <p className="font-semibold text-gray-900 dark:text-white">{bankName}</p>
+              {detailsLoading ? (
+                <div className="h-3 w-24 bg-gray-100 dark:bg-gray-700 rounded animate-pulse mt-1" />
+              ) : balance != null ? (
+                <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
+                  {fmtAmount(balance, currency)}
+                  <span className="text-xs font-normal text-gray-400 ml-1">available</span>
                 </p>
-              )}
+              ) : null}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 Last synced:{" "}
-                {connection.last_synced_at ? fmtDate(connection.last_synced_at) : "Never"}
+                {connection.last_synced_at ? fmtDate(connection.last_synced_at) : "Never — click Sync Now"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => sync.mutate(connection.id)}
+              onClick={handleSync}
               disabled={sync.isPending}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 transition-colors min-h-[40px]"
             >
@@ -327,6 +346,12 @@ function ConnectedCard({ connection }) {
             </button>
           </div>
         </div>
+
+        {syncError && (
+          <div className="mx-5 mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-xs text-red-700 dark:text-red-400">
+            {syncError}
+          </div>
+        )}
       </div>
 
       {/* Drafts panel */}
@@ -540,17 +565,28 @@ function DisconnectedCard() {
 
 export default function BankConnectionPage() {
   const { data, isLoading } = useConnections();
+  const [showAdd, setShowAdd] = useState(false);
 
   const connections = data?.connections ?? [];
-  const activeConnection = connections[0] ?? null;
 
   return (
     <div className="max-w-3xl mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Banking</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Connect a bank account to automatically import and categorise your transactions.
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Banking</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Connect bank accounts to automatically import and categorise your transactions.
+          </p>
+        </div>
+        {connections.length > 0 && (
+          <button
+            onClick={() => setShowAdd((s) => !s)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors min-h-[40px]"
+          >
+            <Landmark size={15} aria-hidden="true" />
+            Add account
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -558,10 +594,20 @@ export default function BankConnectionPage() {
           <div className="h-28 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
           <div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
         </div>
-      ) : activeConnection ? (
-        <ConnectedCard connection={activeConnection} />
-      ) : (
+      ) : connections.length === 0 ? (
         <DisconnectedCard />
+      ) : (
+        <div className="space-y-4">
+          {connections.map((conn) => (
+            <ConnectedCard key={conn.id} connection={conn} />
+          ))}
+          {showAdd && (
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Add another account</h3>
+              <DisconnectedCard />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

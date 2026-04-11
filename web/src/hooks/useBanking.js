@@ -4,6 +4,7 @@ import {
   confirmAllDrafts,
   disconnectBank,
   getBankingStatus,
+  getConnectionDetails,
   getConnectUrl,
   getConnectUrlGocardless,
   listConnections,
@@ -18,6 +19,15 @@ export function useBankingStatus() {
     queryKey: ["banking-status"],
     queryFn: getBankingStatus,
     staleTime: 60_000,
+  });
+}
+
+export function useConnectionDetails(id) {
+  return useQuery({
+    queryKey: ["banking-connection-details", id],
+    queryFn: () => getConnectionDetails(id),
+    staleTime: 60_000,
+    enabled: !!id,
   });
 }
 
