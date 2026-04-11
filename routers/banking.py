@@ -879,27 +879,38 @@ def sync_transactions(
     user = _require_user(db, current_user)
     conn = _get_active_connection(db, user.id, connection_id)
 
+    logger.info(
+        "Starting sync for connection %s (provider=%s, account_id=%s)",
+        conn.id, conn.provider, conn.account_id,
+    )
+
     # Determine fetch window
     from_dt = conn.last_synced_at or (datetime.utcnow() - timedelta(days=90))
 
     # Fetch transactions — route to correct provider
     is_gocardless = (conn.provider or "").startswith("gocardless:")
-    if is_gocardless:
-        if not _gc_configured():
-            raise HTTPException(status_code=503, detail="GoCardless is not configured on this server")
-        raw_txns = _fetch_transactions_gocardless(conn.account_id, from_dt)
-    else:
-        if not _truelayer_configured():
-            raise HTTPException(status_code=503, detail="Open banking is not configured on this server")
-        try:
-            raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
-        except HTTPException as exc:
-            if exc.status_code == 502:
-                logger.info("Refreshing TrueLayer token for connection %s and retrying sync", conn.id)
-                _do_refresh_connection(db, conn)
+    try:
+        if is_gocardless:
+            if not _gc_configured():
+                raise HTTPException(status_code=503, detail="GoCardless is not configured on this server")
+            raw_txns = _fetch_transactions_gocardless(conn.account_id, from_dt)
+        else:
+            if not _truelayer_configured():
+                raise HTTPException(status_code=503, detail="Open banking is not configured on this server")
+            try:
                 raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
-            else:
-                raise
+            except HTTPException as exc:
+                if exc.status_code == 502:
+                    logger.info("Refreshing TrueLayer token for connection %s and retrying sync", conn.id)
+                    _do_refresh_connection(db, conn)
+                    raw_txns = _fetch_transactions(conn.access_token, conn.account_id, from_dt)
+                else:
+                    raise
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected error during sync for connection %s: %s", conn.id, exc)
+        raise HTTPException(status_code=500, detail=f"Sync failed unexpectedly: {type(exc).__name__}: {exc}")
 
     # Collect existing external IDs for deduplication
     existing_txns = (
