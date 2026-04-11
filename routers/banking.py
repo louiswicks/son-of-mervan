@@ -217,8 +217,9 @@ def banking_callback(
         resp.raise_for_status()
         tokens = resp.json()
     except httpx.HTTPStatusError as exc:
-        logger.error("TrueLayer token exchange failed: %s", exc.response.text)
-        raise HTTPException(status_code=502, detail="Token exchange with TrueLayer failed")
+        error_body = exc.response.text
+        logger.error("TrueLayer token exchange failed (status=%s): %s", exc.response.status_code, error_body)
+        raise HTTPException(status_code=502, detail=f"Token exchange with TrueLayer failed: {error_body}")
     except httpx.RequestError as exc:
         logger.error("TrueLayer token exchange network error: %s", exc)
         raise HTTPException(status_code=502, detail="Could not reach TrueLayer")
