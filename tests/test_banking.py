@@ -200,8 +200,8 @@ class TestCallback:
             )
         assert r.status_code == 503
 
-    def test_second_callback_updates_existing_connection(self, client, db, verified_user):
-        """A second callback upserts instead of creating a duplicate connection."""
+    def test_second_callback_creates_additional_connection(self, client, db, verified_user):
+        """A second callback creates an additional connection (multiple accounts supported)."""
         _make_connection(db, verified_user, access_token="old_token")
         state = _make_state(verified_user.id)
         token_resp = self._mock_token_response()
@@ -222,8 +222,10 @@ class TestCallback:
             )
 
         connections = db.query(BankConnection).filter(BankConnection.user_id == verified_user.id).all()
-        assert len(connections) == 1  # upserted, not duplicated
-        assert connections[0].access_token == "new_access_token"
+        assert len(connections) == 2  # additional connection created, not upserted
+        tokens = {c.access_token for c in connections}
+        assert "old_token" in tokens
+        assert "new_access_token" in tokens
 
 
 # ---------------------------------------------------------------------------
