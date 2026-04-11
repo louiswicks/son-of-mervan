@@ -12,6 +12,7 @@ import {
   Building2,
 } from "lucide-react";
 import {
+  useBankingStatus,
   useConnections,
   useConnectBank,
   useConnectGocardless,
@@ -433,86 +434,104 @@ function InstitutionPicker({ onSelect, isConnecting }) {
 // -------------------- Disconnected State --------------------
 
 function DisconnectedCard() {
+  const { data: status } = useBankingStatus();
   const connectGocardless = useConnectGocardless();
   const connectTruelayer = useConnectBank();
-  const [showSandbox, setShowSandbox] = useState(false);
+  const [showGocardless, setShowGocardless] = useState(false);
 
   const isConnecting = connectGocardless.isPending || connectTruelayer.isPending;
+  const tlAvailable = status?.truelayer_available ?? false;
+  const tlSandbox = status?.truelayer_sandbox ?? true;
+  const gcAvailable = status?.gocardless_available ?? false;
 
   return (
     <div className="space-y-4">
-      {/* GoCardless — primary option for real banks */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-            <Landmark size={20} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
+      {/* TrueLayer — primary option (live or sandbox) */}
+      {tlAvailable && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+              <Landmark size={20} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Connect your bank</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {tlSandbox
+                  ? "TrueLayer sandbox — mock data only"
+                  : "HSBC, Santander, Monzo, Barclays and more via TrueLayer"}
+              </p>
+            </div>
+            {tlSandbox && (
+              <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+                Sandbox
+              </span>
+            )}
           </div>
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">Connect your bank</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              HSBC, Santander, Monzo, and 100+ UK banks via GoCardless
-            </p>
-          </div>
+
+          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 mb-5">
+            {[
+              "Read-only — we can never move your money",
+              "Transactions need your approval before they're saved",
+              "You can disconnect at any time",
+              "Bank credentials handled securely by TrueLayer",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <CheckCircle size={13} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={() => connectTruelayer.mutate()}
+            disabled={isConnecting}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 transition-colors min-h-[48px] w-full justify-center"
+          >
+            <Landmark size={16} aria-hidden="true" />
+            {connectTruelayer.isPending
+              ? "Redirecting to bank…"
+              : tlSandbox
+              ? "Connect TrueLayer Sandbox"
+              : "Connect Bank"}
+          </button>
         </div>
+      )}
 
-        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 mb-4">
-          {[
-            "Read-only — we can never move your money",
-            "Transactions need your approval before they're saved",
-            "You can disconnect at any time",
-          ].map((item) => (
-            <li key={item} className="flex items-center gap-2">
-              <CheckCircle size={13} className="text-green-500 flex-shrink-0" aria-hidden="true" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-
-        <InstitutionPicker
-          onSelect={(institutionId) => connectGocardless.mutate(institutionId)}
-          isConnecting={isConnecting}
-        />
-
-        {connectGocardless.isPending && (
-          <p className="text-sm text-blue-600 dark:text-blue-400 text-center mt-3">
-            Redirecting to your bank…
-          </p>
-        )}
-      </div>
-
-      {/* TrueLayer — sandbox/testing */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-        <button
-          onClick={() => setShowSandbox((s) => !s)}
-          className="flex items-center justify-between w-full px-5 py-3.5 text-left"
-          aria-expanded={showSandbox}
-        >
-          <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <AlertTriangle size={14} className="text-yellow-500" aria-hidden="true" />
-            TrueLayer sandbox (mock data only)
-          </span>
-          {showSandbox ? (
-            <ChevronUp size={16} className="text-gray-400" aria-hidden="true" />
-          ) : (
-            <ChevronDown size={16} className="text-gray-400" aria-hidden="true" />
+      {/* GoCardless — shown if configured, or as a collapsed "coming soon" */}
+      {gcAvailable ? (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+          <button
+            onClick={() => setShowGocardless((s) => !s)}
+            className="flex items-center justify-between w-full px-5 py-3.5 text-left"
+            aria-expanded={showGocardless}
+          >
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Also connect via GoCardless
+            </span>
+            {showGocardless ? (
+              <ChevronUp size={16} className="text-gray-400" aria-hidden="true" />
+            ) : (
+              <ChevronDown size={16} className="text-gray-400" aria-hidden="true" />
+            )}
+          </button>
+          {showGocardless && (
+            <div className="px-5 pb-4">
+              <InstitutionPicker
+                onSelect={(institutionId) => connectGocardless.mutate(institutionId)}
+                isConnecting={isConnecting}
+              />
+            </div>
           )}
-        </button>
-        {showSandbox && (
-          <div className="px-5 pb-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Use TrueLayer to test the integration with fake transaction data. Not connected to any real bank.
-            </p>
-            <button
-              onClick={() => connectTruelayer.mutate()}
-              disabled={isConnecting}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 disabled:opacity-60 transition-colors"
-            >
-              <Landmark size={14} aria-hidden="true" />
-              {connectTruelayer.isPending ? "Redirecting…" : "Connect TrueLayer Sandbox"}
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : !tlAvailable ? (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-8 text-center">
+          <AlertTriangle size={32} className="text-yellow-400 mx-auto mb-3" aria-hidden="true" />
+          <p className="font-medium text-gray-900 dark:text-white mb-1">Banking not configured</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No banking provider is set up on this server. Contact the administrator.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

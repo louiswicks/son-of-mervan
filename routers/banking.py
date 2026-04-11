@@ -127,6 +127,20 @@ def _connection_response(conn: BankConnection) -> BankConnectionResponse:
 
 
 # ---------------------------------------------------------------------------
+# GET /banking/status — what providers are configured
+# ---------------------------------------------------------------------------
+
+@router.get("/status")
+def banking_status(current_user: str = Depends(verify_token)):
+    """Return which banking providers are available and whether TrueLayer is in sandbox mode."""
+    return {
+        "truelayer_available": _truelayer_configured(),
+        "truelayer_sandbox": settings.TRUELAYER_SANDBOX,
+        "gocardless_available": _gc_configured(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # GET /banking/connect
 # ---------------------------------------------------------------------------
 

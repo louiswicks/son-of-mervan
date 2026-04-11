@@ -1,5 +1,8 @@
 import client from "./client";
 
+export const getBankingStatus = () =>
+  client.get("/banking/status").then((r) => r.data);
+
 // TrueLayer
 export const getConnectUrl = () =>
   client.get("/banking/connect").then((r) => r.data);

@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import {
   confirmAllDrafts,
   disconnectBank,
+  getBankingStatus,
   getConnectUrl,
   getConnectUrlGocardless,
   listConnections,
@@ -11,6 +12,14 @@ import {
   reviewDraft,
   syncTransactions,
 } from "../api/banking";
+
+export function useBankingStatus() {
+  return useQuery({
+    queryKey: ["banking-status"],
+    queryFn: getBankingStatus,
+    staleTime: 60_000,
+  });
+}
 
 export function useConnections() {
   return useQuery({
