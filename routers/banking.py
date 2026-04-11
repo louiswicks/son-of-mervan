@@ -859,7 +859,7 @@ def _get_or_create_month(db: Session, user: User, month: str) -> MonthlyData:
 # ---------------------------------------------------------------------------
 
 @router.post("/sync", response_model=BankSyncResponse)
-@limiter.limit("1/5 minute")
+@limiter.limit("10/minute")
 def sync_transactions(
     request: Request,
     connection_id: int | None = Query(default=None, description="Specific connection ID to sync (optional)"),

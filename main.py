@@ -18,7 +18,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 import sentry_sdk
@@ -77,9 +76,25 @@ if settings.SENTRY_DSN:
 # -------------------- App Setup --------------------
 app = FastAPI(title="Son of Mervan - Budget API", version="1.0.0")
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 CORS_ORIGINS = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
+
+def _cors_aware_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Rate limit handler that includes CORS headers so browser clients get a readable 429."""
+    origin = request.headers.get("origin", "")
+    headers = {"Retry-After": str(exc.retry_after)} if hasattr(exc, "retry_after") else {}
+    if origin in CORS_ORIGINS or "*" in CORS_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+        headers=headers,
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _cors_aware_rate_limit_handler)
 
 app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
 app.add_middleware(RequestIDMiddleware)
@@ -398,7 +413,9 @@ def login(request: Request, response: Response, payload: LoginRequest, db: Sessi
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/calculate-budget")
+@limiter.limit("60/minute")
 async def calculate_budget(
+    request: Request,
     budget_data: BudgetRequest,
     commit: bool = Query(False),
     current_user: str = Depends(verify_token),
@@ -549,7 +566,9 @@ async def calculate_budget(
     return response_data
 
 @app.post("/monthly-tracker/{month}")
+@limiter.limit("60/minute")
 async def save_actuals(
+    request: Request,
     month: str = Path(..., description="Month in YYYY-MM format"),
     data: ActualBudgetRequest = Body(None),
     current_user: str = Depends(verify_token),
@@ -1070,7 +1089,9 @@ def _check_spending_anomaly(
 
 
 @app.put("/expenses/{expense_id}")
+@limiter.limit("120/minute")
 async def update_expense(
+    request: Request,
     expense_id: int = Path(...),
     data: ExpenseUpdateRequest = Body(...),
     current_user: str = Depends(verify_token),
@@ -1123,7 +1144,9 @@ async def update_expense(
 
 
 @app.delete("/expenses/{expense_id}", status_code=204)
+@limiter.limit("60/minute")
 async def delete_expense(
+    request: Request,
     expense_id: int = Path(...),
     current_user: str = Depends(verify_token),
     db: Session = Depends(get_db),
